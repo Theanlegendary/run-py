@@ -5774,9 +5774,31 @@ async def run_push(
             zone_mode = zone_key_arg.upper()
 
         else:
-            # plain "push" = 23 groups → uses default branch_code from config
-            # exclude any leftover remark tokens (already stripped above)
+            # plain "push" or "push <handle>" (e.g. "push SVAP001")
             target_handles = [arg.upper() for arg in raw_args if arg]
+            if target_handles and not zone_override_branch:
+                # Fast branch detection for specific handles
+                detected_branches = set()
+                for h in target_handles:
+                    b_found = None
+                    for zk, hlist in total_zones.items():
+                        if h in [x.upper() for x in hlist]:
+                            zb = zone_branches_map.get(zk, "")
+                            for b in zb.split(","):
+                                if b.strip() and h.startswith(b.strip()):
+                                    b_found = b.strip()
+                                    break
+                            if not b_found and zb:
+                                b_found = zb.split(",")[0].strip()
+                            break
+                    if not b_found:
+                        b_found = h[:3]
+                    if b_found:
+                        detected_branches.add(b_found)
+                if detected_branches:
+                    for mega in ["MEGA", "MEGA1", "DVCMEGA1"]:
+                        detected_branches.add(mega)
+                    zone_override_branch = ",".join(sorted(detected_branches))
 
         downloader.download_detail(cfg["api"], src, branch_code=zone_override_branch, force_refresh=force_refresh)
         

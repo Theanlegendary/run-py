@@ -409,8 +409,14 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
     else:
         hub_title = "MEGA (Status 306/309)"
 
-    # 1. Top Banner Row 1
+    tot_col = 2 + len(day_keys)
+    fee_col = tot_col + 1
+    cod_col = fee_col + 1
+    urg_col = cod_col + 1
+
+    # 1. Top Banner Row 1 (Merged across all columns to prevent text clipping)
     stamp_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=urg_col)
     ws.cell(1, 1, f"DAILY REPORT — {hub_title}  {stamp_str}").font = banner_font
     ws.cell(1, 1).fill = banner_fill
     ws.cell(1, 1).alignment = _LEFT
@@ -433,11 +439,6 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
         cell.fill = hdr_navy
         cell.border = _BORDER
         cell.alignment = _CENTER
-
-    tot_col = 2 + len(day_keys)
-    fee_col = tot_col + 1
-    cod_col = fee_col + 1
-    urg_col = cod_col + 1
 
     c_tot_hdr = ws.cell(2, tot_col, "TOTAL")
     c_tot_hdr.font = hdr_font

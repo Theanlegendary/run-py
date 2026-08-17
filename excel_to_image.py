@@ -79,16 +79,28 @@ def _cell_align(cell):
 
 
 _WIN_FONTS = "C:/Windows/Fonts"
+_LINUX_FONT_DIRS = [
+    "/usr/share/fonts/truetype/dejavu",
+    "/usr/share/fonts/truetype/liberation",
+    "/usr/share/fonts/truetype/freefont",
+    "/usr/share/fonts/truetype/ubuntu",
+    "/usr/share/fonts/truetype",
+    "/usr/share/fonts",
+]
 
 def _has_khmer(text: str) -> bool:
     """Return True if text contains any Khmer Unicode characters (U+1780–U+17FF)."""
     return any('\u1780' <= ch <= '\u17FF' for ch in text)
 
 def _load_font(size, bold=False):
-    # Try system paths first
-    for name in (['arialbd.ttf', 'Arial Bold.ttf', 'DejaVuSans-Bold.ttf'] if bold
-                 else ['arial.ttf', 'Arial.ttf', 'DejaVuSans.ttf']):
-        for prefix in (f"{_WIN_FONTS}/", ""):
+    candidates = (
+        ['arialbd.ttf', 'Arial Bold.ttf', 'DejaVuSans-Bold.ttf', 'LiberationSans-Bold.ttf', 'FreeSansBold.ttf', 'Ubuntu-B.ttf']
+        if bold else
+        ['arial.ttf', 'Arial.ttf', 'DejaVuSans.ttf', 'LiberationSans-Regular.ttf', 'FreeSans.ttf', 'Ubuntu-R.ttf']
+    )
+    prefixes = [f"{_WIN_FONTS}/", ""] + [f"{d}/" for d in _LINUX_FONT_DIRS] + ["fonts/"]
+    for name in candidates:
+        for prefix in prefixes:
             try:
                 return ImageFont.truetype(prefix + name, size)
             except Exception:
@@ -98,7 +110,7 @@ def _load_font(size, bold=False):
 def _load_khmer_font(size):
     """Load Khmer OS Battambang font for Khmer text."""
     for name in ['KhmerOSbattambang.ttf', 'KhmerOSsiemreap.ttf', 'KhmerOScontent.ttf', 'KhmerOS.ttf']:
-        for prefix in (f"{_WIN_FONTS}/", ""):
+        for prefix in (f"{_WIN_FONTS}/", "") + tuple(f"{d}/" for d in _LINUX_FONT_DIRS) + ("fonts/",):
             try:
                 return ImageFont.truetype(prefix + name, size)
             except Exception:
