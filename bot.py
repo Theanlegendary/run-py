@@ -31,8 +31,13 @@ from telegram.ext import (Application, MessageHandler, CommandHandler,
 from telegram.error import RetryAfter, NetworkError, Forbidden
 
 class WebAppHandler(BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html; charset=utf-8')
+        self.end_headers()
+
     def do_GET(self):
-        if self.path == '/' or self.path.startswith('/?'):
+        if self.path == '/' or self.path.startswith('/?') or self.path == '/healthz':
             self.send_response(200)
             self.send_header('Content-type', 'text/html; charset=utf-8')
             self.end_headers()
