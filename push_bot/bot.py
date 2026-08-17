@@ -1019,7 +1019,7 @@ async def forward_result_to_groups(context: ContextTypes.DEFAULT_TYPE, payload):
 
 @user_guard
 async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Stop forwarding to groups. Bot still responds to push for the sender."""
+    """Stop forwarding to groups. Bot will NEVER send auto reports to groups."""
     await delete_group_command(update, context)
     cfg = load_config()
     cfg["telegram"]["paused"] = True
@@ -1027,10 +1027,11 @@ async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await private_or_current_reply(
         update,
         context,
-        "⏸ Bot PAUSED.\n"
-        "Forwarding to groups is disabled.\n"
-        "You can still use 'push' to test — reports will only be sent to you.\n"
-        "Use /resume to re-enable group forwarding."
+        "🛑 Bot STOPPED / PAUSED.\n\n"
+        "• Group forwarding & auto-pushes are completely DISABLED.\n"
+        "• No messages or reports will be sent to any Telegram groups.\n"
+        "• You can safely test commands privately (reports only sent to you).\n\n"
+        "👉 Use /start or /resume to enable group forwarding again."
     )
 
 
@@ -1045,8 +1046,10 @@ async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await private_or_current_reply(
         update,
         context,
-        f"▶️ Bot RESUMED.\n"
-        f"Forwarding to {len(groups)} group(s) is enabled again."
+        f"▶️ Bot STARTED / RESUMED.\n\n"
+        f"• Group forwarding is ENABLED for {len(groups)} group(s).\n"
+        f"• Automated pushes and live group broadcasts are active.\n\n"
+        f"👉 Use /stop or /pause anytime to stop sending to groups."
     )
 
 
@@ -1383,9 +1386,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "`/delaylist` — List all delayed bills and resume dates\n"
         "\n"
         "⚙️ *Control*\n"
-        "`/pause` — Stop forwarding to groups (bot still works for YOU to test)\n"
-        "`/resume` — Re-enable forwarding to groups\n"
-        "`/status` — Show current state (paused/active, mode, groups)\n"
+        "`/stop` or `/pause` — Completely stop sending to groups (safe test mode)\n"
+        "`/start` or `/resume` — Start / Re-enable auto-pushes & group forwarding\n"
+        "`/status` — Show current state (stopped/active, mode, groups)\n"
         "\n"
         "🖼 *Display*\n"
         "`/mode` — Toggle image layout: LONG (stacked) ↔ WIDE (side by side)\n"
@@ -1398,7 +1401,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "❓ *Help*\n"
         "`/help` — Show this message\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "*Tip:* Use `/pause` before testing so groups don't get spammed."
+        "*Tip:* Use `/stop` anytime so groups don't receive auto or test messages."
     )
     await update.message.reply_text(text, parse_mode="Markdown")
 
@@ -7045,7 +7048,9 @@ def main():
     app.add_handler(CommandHandler("vs2",        cmd_vs2))
     app.add_handler(CommandHandler("help",       cmd_help))
     app.add_handler(CommandHandler("pause",      cmd_pause))
+    app.add_handler(CommandHandler("stop",       cmd_pause))
     app.add_handler(CommandHandler("resume",     cmd_resume))
+    app.add_handler(CommandHandler("start",      cmd_resume))
     app.add_handler(CommandHandler("status",     cmd_status))
     app.add_handler(CommandHandler("statues",    cmd_statues))
     app.add_handler(CommandHandler("statuses",   cmd_statues))
