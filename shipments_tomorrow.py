@@ -3,12 +3,14 @@ import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from datetime import datetime
 
-def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
+def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1", start_time="00:00", end_time="06:00"):
     """
     Builds CEO-Level Executive SHIPMENTS TOMORROW REPORT Excel file:
       - Sheet 1: SHIPMENTS TOMORROW REPORT (Left main table + Right Executive Summary table)
       - Sheet 2: base (Raw order dataset)
+    Filters orders created on current date between start_time (00:00) and end_time (06:00).
     """
+    import pandas as pd
     wb_src = openpyxl.load_workbook(src_xlsx, data_only=True)
     ws_src = wb_src.active
 
@@ -67,27 +69,40 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
         except (ValueError, TypeError):
             cod = 0.0
 
-        # Date Filter: Current date (today) only
+        # Date & Time Filter: Today between start_time (00:00) and end_time (06:00)
         today_str = datetime.now().strftime("%Y%m%d")
         val_created = ws_src.cell(r, ci_created).value
         row_date_str = ""
+        row_dt = None
+
         if isinstance(val_created, datetime):
             row_date_str = val_created.strftime("%Y%m%d")
+            row_dt = val_created
         elif val_created:
             s = str(val_created).strip()
-            import re
-            m_d = re.search(r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})", s)
-            if m_d:
-                day, month, year = m_d.group(1), m_d.group(2), m_d.group(3)
-                row_date_str = f"{int(year):04d}{int(month):02d}{int(day):02d}"
-            else:
-                m_iso = re.search(r"(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})", s)
-                if m_iso:
-                    year, month, day = m_iso.group(1), m_iso.group(2), m_iso.group(3)
-                    row_date_str = f"{int(year):04d}{int(month):02d}{int(day):02d}"
+            try:
+                parsed_dt = pd.to_datetime(s, dayfirst=True, format='mixed', errors='coerce')
+                if pd.notna(parsed_dt):
+                    row_date_str = parsed_dt.strftime("%Y%m%d")
+                    row_dt = parsed_dt.to_pydatetime()
+            except Exception:
+                pass
 
         if row_date_str and row_date_str != today_str:
             continue
+
+        # Time interval check (00:00 to 06:00)
+        if row_dt is not None and start_time and end_time:
+            try:
+                st_h, st_m = [int(x) for x in start_time.split(":")]
+                et_h, et_m = [int(x) for x in end_time.split(":")]
+                row_minutes = row_dt.hour * 60 + row_dt.minute
+                start_minutes = st_h * 60 + st_m
+                end_minutes = et_h * 60 + et_m
+                if not (start_minutes <= row_minutes <= end_minutes):
+                    continue
+            except Exception:
+                pass
 
         # Filter active transit orders (Status 306, 309, 302, 310, 311)
         sc = status.split(" - ")[0].split()[0] if status else ""

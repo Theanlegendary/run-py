@@ -1437,7 +1437,7 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             log.warning("Could not render executive summary image: %s", e_img)
 
 
-        caption = f"🚚 *SHIPMENTS TOMORROW REPORT ({target_label})*\n📦 Total Bills: `{bills}`\n⚖️ Total Weight: `{weight/1000:,.2f} kg`"
+        caption = f"🚚 *SHIPMENTS TOMORROW REPORT ({target_label} | 00:00 - 06:00)*\n📦 Total Bills: `{bills}`\n⚖️ Total Weight: `{weight/1000:,.2f} kg`"
         await send_requester_document(update, context, out_xlsx, filename=os.path.basename(out_xlsx), caption=caption)
 
 
@@ -1454,8 +1454,8 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 z_name = f"Zone {z_idx}"
                 z_clean = f"zone{z_idx}"
                 z_xlsx = os.path.join(tmpdir, f"SHIPMENTS_TOMORROW_REPORT_{stamp}_{z_name.replace(' ', '_')}.xlsx")
-                z_bills, z_weight = shipments_tomorrow.build_shipments_tomorrow_report(src, z_xlsx, target_label=z_name)
-                z_caption = f"🚚 *SHIPMENTS TOMORROW REPORT ({z_name})*\n📦 Total Bills: `{z_bills}`\n⚖️ Total Weight: `{z_weight/1000:,.2f} kg`"
+                z_bills, z_weight = shipments_tomorrow.build_shipments_tomorrow_report(src, z_xlsx, target_label=z_name, start_time="00:00", end_time="06:00")
+                z_caption = f"🚚 *SHIPMENTS TOMORROW REPORT ({z_name} | 00:00 - 06:00)*\n📦 Total Bills: `{z_bills}`\n⚖️ Total Weight: `{z_weight/1000:,.2f} kg`"
 
                 for gid, zkey in zone_fwd_map.items():
                     if zkey.lower() == z_clean:
