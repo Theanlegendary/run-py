@@ -12,23 +12,23 @@ from openpyxl.utils import get_column_letter
 from PIL import Image, ImageDraw, ImageFont
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-SCALE       = 3             # Increased from 2 to 3 for HD resolution quality
+SCALE       = 3             # HD resolution quality
 
-FONT_SIZE   = 10 * SCALE
-ROW_H       = 22 * SCALE    # px — uniform row height
-PAD_X       = 8 * SCALE     # horizontal text padding
+FONT_SIZE   = 11 * SCALE
+ROW_H       = 26 * SCALE    # px — spacious row height
+PAD_X       = 10 * SCALE    # horizontal text padding
 
 # Fixed pixel widths per column type
-PX_DAY      = 34 * SCALE    # day columns "01"-"31"  — all same size
-PX_ZONE     = 72 * SCALE    # ZONE
-PX_GT       = 140 * SCALE   # Grand Total
-PX_MIN      = 72 * SCALE    # minimum for auto-fit text columns (ORDER ID, names etc.)
-PX_MAX      = 230 * SCALE   # maximum for auto-fit
-PX_GAP      = 6 * SCALE     # gap/empty separator columns
+PX_DAY      = 36 * SCALE    # day columns "01"-"31"
+PX_ZONE     = 85 * SCALE    # ZONE
+PX_GT       = 150 * SCALE   # Grand Total
+PX_MIN      = 80 * SCALE    # minimum for auto-fit text columns
+PX_MAX      = 260 * SCALE   # maximum for auto-fit
+PX_GAP      = 8 * SCALE     # gap/empty separator columns
 
 BG_WHITE    = (255, 255, 255)
-BORDER_COL  = (190, 190, 190)
-TEXT_DEF    = (0,   0,   0)
+BORDER_COL  = (218, 222, 229) # Clean, subtle modern grid border
+TEXT_DEF    = (15,  23,  42)  # Modern dark slate
 
 
 def _hex(h):
@@ -93,6 +93,19 @@ def _has_khmer(text: str) -> bool:
     return any('\u1780' <= ch <= '\u17FF' for ch in text)
 
 def _load_font(size, bold=False):
+    import os
+    here = os.path.dirname(os.path.abspath(__file__))
+    bundled_fonts = [
+        os.path.join(here, "fonts", "arialbd.ttf" if bold else "arial.ttf"),
+        os.path.join(here, "fonts", "calibrib.ttf" if bold else "calibri.ttf"),
+    ]
+    for b_font in bundled_fonts:
+        if os.path.exists(b_font):
+            try:
+                return ImageFont.truetype(b_font, size)
+            except Exception:
+                pass
+
     candidates = (
         ['arialbd.ttf', 'Arial Bold.ttf', 'DejaVuSans-Bold.ttf', 'LiberationSans-Bold.ttf', 'FreeSansBold.ttf', 'Ubuntu-B.ttf']
         if bold else
@@ -109,10 +122,18 @@ def _load_font(size, bold=False):
 
 def _load_khmer_font(size):
     """Load Khmer OS Battambang font for Khmer text."""
-    for name in ['KhmerOSbattambang.ttf', 'KhmerOSsiemreap.ttf', 'KhmerOScontent.ttf', 'KhmerOS.ttf']:
-        for prefix in (f"{_WIN_FONTS}/", "") + tuple(f"{d}/" for d in _LINUX_FONT_DIRS) + ("fonts/",):
+    import os
+    here = os.path.dirname(os.path.abspath(__file__))
+    for k_name in ['KhmerOSbattambang.ttf', 'KhmerOSsiemreap.ttf', 'KhmerOScontent.ttf', 'KhmerOS.ttf']:
+        k_path = os.path.join(here, "fonts", k_name)
+        if os.path.exists(k_path):
             try:
-                return ImageFont.truetype(prefix + name, size)
+                return ImageFont.truetype(k_path, size)
+            except Exception:
+                pass
+        for prefix in (f"{_WIN_FONTS}/", "") + tuple(f"{d}/" for d in _LINUX_FONT_DIRS):
+            try:
+                return ImageFont.truetype(prefix + k_name, size)
             except Exception:
                 pass
     return _load_font(size, bold=False)
@@ -120,7 +141,6 @@ def _load_khmer_font(size):
 def _get_font(text: str, size: int, bold: bool = False):
     """Return Khmer font if text has Khmer chars, otherwise return normal font."""
     if _has_khmer(text):
-        # Khmer fonts are slightly smaller, boost size dynamically based on scale
         return _load_khmer_font(size + int(1.5 * SCALE))
     return _load_font(size, bold)
 
