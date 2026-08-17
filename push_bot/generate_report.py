@@ -1045,11 +1045,10 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
     else:
         df['STATUS_CODE'] = ''
 
-    # ========== LIVE API STATUS SYNC (FIX FOR METFONE REPORT EXPORT LAG) ==========
+    # ========== LIVE API STATUS SYNC (OPTIONAL / LOCAL LOGS ONLY) ==========
+    completed_from_sync = set()
     try:
-        completed_from_sync = set()
-        
-        # 1. Check local tracking log Excel files
+        # Check local tracking log Excel files if present
         for f_log in glob.glob('*Tracking*Status*Logs*.xlsx') + glob.glob('Bill_Tracking*.xlsx'):
             try:
                 xl_log = pd.ExcelFile(f_log)
@@ -1065,53 +1064,8 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
                                     completed_from_sync.add(normalize_id(oid_str))
             except Exception:
                 pass
-
-        # 2. Query Live API multithreading for any candidate pending orders
-        token = cfg.get('api', {}).get('bearer_token', '')
-        if token:
-            headers = {'Authorization': f'Bearer {token}'}
-            def _check_live_tracking(oid):
-                try:
-                    url_tr = 'https://gw-express.metfone.com.kh/tms-tracking/api/v1/order-tracking'
-                    r_tr = requests.get(url_tr, params={'order_id': str(oid)}, headers=headers, timeout=4)
-                    if r_tr.status_code == 200:
-                        data_tr = r_tr.json()
-                        top_st = str(data_tr.get('status', '') or data_tr.get('statusName', '') or '').upper()
-                        if '410' in top_st or '520' in top_st or 'DELIVERED' in top_st:
-                            return normalize_id(oid)
-
-                        trips_tr = data_tr.get('trackingTrips', [])
-                        for trip in trips_tr:
-                            st_tr = str(trip.get('status', '') or '').upper()
-                            st_name = str(trip.get('statusName', '') or '').upper()
-                            desc_tr = str(trip.get('desc', '') or '').upper()
-                            if '410' in st_tr or '520' in st_tr or '410' in st_name or '520' in st_name or 'DELIVERED' in desc_tr or 'DELIVERED' in st_name or 'GIAO THÀNH CÔNG' in desc_tr or 'SHIPPED' in desc_tr:
-                                return normalize_id(oid)
-                except Exception:
-                    pass
-                return None
-
-            candidate_ids = []
-            if 'ORDER ID' in df.columns and 'STATUS_CODE' in df.columns:
-                for oid, sc_val in zip(df['ORDER ID'], df['STATUS_CODE']):
-                    if pd.notna(oid) and pd.notna(sc_val):
-                        if str(sc_val).strip() in ('402', '306', '310', '311', '309', '400', '401', '420', '470', '472', '480', '500'):
-                            candidate_ids.append(str(oid).strip())
-
-            if candidate_ids:
-                with ThreadPoolExecutor(max_workers=20) as executor:
-                    for comp_oid in executor.map(_check_live_tracking, candidate_ids):
-                        if comp_oid:
-                            completed_from_sync.add(comp_oid)
-
-        if completed_from_sync and 'ORDER ID' in df.columns:
-            for i in range(len(df)):
-                oid_norm = normalize_id(df.iloc[i]['ORDER ID'])
-                if oid_norm in completed_from_sync:
-                    df.iloc[i, df.columns.get_loc('CURRENT STATUS')] = '410 - Giao thành công'
-                    df.iloc[i, df.columns.get_loc('STATUS_CODE')] = '410'
     except Exception as e_sync:
-        print(f"⚠️ Live API Status Sync Warning: {e_sync}")
+        pass
     # ========== END LIVE API STATUS SYNC ==========
 
     # ========== STRICT EXCLUDED STATUS SCRAPING / PRE-FILTERING ==========
