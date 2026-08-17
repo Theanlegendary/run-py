@@ -3,4 +3,5 @@ requests
 openpyxl
 pandas
 Pillow
-pywin32
+apscheduler
+pywin32; sys_platform == 'win32'

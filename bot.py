@@ -121,8 +121,9 @@ class WebAppHandler(BaseHTTPRequestHandler):
 
 def start_webapp_server():
     try:
-        server = HTTPServer(('0.0.0.0', 8080), WebAppHandler)
-        log.info("Telegram WebApp Server listening on port 8080...")
+        port = int(os.environ.get('PORT', 8080))
+        server = HTTPServer(('0.0.0.0', port), WebAppHandler)
+        log.info(f"Telegram WebApp Server listening on port {port}...")
         server.serve_forever()
     except Exception as e:
         log.error(f"Failed to start Telegram WebApp Server: {e}")

@@ -3,5 +3,5 @@ requests
 openpyxl
 pandas
 Pillow
-# Neu dung proxy SOCKS (telegram.proxy_url = "socks5://..."), can them:
-#   pip install "python-telegram-bot[socks]==20.7"
+apscheduler
+pywin32; sys_platform == 'win32'
