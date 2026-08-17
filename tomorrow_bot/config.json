@@ -1,0 +1,762 @@
+{
+  "telegram": {
+    "bot_token": "8988179337:AAGJsJ9XbVMpxbQTDSJ-2zeLrl0Nt8LWiCQ",
+    "keyword": "push",
+    "allowed_chat_ids": [],
+    "allowed_user_ids": [],
+    "proxy_url": "",
+    "webapp_url": "http://localhost:8080",
+    "forward_mapping": {
+      "-1003929665530": [
+        "PNPP001"
+      ],
+      "-1003951534578": [
+        "PNPP002"
+      ],
+      "-5280197895": [
+        "PNPP003"
+      ],
+      "-1003704589057": [
+        "PNPP004"
+      ],
+      "-5154787193": [
+        "PNPP005"
+      ],
+      "-5018087305": [
+        "PNPP006"
+      ],
+      "-1003897834323": [
+        "PNPP007"
+      ],
+      "-1004456581514": [
+        "PNPP008"
+      ],
+      "-1004340849795": [
+        "PNPP009"
+      ],
+      "-5221155152": [
+        "PNPP010"
+      ],
+      "-5254303211": [
+        "PNPP011"
+      ],
+      "-5212661819": [
+        "PNPP012"
+      ],
+      "-1003728156246": [
+        "PNPP013"
+      ],
+      "-5216161772": [
+        "PNPP014"
+      ],
+      "-1003736417202": [
+        "SIEP001"
+      ],
+      "-1003984366062": [
+        "PRHP001"
+      ],
+      "-1004436251830": [
+        "ODDP001"
+      ],
+      "-1003906802367": [
+        "THOP001"
+      ],
+      "-1004342440561": [
+        "SIHP001"
+      ],
+      "-1004405421702": [
+        "KOHP001"
+      ],
+      "-1004418923006": [
+        "CHHP001"
+      ],
+      "-1004473573888": [
+        "TAKP001"
+      ],
+      "-1004498223729": [
+        "PURP001"
+      ],
+      "-1003950095969": [
+        "BANP001"
+      ],
+      "-1003539358962": [
+        "TBKP001"
+      ],
+      "-1004293472089": [
+        "CHAP001"
+      ],
+      "-5230030125": [
+        "KRAP001"
+      ],
+      "-1003980820463": [
+        "BATP001"
+      ],
+      "-1004430161132": [
+        "SPEP001"
+      ],
+      "-1004432032933": [
+        "STUP001"
+      ],
+      "-1004391646622": [
+        "ROTP001"
+      ],
+      "-1004437427485": [
+        "MONP001"
+      ],
+      "-1003970979375": [
+        "KANP001"
+      ],
+      "-1004440737878": [
+        "PREP001"
+      ],
+      "-1003879191883": [
+        "KAMP001"
+      ],
+      "-1003931498313": [
+        "SVAP001"
+      ]
+    },
+    "image_mode": "long",
+    "paused": false
+  },
+  "api": {
+    "url": "https://gw-express.metfone.com.kh/tms-report/api/v1/reports/stages/export-detail",
+    "bearer_token": "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJ5M3NNemZLdUIweTFwOVlPSWFxT3VwMGFaQlhtOEFuclBILURlUU04NnhZIn0.eyJleHAiOjE3ODE3NjcxNDIsImlhdCI6MTc4MTY4MDc0MiwianRpIjoiNWVlNDkwM2EtYjdiMy00Y2JlLWFiOWItM2U5MzJjZThiMTg3IiwiaXNzIjoiaHR0cHM6Ly9zc28xLWV4cHJlc3MubWV0Zm9uZS5jb20ua2gvcmVhbG1zL3RtcyIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiJhNzMwNGM1Yy03NDk2LTQ2NjQtYmMzNC05NjhhZjU3MmZjZmIiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJUTVNfQU5EUk9JRCIsInNlc3Npb25fc3RhdGUiOiI2Y2E0Yjg0Ni02ZjMzLTQyZjMtYWM1NS05NTNkMzVlYjUxYWIiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsiZGVmYXVsdC1yb2xlcy10bXMiLCJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiIiLCJzaWQiOiI2Y2E0Yjg0Ni02ZjMzLTQyZjMtYWM1NS05NTNkMzVlYjUxYWIiLCJjdGgtcG9zdC1wYXRoIjoiXzFfMl8xMzdfMjIxXyIsImN0aC10ZW5hbnQtaWQiOiIyIiwiY3RoLWJyYW5jaC1jb2RlIjoiQkFOIiwiY3RoLXNjb3BlIjoiVlRQX0NBTV9CQU5QMDAxIiwiY3RoLXRlbmFudC1jb2RlIjoiVlRQX0NBTSIsImN0aC1mdWxsLW5hbWUiOiJUbWQxZVdWdUlGWmhiaUJDWVc0PSIsImN0aC1wYXNzd29yZC1jaGFuZ2VkIjoidHJ1ZSIsImN0aC1wb3N0LWNvZGUiOiJCQU5QMDAxIiwiY3RoLXVzZXItaWQiOiIxNDkiLCJjdGgtcGhvbmUiOiIwNzE4Njg0NzE1OTk5IiwiY3RoLXJvbGUtY29kZSI6IkRDIiwiY3RoLXVzZXJuYW1lIjoiMjQwNDk5IiwiY3RoLWJyYW5jaC1wYXRoIjoiXzFfMl8xMzdfIiwiY3RoLXJvbGUtaWQiOiIxIiwiY3RoLWJyYW5jaC1pZCI6IjEzNyIsImN0aC1wb3N0LWlkIjoiMjIxIn0.p4E5DGwLiQMMhmpTefOWUhqqb8qfbL-ZZyDD0AcEmluhcXtyHhWpck1qD7WFoDgs9xOhjHfg5EA6dkQH4I13jjy0NEu3OdRghzKlOOE1kBlZizEeFHy76qCdtARroSOPLG--GVKkgCq2cdGv4wiS7ydaakqDWny7FqbOuOHgOsHDTMUoxDV6Ho7DhZxIox_eUf-31pjiJZp4iMZeQrhjZDLnkW7yV1vhe-OsMCy2KYbUNNIHLBuvqDMOfoxszUdNEDDgKArsyBIHkqNxatHm_G4rLlxo5LQBr7YHJYlDGnbVeOR-QRlfBjx4QB3h7E0tJ_SR0tPB7HClMfvlaTLC5w",
+    "x_client_id": "TMS_ANDROID",
+    "branch_code": "MEGA,MEGA1,DVCMEGA1,PRE,PNP,SVA,KAN,KAM,KOH,SIH,SPE,TAK,BAN,BAT,CHH,PUR,SIE,PRH,ODD,THO,CHA,KRA,TBK,ROT,MON,STU",
+    "date_range_days": 30,
+    "cache_minutes": 0
+  },
+  "pivot": {
+    "title": "PENDING BILL CHECK",
+    "classification": "Post office",
+    "pending_status_codes": [
+      "110"
+    ],
+    "exclude_test": true,
+    "test_keywords": [
+      "test"
+    ]
+  },
+  "test_receipts": {
+    "enabled": true,
+    "path": "C:/Users/DELL/Downloads/Telegram Desktop/DataPusher 2/DataPusher/push_bot/test.xlsx"
+  },
+  "ask_app_actions": {
+    "default": {
+      "actor": "Responsible post office",
+      "app": "TMS / mExpress App",
+      "tab": "Current task list",
+      "function": "Scan order QR/barcode",
+      "action": "Open the matching task list for this status, then scan the parcel to update it."
+    },
+    "110": {
+      "tab": "Pickup",
+      "function": "Pick up / receive parcel",
+      "action": "Open Pickup tab and scan the parcel to receive it."
+    },
+    "120": {
+      "tab": "Pickup",
+      "function": "Pick up / receive parcel",
+      "action": "Open Pickup tab and scan the parcel to continue pickup."
+    },
+    "200": {
+      "tab": "Pickup",
+      "function": "Handover / send to transit",
+      "action": "Open Pickup or Handover tab and scan the parcel to move it forward."
+    },
+    "210": {
+      "tab": "Transit",
+      "function": "Transit scan",
+      "action": "Open Transit tab and scan the parcel to update transit status."
+    },
+    "302": {
+      "tab": "Transit",
+      "function": "Receive at post office",
+      "action": "Open Transit/Receiving tab and scan the parcel as received."
+    },
+    "306": {
+      "tab": "Transit",
+      "function": "Arrive / depart hub",
+      "action": "Open Hub/Transit tab and scan the parcel to update hub movement."
+    },
+    "309": {
+      "tab": "Transit",
+      "function": "Receive at destination",
+      "action": "Open Receiving tab and scan the parcel at destination."
+    },
+    "310": {
+      "tab": "Transit",
+      "function": "Receive at post office",
+      "action": "Open Receiving tab and scan the parcel as received."
+    },
+    "311": {
+      "tab": "Transit",
+      "function": "Dispatch / transfer",
+      "action": "Open Dispatch/Transfer tab and scan the parcel to move it forward."
+    },
+    "300": {
+      "tab": "Transit",
+      "function": "Transit update",
+      "action": "Open Transit tab and scan the parcel to update movement."
+    },
+    "500": {
+      "tab": "Return",
+      "function": "Return parcel processing",
+      "action": "Open Return/Pending tab and scan/update the parcel for return processing."
+    },
+    "472": {
+      "tab": "Storage",
+      "function": "Storage / hold parcel",
+      "action": "Open Storage/Hold tab and update or release the parcel based on the next instruction."
+    },
+    "480": {
+      "tab": "Delivery",
+      "function": "Change address handling",
+      "action": "Open Delivery/Change address task, confirm the new address, then reassign or update delivery."
+    },
+    "400": {
+      "actor": "Assigned delivery staff",
+      "app": "mExpress Delivery App",
+      "tab": "Delivery",
+      "function": "Assigned to deliver - complete delivery",
+      "action": "Open Delivery tab, find the assigned order, then scan/update it after delivery is completed."
+    },
+    "401": {
+      "actor": "Receiver/customer",
+      "app": "mExpress App",
+      "tab": "Delivery",
+      "function": "QR payment / delivery completion",
+      "action": "Open Delivery or parcel detail, scan the QR code, then pay/complete delivery."
+    },
+    "402": {
+      "actor": "Receiver/customer",
+      "app": "mExpress App",
+      "tab": "Delivery",
+      "function": "QR payment / delivery completion",
+      "action": "Open Delivery or parcel detail, scan the QR code, then pay/complete delivery."
+    },
+    "420": {
+      "actor": "Receiver/customer",
+      "app": "mExpress App",
+      "tab": "Store pickup",
+      "function": "QR payment / customer pickup scan",
+      "action": "Open Store pickup or parcel detail, scan the QR code, then pay/complete pickup."
+    },
+    "430": {
+      "actor": "Receiver/customer",
+      "app": "mExpress App",
+      "tab": "Redelivery",
+      "function": "QR payment / redelivery completion",
+      "action": "Open Redelivery or parcel detail, scan the QR code, then pay/complete redelivery."
+    },
+    "460": {
+      "actor": "Receiver/customer",
+      "app": "mExpress App",
+      "tab": "Redelivery",
+      "function": "QR payment / redelivery completion",
+      "action": "Open Redelivery or parcel detail, scan the QR code, then pay/complete redelivery."
+    },
+    "410": {
+      "actor": "No action needed",
+      "app": "mExpress App",
+      "tab": "History / completed",
+      "function": "Completed order",
+      "action": "Order is already completed."
+    },
+    "201": {
+      "actor": "No action needed",
+      "app": "mExpress App",
+      "tab": "History / cancelled",
+      "function": "Cancelled order",
+      "action": "Order is cancelled/closed. No next delivery scan is required."
+    },
+    "512": {
+      "actor": "Responsible post office",
+      "app": "TMS / mExpress App",
+      "tab": "Return",
+      "function": "Return exception handling",
+      "action": "Status 512 was found in export data, but the exact label was not available. Check the latest tracking note and handle it in the Return/Exception task list."
+    },
+    "520": {
+      "actor": "No action needed",
+      "app": "mExpress App",
+      "tab": "History / returned",
+      "function": "Returned order",
+      "action": "Order has been returned. No next delivery scan is required."
+    },
+    "540": {
+      "actor": "Responsible post office",
+      "app": "TMS / mExpress App",
+      "tab": "Return",
+      "function": "Return failed handling",
+      "action": "Open Return/Exception tab and resolve why the parcel could not be returned."
+    }
+  },
+  "ask_status_flow": {
+    "default": {
+      "meaning": "Status is not mapped yet.",
+      "next_statuses": [],
+      "next_flow": "Check the latest tracking note and confirm the correct next scan with the responsible post office."
+    },
+    "-99": {
+      "meaning": "Registered/unscanned.",
+      "next_statuses": [
+        "110",
+        "120",
+        "200"
+      ],
+      "next_flow": "Pickup office must scan/receive the parcel."
+    },
+    "0": {
+      "meaning": "Registered/unscanned.",
+      "next_statuses": [
+        "110",
+        "120",
+        "200"
+      ],
+      "next_flow": "Pickup office must scan/receive the parcel."
+    },
+    "100": {
+      "meaning": "Registered/unscanned.",
+      "next_statuses": [
+        "110",
+        "120",
+        "200"
+      ],
+      "next_flow": "Pickup office must scan/receive the parcel."
+    },
+    "110": {
+      "meaning": "Pickup confirmed.",
+      "next_statuses": [
+        "120",
+        "200"
+      ],
+      "next_flow": "Pickup staff must pick up and receive the parcel."
+    },
+    "120": {
+      "meaning": "Pickup in progress.",
+      "next_statuses": [
+        "200"
+      ],
+      "next_flow": "Pickup staff must finish pickup/receiving scan."
+    },
+    "200": {
+      "meaning": "Parcel received.",
+      "next_statuses": [
+        "210",
+        "302",
+        "306"
+      ],
+      "next_flow": "Post office must hand over or move the parcel into transit."
+    },
+    "210": {
+      "meaning": "In transit.",
+      "next_statuses": [
+        "302",
+        "306",
+        "309",
+        "310",
+        "311",
+        "300"
+      ],
+      "next_flow": "Next post office or hub must scan the parcel when it arrives or dispatches."
+    },
+    "302": {
+      "meaning": "Transit/receiving scan.",
+      "next_statuses": [
+        "306",
+        "309",
+        "310",
+        "400",
+        "401",
+        "420"
+      ],
+      "next_flow": "Continue transit to the destination office, or assign/start delivery if already at destination."
+    },
+    "306": {
+      "meaning": "Hub/transit movement.",
+      "next_statuses": [
+        "309",
+        "310",
+        "400",
+        "401",
+        "420"
+      ],
+      "next_flow": "Move parcel to the destination office, then assign or start delivery."
+    },
+    "309": {
+      "meaning": "Arrived/received at destination.",
+      "next_statuses": [
+        "400",
+        "401",
+        "420"
+      ],
+      "next_flow": "Destination office must assign delivery staff or prepare customer/store pickup."
+    },
+    "310": {
+      "meaning": "Received at post office.",
+      "next_statuses": [
+        "400",
+        "401",
+        "420"
+      ],
+      "next_flow": "Post office must assign delivery staff or prepare pickup/delivery."
+    },
+    "311": {
+      "meaning": "Dispatch/transfer scan.",
+      "next_statuses": [
+        "309",
+        "310",
+        "400",
+        "401",
+        "420"
+      ],
+      "next_flow": "Next receiving office must scan the parcel, then prepare delivery."
+    },
+    "300": {
+      "meaning": "Transit update.",
+      "next_statuses": [
+        "309",
+        "310",
+        "400",
+        "401",
+        "420"
+      ],
+      "next_flow": "Continue to destination and scan at the next post office."
+    },
+    "500": {
+      "meaning": "Return processing.",
+      "next_statuses": [
+        "300",
+        "309",
+        "310",
+        "400",
+        "401",
+        "420",
+        "520",
+        "540"
+      ],
+      "next_flow": "Process the parcel in the Return/Pending task list. It may continue delivery if resolved, or move to returned/return-failed statuses."
+    },
+    "400": {
+      "meaning": "Assigned to deliver - not completed.",
+      "next_statuses": [
+        "410",
+        "201",
+        "520"
+      ],
+      "next_flow": "Assigned delivery staff must complete delivery in the Delivery tab. After completion, status should become one of the Done statuses."
+    },
+    "401": {
+      "meaning": "Delivering.",
+      "next_statuses": [
+        "410",
+        "201",
+        "520"
+      ],
+      "next_flow": "Delivery/customer completion scan or payment must finish the order."
+    },
+    "402": {
+      "meaning": "Delivery in progress.",
+      "next_statuses": [
+        "410",
+        "201",
+        "520"
+      ],
+      "next_flow": "Finish delivery/customer scan so the order becomes Done."
+    },
+    "420": {
+      "meaning": "At store/customer pickup point.",
+      "next_statuses": [
+        "410",
+        "201",
+        "520"
+      ],
+      "next_flow": "Customer/receiver pickup scan and payment should complete the order."
+    },
+    "430": {
+      "meaning": "Redelivery prepared.",
+      "next_statuses": [
+        "460",
+        "410",
+        "201",
+        "520"
+      ],
+      "next_flow": "Start redelivery, then complete delivery."
+    },
+    "460": {
+      "meaning": "Redelivering.",
+      "next_statuses": [
+        "410",
+        "201",
+        "520"
+      ],
+      "next_flow": "Complete redelivery so the order becomes Done."
+    },
+    "410": {
+      "meaning": "Done/completed.",
+      "next_statuses": [],
+      "next_flow": "No next scan is required."
+    },
+    "201": {
+      "meaning": "Cancelled/closed.",
+      "next_statuses": [],
+      "next_flow": "Order is cancelled/closed. No next delivery scan is required."
+    },
+    "472": {
+      "meaning": "Stored/held at post office.",
+      "next_statuses": [
+        "480",
+        "400",
+        "401",
+        "420",
+        "500"
+      ],
+      "next_flow": "Post office must release from storage, update address, assign delivery, or start return based on the latest note."
+    },
+    "480": {
+      "meaning": "Change address.",
+      "next_statuses": [
+        "400",
+        "401",
+        "420",
+        "500"
+      ],
+      "next_flow": "Confirm the new address, then reassign delivery or return the parcel if delivery cannot continue."
+    },
+    "512": {
+      "meaning": "Return/exception status found in export data; exact system label unknown.",
+      "next_statuses": [
+        "520",
+        "540"
+      ],
+      "next_flow": "Check the latest tracking note and process the return/exception in the Return task list."
+    },
+    "520": {
+      "meaning": "Returned order.",
+      "next_statuses": [],
+      "next_flow": "Order has been returned. No next delivery scan is required."
+    },
+    "540": {
+      "meaning": "Could not return parcel.",
+      "next_statuses": [
+        "520"
+      ],
+      "next_flow": "Responsible post office must resolve the return failure, then complete return if possible."
+    }
+  },
+  "reports": [
+    {
+      "key": "pickup",
+      "title": "PICK UP BILL CHECK",
+      "is_label": "Pick up",
+      "status_codes": [
+        "110",
+        "120",
+        "200"
+      ]
+    },
+    {
+      "key": "delivery",
+      "title": "DELIVERY BILL CHECK",
+      "is_label": "Delivery",
+      "status_codes": [
+        "401",
+        "402",
+        "420",
+        "430",
+        "460",
+        "470",
+        "471",
+        "472",
+        "480",
+        "500",
+        "510",
+        "511",
+        "512"
+      ]
+    },
+    {
+      "key": "transit",
+      "title": "PENDING BILL CHECK",
+      "is_label": "Transit",
+      "status_codes": [
+        "210",
+        "230",
+        "300",
+        "302",
+        "310",
+        "311"
+      ]
+    },
+    {
+      "key": "branch",
+      "title": "PENDING BILL CHECK",
+      "is_label": "Branch",
+      "status_codes": [
+        "306",
+        "309",
+        "400"
+      ]
+    }
+  ],
+  "excel_design": {
+    "header_rows": 2,
+    "merge_title": true,
+    "merge_cells": false,
+    "merge_same_handle": true,
+    "merge_handle_total": true,
+    "freeze_panes": true,
+    "center_group_columns": false,
+    "wrap_text": true,
+    "show_borders": true,
+    "font_name": "SF Pro",
+    "title_fill_color": "1F4E78",
+    "header_fill_color": "1F4E78",
+    "header_font_color": "FFFFFF",
+    "zone_fill_color": "FFFFFF",
+    "zone_font_color": "0F172A",
+    "group_fill_color": "FFFFFF",
+    "group_font_color": "0F172A",
+    "total_fill_color": "EEF2F7",
+    "total_font_color": "EF4444",
+    "pending_font_color": "F59E0B",
+    "error_font_color": "EF4444"
+  },
+  "zone_mapping": {
+    "by_post_office": {
+      "KANP001": "Zone 1",
+      "PNPP001": "Zone 1",
+      "PNPP002": "Zone 1",
+      "PNPP003": "Zone 1",
+      "PNPP004": "Zone 1",
+      "PNPP005": "Zone 1",
+      "PNPP006": "Zone 1",
+      "PNPP007": "Zone 1",
+      "PNPP008": "Zone 1",
+      "PNPP009": "Zone 1",
+      "PNPP010": "Zone 1",
+      "PNPP011": "Zone 1",
+      "PNPP012": "Zone 1",
+      "PNPP013": "Zone 1",
+      "PNPP014": "Zone 1",
+      "PREP001": "Zone 1",
+      "SVAP001": "Zone 1",
+      "KAMP001": "Zone 2",
+      "KOHP001": "Zone 2",
+      "SIHP001": "Zone 2",
+      "SPEP001": "Zone 2",
+      "TAKP001": "Zone 2",
+      "BANP001": "Zone 3",
+      "BATP001": "Zone 3",
+      "CHHP001": "Zone 3",
+      "PURP001": "Zone 3",
+      "ODDP001": "Zone 4",
+      "PRHP001": "Zone 4",
+      "SIEP001": "Zone 4",
+      "THOP001": "Zone 4",
+      "CHAP001": "Zone 5",
+      "KRAP001": "Zone 5",
+      "TBKP001": "Zone 5",
+      "ROTS001": "Zone 5",
+      "MONS001": "Zone 5",
+      "STUS001": "Zone 5",
+      "STUP001": "Zone 5",
+      "ROTP001": "Zone 5",
+      "MONP001": "Zone 5"
+    },
+    "by_prefix": {
+      "KAN": "Zone 1",
+      "PNP": "Zone 1",
+      "PRE": "Zone 1",
+      "SVA": "Zone 1",
+      "KAM": "Zone 2",
+      "KOH": "Zone 2",
+      "SIH": "Zone 2",
+      "SPE": "Zone 2",
+      "TAK": "Zone 2",
+      "BAN": "Zone 3",
+      "BAT": "Zone 3",
+      "CHH": "Zone 3",
+      "PUR": "Zone 3",
+      "ODD": "Zone 4",
+      "PRH": "Zone 4",
+      "SIE": "Zone 4",
+      "THO": "Zone 4",
+      "CHA": "Zone 5",
+      "KRA": "Zone 5",
+      "TBK": "Zone 5",
+      "ROT": "Zone 5",
+      "MON": "Zone 5",
+      "STU": "Zone 5"
+    },
+    "default_zone": "Zone 1"
+  },
+  "push_exclude_zones": [],
+  "zone_forward_mapping": {
+    "-1004390650725": "zone1",
+    "-1004385939533": "zone2",
+    "-1004300219891": "zone3",
+    "-1004366256254": "zone4",
+    "-5109161201": "zone5"
+  },
+  "total_zones": {
+    "zone1": [
+      "PNPP001",
+      "PNPP002",
+      "PNPP003",
+      "PNPP004",
+      "PNPP005",
+      "PNPP006",
+      "PNPP007",
+      "PNPP008",
+      "PNPP009",
+      "PNPP010",
+      "PNPP011",
+      "PNPP012",
+      "PNPP013",
+      "PNPP014",
+      "KANP001",
+      "PREP001",
+      "SVAP001"
+    ],
+    "zone2": [
+      "KAMP001",
+      "KOHP001",
+      "SIHP001",
+      "SPEP001",
+      "TAKP001"
+    ],
+    "zone3": [
+      "BANP001",
+      "BATP001",
+      "CHHP001",
+      "PURP001"
+    ],
+    "zone4": [
+      "ODDP001",
+      "PRHP001",
+      "SIEP001",
+      "THOP001"
+    ],
+    "zone5": [
+      "CHAP001",
+      "KRAP001",
+      "TBKP001",
+      "ROTS001",
+      "MONS001",
+      "STUS001",
+      "STUP001",
+      "ROTP001",
+      "MONP001"
+    ]
+  },
+  "zone_branches": {
+    "zone1": "PRE,PNP,SVA,KAN",
+    "zone2": "KAM,KOH,SIH,SPE,TAK",
+    "zone3": "BAN,BAT,CHH,PUR",
+    "zone4": "SIE,PRH,ODD,THO",
+    "zone5": "CHA,KRA,TBK,ROT,MON,STU"
+  }
+}
