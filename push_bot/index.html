@@ -2,1034 +2,745 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Metfone Express — 5-Slide Landscape Training Deck</title>
-    <!-- Import Telegram WebApp JS -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Google Fonts: Angkor (Khmer Display Serif) + Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Angkor&family=Inter:wght@600;700;800;900&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🐍 Python ❤️ Cloud Server — An I.T. Love Story</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-white: #ffffff;
-            --brand-red: #e11b22;
-            --text-black: #090d16;
-            --text-dark: #1e293b;
-            --text-muted: #334155;
-            --border-dark: #0f172a;
-            --border-light: #94a3b8;
-            --sticky-yellow: #fef08a;
-            --sticky-text: #713f12;
-            --node-blue: #1d4ed8;
-            --node-green: #047857;
+            --bg-deep: #0f0c20;
+            --pink: #ff2a7a;
+            --pink-glow: rgba(255, 42, 122, 0.4);
+            --cyan: #00f0ff;
+            --yellow: #ffd000;
+            --purple: #8b5cf6;
+            --card-bg: rgba(26, 20, 51, 0.75);
+            --border-card: rgba(255, 42, 122, 0.25);
         }
 
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
+            font-family: 'Fredoka', cursive, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        html, body {
+        body {
+            background: radial-gradient(circle at 50% 20%, #2b1055, var(--bg-deep) 80%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+            position: relative;
+            padding-bottom: 50px;
+        }
+
+        /* Floating background hearts/particles */
+        .hearts-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100vw;
             height: 100vh;
+            pointer-events: none;
+            z-index: 0;
             overflow: hidden;
-            background-color: var(--bg-white);
-            color: var(--text-black);
-            -webkit-font-smoothing: antialiased;
         }
 
-        /* 16:9 Landscape Canvas */
-        .landscape-canvas {
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            position: relative;
-            background: #ffffff;
-            overflow: hidden;
-            perspective: 1200px;
-        }
-
-        /* Far Left Vertical Stamp Margin */
-        .side-stamp {
+        .bg-heart {
             position: absolute;
-            left: 20px;
-            bottom: 120px;
-            transform: rotate(-90deg);
-            transform-origin: left bottom;
-            font-size: 0.95rem;
-            font-weight: 900;
-            letter-spacing: 0.25em;
-            color: var(--text-dark);
-            text-transform: uppercase;
-            white-space: nowrap;
+            color: rgba(255, 42, 122, 0.15);
+            font-size: 24px;
+            animation: floatUp 12s linear infinite;
         }
 
-        /* Top Bar Layout with Official Metfone Express Brand Logo */
-        .top-nav {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            right: 40px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 100;
+        @keyframes floatUp {
+            0% { transform: translateY(105vh) rotate(0deg) scale(0.8); opacity: 0; }
+            20% { opacity: 0.6; }
+            80% { opacity: 0.6; }
+            100% { transform: translateY(-10vh) rotate(360deg) scale(1.2); opacity: 0; }
         }
 
-        .logo-box {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .brand-logo-img {
-            height: 52px;
-            object-fit: contain;
-            display: block;
-        }
-
-        .nav-header-text {
-            font-family: 'Angkor', serif;
-            font-size: 1.15rem;
-            color: var(--text-black);
-            letter-spacing: 0.05em;
-        }
-
-        /* SLEEK LANGUAGE SWITCHER TOGGLE */
-        .nav-right-controls {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .lang-switcher-box {
-            background: #f1f5f9;
-            border: 2px solid var(--text-black);
-            padding: 4px;
-            border-radius: 30px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.06);
-        }
-
-        .lang-btn {
-            background: transparent;
-            border: none;
-            padding: 6px 14px;
-            font-size: 0.88rem;
-            font-weight: 900;
-            color: var(--text-dark);
-            border-radius: 20px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .lang-btn.active {
-            background: var(--brand-red);
-            color: #ffffff;
-            box-shadow: 0 2px 8px rgba(225, 27, 34, 0.3);
-        }
-
-        .nav-right-tag {
-            font-size: 1rem;
-            font-weight: 900;
-            color: var(--text-dark);
-        }
-
-        /* Slide Views Switcher with 3D Book Page Flip Animation */
-        .slide-view {
-            display: none;
-            width: 100%;
-            height: 100%;
-            transform-origin: left center;
-        }
-
-        .slide-view.active {
-            display: grid;
-            grid-template-columns: 1.05fr 1.25fr;
-            padding: 85px 30px 85px 75px;
-            gap: 30px;
-            align-items: center;
-            animation: bookPageFlip 0.45s cubic-bezier(0.25, 1, 0.5, 1);
-        }
-
-        @keyframes bookPageFlip {
-            from {
-                opacity: 0;
-                transform: rotateY(-20deg) scale(0.98);
-            }
-            to {
-                opacity: 1;
-                transform: rotateY(0deg) scale(1);
-            }
-        }
-
-        /* LEFT CONTENT COLUMN */
-        .left-content {
-            display: flex;
-            flex-direction: column;
-            gap: 22px;
-            max-width: 720px;
-        }
-
-        .eyebrow-line {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            font-size: 1.35rem;
-            font-weight: 900;
-            letter-spacing: 0.18em;
-            color: var(--brand-red);
-            text-transform: uppercase;
-        }
-
-        .eyebrow-line::before {
-            content: '';
-            width: 48px;
-            height: 6px;
-            background: var(--brand-red);
-            border-radius: 4px;
-        }
-
-        /* HERO TITLE WITH ANGKOR FONT */
-        .hero-title-bold {
-            font-family: 'Angkor', serif;
-            font-size: 5.2rem;
-            line-height: 1.1;
-            color: var(--text-black);
-            letter-spacing: -0.01em;
-        }
-
-        .hero-title-bold span {
-            color: var(--brand-red);
-        }
-
-        /* ENLARGED BILINGUAL DESCRIPTION & KHMER TEXT */
-        .sub-english {
-            font-size: 1.75rem;
-            color: var(--text-black);
-            line-height: 1.45;
-            font-weight: 800;
-        }
-
-        .sub-khmer {
-            font-family: 'Angkor', serif;
-            font-size: 1.6rem;
-            color: var(--brand-red);
-            line-height: 1.65;
-            background: #fff1f2;
-            padding: 16px 20px;
-            border-radius: 10px;
-            border-left: 6px solid var(--brand-red);
-            box-shadow: 0 4px 12px rgba(225, 27, 34, 0.08);
-        }
-
-        /* LANGUAGE TOGGLE VISIBILITY CONTROL */
-        body.mode-en .kh-el { display: none !important; }
-        body.mode-kh .en-el { display: none !important; }
-
-        body.mode-kh .hero-title-bold {
-            font-size: 4.2rem;
-            line-height: 1.25;
-        }
-
-        /* Status & Rule Cards */
-        .status-flow-container {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .status-step-card {
-            background: #f8fafc;
-            border: 2px solid var(--text-black);
-            border-left: 6px solid var(--brand-red);
-            padding: 14px 18px;
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .status-code-badge {
-            background: var(--text-black);
-            color: #ffffff;
-            font-weight: 900;
-            font-size: 1.25rem;
-            padding: 8px 16px;
-            border-radius: 8px;
-            flex-shrink: 0;
-        }
-
-        .status-desc-text {
-            font-size: 1.35rem;
-            color: var(--text-black);
-            line-height: 1.4;
-            font-weight: 800;
-        }
-
-        body.mode-kh .status-desc-text {
-            font-family: 'Angkor', serif;
-            font-size: 1.2rem;
-            line-height: 1.5;
-        }
-
-        /* KPI Explanation Grid */
-        .kpi-explain-box {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
-        }
-
-        .kpi-card {
-            background: #f8fafc;
-            border: 2px solid var(--text-black);
-            border-radius: 12px;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .kpi-badge-tag {
-            font-size: 1.1rem;
-            font-weight: 900;
-            padding: 6px 14px;
-            border-radius: 6px;
-            display: inline-block;
-            width: max-content;
-        }
-
-        .kpi-badge-tag.green { background: #d1fae5; color: #047857; }
-        .kpi-badge-tag.red { background: #ffe4e6; color: #b91c1c; }
-
-        .kpi-card-text {
-            font-size: 1.3rem;
-            color: var(--text-black);
-            line-height: 1.4;
-            font-weight: 800;
-        }
-
-        body.mode-kh .kpi-card-text {
-            font-family: 'Angkor', serif;
-            font-size: 1.15rem;
-            line-height: 1.5;
-        }
-
-        /* Right Visual Slide Paper Frame */
-        .right-exhibit {
-            width: 100%;
-            height: 100%;
-            max-height: 640px;
-            background: #ffffff;
-            border: 3px solid var(--text-black);
-            border-radius: 14px;
-            box-shadow: 16px 16px 0px rgba(9, 13, 22, 0.1);
-            position: relative;
-            padding: 16px 20px 16px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        /* REDESIGNED BILINGUAL STICKER FOOTER NOTE UNDER TABLE */
-        .sticky-note-under {
-            background: var(--sticky-yellow);
-            color: var(--sticky-text);
-            padding: 12px 18px;
-            border-radius: 10px;
-            font-size: 0.95rem;
-            font-weight: 900;
-            border: 2px solid #eab308;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-            line-height: 1.4;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            width: 100%;
-        }
-
-        .sticky-text-wrapper {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .sticky-kh-text {
-            font-family: 'Angkor', serif;
-            font-size: 0.85rem;
-            line-height: 1.35;
-        }
-
-        /* STYLISH SMALL BADGE TAG INSIDE FOOTER NOTE */
-        .badge-tag-inline {
-            background: var(--brand-red);
-            color: #ffffff;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.72rem;
-            font-weight: 900;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            white-space: nowrap;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-        }
-
-        .badge-tag-inline.blue { background: #2563eb; }
-        .badge-tag-inline.amber { background: #d97706; }
-        .badge-tag-inline.green { background: #059669; }
-        .badge-tag-inline.purple { background: #7c3aed; }
-
-        /* GRID TAB SWITCHERS (CLEAN TITLES, NO PARENTHESES!) */
-        .tab-switcher {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
-            border-bottom: 3px solid var(--border-light);
-            padding-bottom: 8px;
-            width: 100%;
-            position: relative;
-            z-index: 50;
-        }
-
-        .tab-switcher.two-cols {
-            grid-template-columns: repeat(2, 1fr);
-        }
-
-        .tab-switcher.three-cols {
-            grid-template-columns: repeat(3, 1fr);
-        }
-
-        .exhibit-tab {
-            background: #f1f5f9;
-            border: 2px solid var(--border-light);
-            font-size: 1.05rem;
-            font-weight: 900;
-            color: var(--text-dark);
-            padding: 12px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s ease;
+        /* Header */
+        header {
             text-align: center;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            margin-top: 30px;
+            z-index: 10;
+            padding: 0 15px;
         }
 
-        .exhibit-tab.active {
-            background: var(--text-black);
-            color: #ffffff;
-            border-color: var(--text-black);
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 42, 122, 0.15);
+            border: 1px solid var(--pink);
+            color: #ff85b3;
+            padding: 6px 18px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            box-shadow: 0 0 15px var(--pink-glow);
+            animation: pulseBadge 2s infinite ease-in-out;
         }
 
-        /* Display Image Container */
-        .exhibit-display-frame {
-            flex: 1;
-            width: 100%;
-            background: #ffffff;
-            border: 2px solid var(--border-light);
-            border-radius: 10px;
-            overflow: hidden;
+        @keyframes pulseBadge {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        h1 {
+            font-size: clamp(2rem, 5vw, 3.2rem);
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff 20%, #ff80bf 60%, var(--cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(255, 42, 122, 0.3);
+            line-height: 1.2;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: #c4b5fd;
+            margin-top: 8px;
+        }
+
+        /* Romantic Stage Arena */
+        .stage {
             position: relative;
-            cursor: pointer;
+            width: min(92%, 850px);
+            background: var(--card-bg);
+            border: 2px solid var(--border-card);
+            border-radius: 28px;
+            margin-top: 30px;
+            padding: 40px 20px 30px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(255, 42, 122, 0.08);
+            backdrop-filter: blur(16px);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .lovers-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            width: 100%;
+            position: relative;
+            min-height: 240px;
+        }
+
+        /* Characters */
+        .character-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 5;
+        }
+
+        .avatar-box {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 70px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
         }
 
-        .exhibit-img {
+        .python-box {
+            border: 3px solid #3b82f6;
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.4);
+            animation: bouncePython 3s infinite ease-in-out;
+        }
+
+        .cloud-box {
+            border: 3px solid var(--pink);
+            box-shadow: 0 0 25px var(--pink-glow);
+            animation: bounceCloud 3s infinite ease-in-out 1.5s;
+        }
+
+        .avatar-box:hover {
+            transform: scale(1.15) rotate(5deg);
+        }
+
+        @keyframes bouncePython {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(-3deg); }
+        }
+
+        @keyframes bounceCloud {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(3deg); }
+        }
+
+        .char-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-top: 12px;
+        }
+
+        .char-role {
+            font-size: 0.85rem;
+            color: #a78bfa;
+            font-weight: 600;
+        }
+
+        .speech-bubble {
+            position: absolute;
+            top: -45px;
+            background: #fff;
+            color: #1e1b4b;
+            padding: 6px 14px;
+            border-radius: 18px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            white-space: nowrap;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            animation: popBubble 0.4s ease;
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: #fff transparent;
+        }
+
+        /* Love Connection Bridge in the Middle */
+        .love-bridge {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            flex: 1;
+            padding: 0 10px;
+        }
+
+        .pulsing-heart {
+            font-size: 48px;
+            cursor: pointer;
+            animation: heartThrob 1.2s infinite;
+            filter: drop-shadow(0 0 15px #ff2a7a);
+            transition: transform 0.2s;
+            user-select: none;
+        }
+
+        .pulsing-heart:hover {
+            transform: scale(1.35);
+        }
+
+        @keyframes heartThrob {
+            0%, 100% { transform: scale(1); }
+            14% { transform: scale(1.25); }
+            28% { transform: scale(1); }
+            42% { transform: scale(1.2); }
+            70% { transform: scale(1); }
+        }
+
+        .connection-line {
             width: 100%;
-            height: 100%;
-            object-fit: contain;
-            display: block;
-            image-rendering: -webkit-optimize-contrast;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, var(--pink), var(--cyan));
+            margin-top: 10px;
+            position: relative;
+            border-radius: 2px;
+            box-shadow: 0 0 10px var(--pink);
         }
 
-        /* FIXED PERMANENTLY VISIBLE BOOK FLIP NAVIGATION BAR */
-        .bottom-nav {
-            position: fixed;
-            bottom: 24px;
-            left: 75px;
-            right: 40px;
+        .flying-packet {
+            position: absolute;
+            top: -10px;
+            font-size: 14px;
+            animation: sendLovePacket 2.5s infinite linear;
+        }
+
+        @keyframes sendLovePacket {
+            0% { left: 5%; opacity: 0; transform: scale(0.5); }
+            20% { opacity: 1; transform: scale(1.2); }
+            80% { opacity: 1; transform: scale(1.2); }
+            100% { left: 90%; opacity: 0; transform: scale(0.5); }
+        }
+
+        .status-pill {
+            margin-top: 15px;
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid var(--cyan);
+            color: var(--cyan);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Sleeping PC Box */
+        .sleeping-pc {
+            position: absolute;
+            bottom: 12px;
+            right: 20px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            z-index: 9999;
-            pointer-events: none;
+            gap: 8px;
+            background: rgba(0,0,0,0.3);
+            border: 1px dashed rgba(255,255,255,0.2);
+            padding: 6px 14px;
+            border-radius: 12px;
+            font-size: 0.78rem;
+            color: #94a3b8;
         }
 
-        .page-mark {
-            font-size: 0.95rem;
-            font-weight: 900;
-            letter-spacing: 0.12em;
-            color: var(--text-black);
-            background: rgba(255, 255, 255, 0.9);
-            padding: 8px 16px;
-            border-radius: 8px;
-            border: 2px solid var(--text-black);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            pointer-events: auto;
-        }
-
-        /* ELEGANT BOOK PAGE TURN CONTROLLER */
-        .nav-controls-box {
-            background: var(--text-black);
-            color: #ffffff;
-            padding: 10px 24px;
-            border-radius: 30px;
+        /* Interactive Buttons */
+        .action-buttons {
             display: flex;
-            align-items: center;
-            gap: 20px;
-            box-shadow: 0 8px 24px rgba(9, 13, 22, 0.25);
-            border: 2px solid #ffffff;
-            pointer-events: auto;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 25px;
+            width: 100%;
         }
 
-        .book-turn-btn {
-            background: transparent;
+        .btn {
+            background: linear-gradient(135deg, #ff2a7a, #8b5cf6);
+            color: white;
             border: none;
-            color: #ffffff;
-            font-size: 0.9rem;
-            font-weight: 900;
+            padding: 12px 22px;
+            border-radius: 14px;
+            font-size: 0.95rem;
+            font-weight: 700;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 8px;
-            transition: all 0.2s ease;
-        }
-
-        .book-turn-btn:hover:not(:disabled) {
-            color: var(--brand-red);
-            transform: scale(1.05);
-        }
-
-        .book-turn-btn:disabled {
-            opacity: 0.35;
-            cursor: not-allowed;
-        }
-
-        .slide-dots {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .dot {
-            width: 10px;
-            height: 10px;
-            background: rgba(255, 255, 255, 0.35);
-            border-radius: 50%;
-            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(255, 42, 122, 0.35);
             transition: all 0.25s ease;
         }
 
-        .dot.active {
-            background: var(--brand-red);
-            width: 26px;
-            border-radius: 10px;
+        .btn:hover {
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 10px 25px rgba(255, 42, 122, 0.55);
         }
 
-        /* Fullscreen Sharp Lightbox Modal */
-        .lightbox-modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(9, 13, 22, 0.95);
-            z-index: 999999;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
+        .btn:active {
+            transform: translateY(1px);
         }
 
-        .lightbox-modal.active {
-            display: flex;
+        .btn-cyan {
+            background: linear-gradient(135deg, #0284c7, #06b6d4);
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35);
+        }
+        .btn-cyan:hover {
+            box-shadow: 0 10px 25px rgba(6, 182, 212, 0.55);
         }
 
-        .lightbox-box {
-            width: 95vw;
-            height: 90vh;
-            background: #ffffff;
-            border-radius: 14px;
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
+        .btn-yellow {
+            background: linear-gradient(135deg, #f59e0b, #e11d48);
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
+        }
+
+        /* Metrics Bar */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 14px;
-            position: relative;
+            width: min(92%, 850px);
+            margin-top: 20px;
+            z-index: 10;
         }
 
-        .lightbox-close {
-            position: absolute;
-            top: 16px; right: 16px;
-            background: var(--text-black);
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 16px 14px;
+            border-radius: 18px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        .metric-val {
+            font-size: 1.4rem;
+            font-weight: 700;
             color: #fff;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 900;
-            cursor: pointer;
+            margin-top: 4px;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: #a78bfa;
+            font-weight: 600;
+        }
+
+        /* IT Love Code Terminal */
+        .terminal-container {
+            width: min(92%, 850px);
+            background: #080613;
+            border: 1px solid #332a58;
+            border-radius: 18px;
+            margin-top: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            z-index: 10;
+        }
+
+        .terminal-header {
+            background: #140f28;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #282046;
+        }
+
+        .dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+        }
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+
+        .terminal-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-left: 6px;
+        }
+
+        .terminal-body {
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #38bdf8;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .log-line {
+            margin-bottom: 4px;
+        }
+        .log-time { color: #64748b; }
+        .log-heart { color: #ff2a7a; font-weight: bold; }
+        .log-success { color: #4ade80; font-weight: bold; }
+        .log-info { color: #facc15; }
+
+        /* Floating Confetti Hearts */
+        .click-heart {
+            position: absolute;
+            font-size: 28px;
+            pointer-events: none;
+            animation: burstHeart 1s forwards ease-out;
             z-index: 100;
         }
 
-        .lightbox-img-full {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            image-rendering: -webkit-optimize-contrast;
+        @keyframes burstHeart {
+            0% { transform: translate(0, 0) scale(0.5); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(1.5); opacity: 0; }
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 30px;
+            font-size: 0.88rem;
+            color: #64748b;
+            text-align: center;
+            z-index: 10;
+        }
+
+        footer span {
+            color: var(--pink);
+        }
+
+        @media (max-width: 600px) {
+            .lovers-container {
+                flex-direction: column;
+                gap: 20px;
+            }
+            .love-bridge {
+                width: 100%;
+                margin: 10px 0;
+            }
+            .avatar-box {
+                width: 100px;
+                height: 100px;
+                font-size: 50px;
+            }
+            .sleeping-pc {
+                position: static;
+                margin-top: 15px;
+            }
         }
     </style>
 </head>
-<body class="mode-both">
+<body>
 
-    <!-- 16:9 Landscape Presentation Canvas -->
-    <div class="landscape-canvas">
-        
-        <!-- Left Margin Vertical Stamp -->
-        <div class="side-stamp">METFONE EXPRESS · INTERNAL TRAINING</div>
+    <!-- Floating Background Hearts -->
+    <div class="hearts-bg" id="heartsBg"></div>
 
-        <!-- Top Navigation with Official Metfone Express Brand Logo & Language Switcher -->
-        <div class="top-nav">
-            <div class="logo-box">
-                <img src="images/metfone_express_logo.png" onerror="this.onerror=null; this.src='https://theanlegendary.github.io/run-py/images/metfone_express_logo.png';" alt="Metfone Express Logo" class="brand-logo-img">
-                <div class="nav-header-text">DAILY DISPATCH BOT TRAINING</div>
-            </div>
+    <header>
+        <div class="badge">☁️ 24/7 CLOUD HOSTED ON RENDER</div>
+        <h1>Python 🐍 & Cloud Server ☁️</h1>
+        <p class="subtitle">"The Ultimate I.T. Romance — Online Forever, Even When PC Sleeps! 💤"</p>
+    </header>
 
-            <div class="nav-right-controls">
-                <!-- SLEEK LANGUAGE SWITCHER TOGGLE BUTTONS -->
-                <div class="lang-switcher-box">
-                    <button class="lang-btn active" id="btnBoth" onclick="setLanguage('both')">🌐 EN+KH</button>
-                    <button class="lang-btn" id="btnEn" onclick="setLanguage('en')">🇬🇧 EN</button>
-                    <button class="lang-btn" id="btnKh" onclick="setLanguage('kh')">🇰🇭 KH</button>
-                </div>
-                <div class="nav-right-tag" id="slideTag">Slide 1 of 5 · Ops tms guide</div>
-            </div>
-        </div>
-
-        <!-- SLIDE 1 VIEW: CORE BOT OPERATIONS -->
-        <div id="slide1" class="slide-view active">
-            <div class="left-content">
-                <div class="eyebrow-line">Chapter 01 · Bot Core Operations</div>
-                
-                <h1 class="hero-title-bold en-el">
-                    Right report.<br><span>Every shift.</span>
-                </h1>
-                <h1 class="hero-title-bold kh-el">
-                    របាយការណ៍ត្រឹមត្រូវ<br><span>កំពុងពេលធ្វើការ</span>
-                </h1>
-
-                <p class="sub-english en-el">
-                    A practical guide for automated daily pushes, 4-stage order tracking, 3-shift clearance comparison, and status logs.
-                </p>
-
-                <p class="sub-khmer kh-el">
-                    ការណែនាំណែនាំអំពីប្រតិបត្តិការ របាយការណ័ប្រចាំថ្ងៃនិងតាមដានទិន្នន័យរបស់អីវ៉ាន់។
-                </p>
-            </div>
-
-            <div class="right-exhibit">
-                <!-- TAB 4 CORRECTED TO '4. Not Assign' -->
-                <div class="tab-switcher">
-                    <button class="exhibit-tab active" onclick="switchExhibit('table1', this)">1. Pickup</button>
-                    <button class="exhibit-tab" onclick="switchExhibit('table2', this)">2. Delivery</button>
-                    <button class="exhibit-tab" onclick="switchExhibit('table3', this)">3. Transit</button>
-                    <button class="exhibit-tab" onclick="switchExhibit('table4', this)">4. Not Assign</button>
-                </div>
-
-                <div class="exhibit-display-frame" onclick="openLightbox()">
-                    <img id="exhibitImg" src="images/thop001_branch_sharp.png" onerror="this.onerror=null; this.src='https://theanlegendary.github.io/run-py/images/thop001_branch_sharp.png';" alt="Pickup Table" class="exhibit-img">
-                </div>
-
-                <!-- BILINGUAL STICKY FOOTER NOTE UNDER TABLE -->
-                <div class="sticky-note-under">
-                    <div class="sticky-text-wrapper">
-                        <div class="en-el">📌 <b>Crisp Table View:</b> Click table to inspect full size</div>
-                        <div class="kh-el sticky-kh-text">📌 <b>ពិនិត្យតារាងច្បាស់៖</b> ចុចលើតារាងដើម្បីមើលទំហំពេញ 100%</div>
-                    </div>
-                    <div class="badge-tag-inline">🏷️ VERIFIED DATA</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SLIDE 2 VIEW: DELIVERY & NOT ASSIGN CLEARANCE -->
-        <div id="slide2" class="slide-view">
-            <div class="left-content">
-                <div class="eyebrow-line">Chapter 02 · Delivery & Not Assign Logic</div>
-                
-                <h1 class="hero-title-bold en-el" style="font-size: 4.6rem;">
-                    Clear pending.<br><span>Hit KPI 10h.</span>
-                </h1>
-                <h1 class="hero-title-bold kh-el" style="font-size: 4rem;">
-                    ដោះស្រាយទំនិញកកស្ទះ<br><span>សម្រេច KPI 10ម៉ោង</span>
-                </h1>
-
-                <div class="status-flow-container">
-                    <div class="status-step-card" style="border-left-color: #f59e0b;">
-                        <div class="status-code-badge" style="background: #f59e0b;">306</div>
-                        <div class="status-desc-text en-el"><b>At Store / Pending:</b> Order pending at branch awaiting courier assignment.</div>
-                        <div class="status-desc-text kh-el"><b>ទំនិញនៅហាង / រង់ចាំ៖</b> ទំនិញកកស្ទះនៅសាខារង់ចាំការចាត់ចែងអ្នកដឹក។</div>
-                    </div>
-
-                    <div class="status-step-card" style="border-left-color: #2563eb;">
-                        <div class="status-code-badge" style="background: #2563eb;">402</div>
-                        <div class="status-desc-text en-el"><b>Assign Courier (10h KPI):</b> Courier assigned — 10h SLA timer starts!</div>
-                        <div class="status-desc-text kh-el"><b>ចាត់ចែងអ្នកដឹក (KPI 10h)៖</b> ចាត់ចែងអ្នកដឹក — ចាប់ផ្តើមរាប់ម៉ោង 10h KPI!</div>
-                    </div>
-
-                    <div class="status-step-card" style="border-left-color: #10b981;">
-                        <div class="status-code-badge" style="background: #10b981;">OUTCOMES</div>
-                        <div class="status-desc-text en-el">
-                            <b>410</b> (Shipped) | <b>420</b> (Ship again) | <b>430</b> (Failed) | <b>460</b> (Return)
-                        </div>
-                        <div class="status-desc-text kh-el">
-                            <b>410</b> (ផ្ញើរួច) | <b>420</b> (ផ្ញើម្តងទៀត) | <b>430</b> (បរាជ័យ) | <b>460</b> (ត្រឡប់)
-                        </div>
-                    </div>
-                </div>
-
-                <p class="sub-english en-el">
-                    Operational Rule: Transition stuck 306 packages to 402 (Set 10h KPI) to start SLA timer and achieve 410, 420, 430, or 460 outcomes.
-                </p>
-                <p class="sub-khmer kh-el" style="font-size: 1.2rem; line-height: 1.5; padding: 12px 16px;">
-                    អំពីប្រភេទទំនិញជាប់មិនទានធ្វេីប្រតិបត្តិការនាមួួ៖ប្ដូរស្ថានភាពទំនិញ ពី306 ទៅ 402 ( KPI 10h នឹងត្រូវបានកំណត់ ) >>> ចំពោះស្ថានភាពទំនិញបន្ទាប់នឹងត្រូវប្ដូរទៅស្ថានភាពទាំងនេះ :   410, 420, 430 ឬ 460។
-                </p>
-            </div>
-
-            <div class="right-exhibit">
-                <div class="tab-switcher two-cols">
-                    <button class="exhibit-tab active" onclick="switchExhibitSlide2('table2', this)">1. Delivery</button>
-                    <button class="exhibit-tab" onclick="switchExhibitSlide2('table4', this)">2. Not Assign</button>
-                </div>
-
-                <div class="exhibit-display-frame" onclick="openLightbox()">
-                    <img id="exhibitImgSlide2" src="images/svap001_delivery_sharp.png" onerror="this.onerror=null; this.src='https://theanlegendary.github.io/run-py/images/svap001_delivery_sharp.png';" alt="Delivery Sharp Table" class="exhibit-img">
-                </div>
-
-                <div class="sticky-note-under" style="background: #dbeafe; color: #1e40af; border-color: #3b82f6;">
-                    <div class="sticky-text-wrapper">
-                        <div class="en-el">⚡ <b>Rule 306 → 402:</b> Assign courier to start 10h SLA timer!</div>
-                        <div class="kh-el sticky-kh-text">⚡ <b>ច្បាប់ 306 → 402៖</b> ចាត់ចែងអ្នកដឹកដើម្បីចាប់ផ្តើមរាប់ KPI 10ម៉ោង!</div>
-                    </div>
-                    <div class="badge-tag-inline blue">⚡ 10H SLA ACTIVE</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SLIDE 3 VIEW: PICKUP & MEGA TRANSIT -->
-        <div id="slide3" class="slide-view">
-            <div class="left-content">
-                <div class="eyebrow-line">Chapter 03 · Pickup & Mega Transit Action</div>
-                
-                <h1 class="hero-title-bold en-el" style="font-size: 4.6rem;">
-                    Verify pickup.<br><span>Transit fast.</span>
-                </h1>
-                <h1 class="hero-title-bold kh-el" style="font-size: 4rem;">
-                    ពិនិត្យការយកទំនិញ<br><span>ដឹកជញ្ជូនបន្តលឿន</span>
-                </h1>
-
-                <div class="status-flow-container">
-                    <div class="status-step-card" style="border-left-color: #e11b22;">
-                        <div class="status-code-badge" style="background: #e11b22;">PICKUP APP</div>
-                        <div class="status-desc-text en-el">For pending pickup bills, staff <b>must check Pickup Page in TMS App</b> for customer assignments!</div>
-                        <div class="status-desc-text kh-el">សម្រាប់អីវ៉ាន់ Pickup <b>ត្រូវពិនិត្យទំព័រ Pickup ក្នុង App</b> ដើម្បីមើលការ assign ពីអតិថិជន!</div>
-                    </div>
-
-                    <div class="status-step-card" style="border-left-color: #2563eb;">
-                        <div class="status-code-badge" style="background: #2563eb;">MEGA TRANSIT</div>
-                        <div class="status-desc-text en-el">Verify <b>Send Mega Table (302/306/311)</b> to ensure packages are loaded on transit trucks.</div>
-                        <div class="status-desc-text kh-el">ពិនិត្យ <b>តារាងអីវាន់ ដាក់ នឹងកំពុងដាក់ទៅ MEGA (302/306/311)</b> ដើម្បីប្រាកដថាទំនិញកំពុងមានប្រតិបត្តិការជាមួយឡាន។</div>
-                    </div>
-
-                    <div class="status-step-card" style="border-left-color: #a855f7;">
-                        <div class="status-code-badge" style="background: #7c3aed;">NTN SERVICE</div>
-                        <div class="status-desc-text en-el"><b>NTN Express Priority:</b> Fast-track direct branch dispatch to MEGA for urgent customer shipments!</div>
-                        <div class="status-desc-text kh-el"><b>សេវាកម្ម NTN ដឹកជញ្ជូនលឿន៖</b> រៀបចំផ្ញើផ្ទាល់ទៅ MEGA យ៉ាងរហ័សសម្រាប់អីវ៉ាន់ប្រញាប់!</div>
-                    </div>
-                </div>
-
-                <p class="sub-english en-el">
-                    Operational Rule: For pending pickup items, check TMS App Pickup Page to inspect customer assignments and send via MEGA transit.
-                </p>
-                <p class="sub-khmer kh-el">
-                    អំពីលំហូរការងាររ៖ សម្រាប់អីវ៉ាន់បានបង្កេីតដោយភ្ញៀវ (Pickup) នឹងលោតទៅ  Pickup ស្វ័យប្រវត្តិក្នុង App ទៅតាមទិសដៅតំបន់នៅជិតទំនិញបានបង្កេីត បុគ្គលិកត្រូវឆែកមេីលជាប្រចាំដេីម្បីប្រាកដថាបានឃេីញ នឹងទទួលទំនិញ
-                </p>
-            </div>
-
-            <div class="right-exhibit">
-                <div class="tab-switcher two-cols">
-                    <button class="exhibit-tab active" onclick="switchExhibitSlide3('table1', this)">1. Pickup</button>
-                    <button class="exhibit-tab" onclick="switchExhibitSlide3('table3', this)">2. Send Mega</button>
-                </div>
-
-                <div class="exhibit-display-frame" onclick="openLightbox()">
-                    <img id="exhibitImgSlide3" src="images/thop001_branch_sharp.png" onerror="this.onerror=null; this.src='https://theanlegendary.github.io/run-py/images/thop001_branch_sharp.png';" alt="Pickup & Send Mega Table" class="exhibit-img">
-                </div>
-
-                <div class="sticky-note-under" style="background: #fef3c7; color: #92400e; border-color: #f59e0b;">
-                    <div class="sticky-text-wrapper">
-                        <div class="en-el">📲 <b>Check App First:</b> Open TMS App Pickup Page to confirm customer requests!</div>
-                        <div class="kh-el sticky-kh-text">📲 <b>ពិនិត្យ App៖</b> បើកទំព័រ Pickup ក្នុង App ដើម្បីផ្ទៀងផ្ទាត់ការចាត់ចែង!</div>
-                    </div>
-                    <div class="badge-tag-inline amber">📲 APP CHECK REQUIRED</div> <div class="badge-tag-inline purple">🚀 NTN PRIORITY</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SLIDE 4 VIEW: HOW OPERATIONAL KPI & AGE SLA WORK -->
-        <div id="slide4" class="slide-view">
-            <div class="left-content">
-                <div class="eyebrow-line">Chapter 04 · Operational KPI & Age SLA</div>
-                
-                <h1 class="hero-title-bold en-el" style="font-size: 4.6rem;">
-                    Target 10h.<br><span>Zero overdue.</span>
-                </h1>
-                <h1 class="hero-title-bold kh-el" style="font-size: 4rem;">
-                    គោលដៅ 10ម៉ោង<br><span>គ្មានទំនិញយឺតយ៉ាវ</span>
-                </h1>
-
-                <div class="kpi-explain-box">
-                    <div class="kpi-card" style="border-left: 6px solid #10b981;">
-                        <div class="kpi-badge-tag green">🟢 GREEN (0h — 9h 59m)</div>
-                        <div class="kpi-card-text en-el">
-                            <b>Safe SLA Zone:</b> Order age is within 10-hour target. Delivery on schedule.
-                        </div>
-                        <div class="kpi-card-text kh-el">
-                            <b>តំបន់សុវត្ថិភាព SLA៖</b> អាយុទំនិញស្ថិតក្នុងគោលដៅ 10ម៉ោង។
-                        </div>
-                    </div>
-
-                    <div class="kpi-card" style="border-left: 6px solid #e11b22;">
-                        <div class="kpi-badge-tag red">🔴 RED (≥ 10h 00m)</div>
-                        <div class="kpi-card-text en-el">
-                            <b>Overdue Alert:</b> Order age exceeded 10 hours! Requires immediate courier follow-up.
-                        </div>
-                        <div class="kpi-card-text kh-el">
-                            <b>អាសន្នយឺតយ៉ាវ៖</b> អាយុទំនិញលើស 10ម៉ោង! ត្រូវប្រញាប់តាមដាន។
-                        </div>
-                    </div>
-                </div>
-
-                <p class="sub-english en-el">
-                    KPI SLA Logic: Green 🟢 order age is safe (<10h) | Red 🔴 order age is overdue (≥10h) and requires urgent resolution across all 3 shifts.
-                </p>
-                <p class="sub-khmer kh-el">
-                    <b>ការរាប់ KPI៖</b> រយៈពេលអាយុ (Age) ពណ៌បៃតង 🟢 គឺទាន់ពេល (<10h) | ពណ៌ក្រហម 🔴 គឺហួសកាលកំណត់ (≥10h) ត្រូវតែប្រញាប់ដោះស្រាយ!
-                </p>
-            </div>
-
-            <div class="right-exhibit">
-                <div class="tab-switcher two-cols">
-                    <button class="exhibit-tab active" onclick="switchExhibitSlide4('table2', this)">1. Delivery KPI</button>
-                    <button class="exhibit-tab" onclick="switchExhibitSlide4('table1', this)">2. Not Assign Age</button>
-                </div>
-
-                <div class="exhibit-display-frame" onclick="openLightbox()">
-                    <img id="exhibitImgSlide4" src="images/svap001_delivery_sharp.png" onerror="this.onerror=null; this.src='https://theanlegendary.github.io/run-py/images/svap001_delivery_sharp.png';" alt="Delivery KPI Table" class="exhibit-img">
-                </div>
-
-                <div class="sticky-note-under" style="background: #dcfce7; color: #166534; border-color: #22c55e;">
-                    <div class="sticky-text-wrapper">
-                        <div class="en-el">🎯 <b>Target SLA 10H:</b> Keep order ages green (<10h) across all shifts!</div>
-                        <div class="kh-el sticky-kh-text">🎯 <b>គោលដៅ 10H៖</b> រក្សាអាយុទំនិញជាពណ៌បៃតង (<10h) គ្រប់វេន!</div>
-                    </div>
-                    <div class="badge-tag-inline green">🟢 0 OVERDUE TARGET</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SLIDE 5 VIEW: END OF DAY CHECK & SCAN IN INVENTORY FEATURE -->
-        <div id="slide5" class="slide-view">
-            <div class="left-content">
-                <div class="eyebrow-line">Chapter 05 · End of Day Inventory Audit</div>
-                
-                <h1 class="hero-title-bold en-el" style="font-size: 4.6rem;">
-                    Scan inventory.<br><span>Close shift clean.</span>
-                </h1>
-                <h1 class="hero-title-bold kh-el" style="font-size: 4rem;">
-                    ស្កេនពិនិត្យស្តុក<br><span>បិទទំនិញពេលបញ្ចប់ម៉ោងការងារ</span>
-                </h1>
-
-                <p class="sub-english en-el">
-                    At the end of every operational shift, staff must perform a physical audit using the <b>Scan in Inventory feature</b> in the TMS app.
-                </p>
-
-                <div class="status-flow-container">
-                    <div class="status-step-card" style="border-left-color: #2563eb;">
-                        <div class="status-code-badge" style="background: #2563eb;">1. PHYSICAL AUDIT</div>
-                        <div class="status-desc-text en-el">Scan all remaining store packages using <b>Scan in Inventory feature</b> to reconcile store stock.</div>
-                        <div class="status-desc-text kh-el">ស្កេនទំនិញដែលនៅសល់ក្នុងហាងដោយប្រើ <b>មុខងារ Scan ចូលស្តុក</b> ដើម្បីផ្ទៀងផ្ទាត់ស្តុកហាង។</div>
-                    </div>
-
-                    <div class="status-step-card" style="border-left-color: #10b981;">
-                        <div class="status-code-badge" style="background: #10b981;">2. MATCH BOT LOGS</div>
-                        <div class="status-desc-text en-el">Ensure total scanned store count matches the <b>Not Assign & Branch Tables</b> in bot report.</div>
-                        <div class="status-desc-text kh-el">ធានាថាចំនួនទំនិញដែលបានស្កេន ត្រូវគ្នានឹង <b>តារាង មិនទាន់ចាត់ចែង</b> ក្នុងរបាយការណ៍ Bot។</div>
-                    </div>
-                </div>
-
-                <p class="sub-khmer kh-el">
-                    <b>គ្រប់គ្រងស្តុកចុងម៉ោង៖</b> នៅចុងបញ្ចប់នៃវេនការងារ ត្រូវតែប្រើមុខងារ Scan ចូលស្តុក ក្នុង App ដើម្បីស៊ើបអង្កេតទំនិញ និងទិន្នន័យក្នុងប្រព័ន្ធ!
-                </p>
-            </div>
-
-            <div class="right-exhibit">
-                <div class="tab-switcher three-cols">
-                    <button class="exhibit-tab active" onclick="switchExhibitSlide5('inv1', this)">1. Audit Summary</button>
-                    <button class="exhibit-tab" onclick="switchExhibitSlide5('inv2', this)">2. Scan Package</button>
-                    <button class="exhibit-tab" onclick="switchExhibitSlide5('inv3', this)">3. Scanned Items</button>
-                </div>
-
-                <div class="exhibit-display-frame" onclick="openLightbox()">
-                    <img id="exhibitImgSlide5" src="images/tms_inventory_audit.png" onerror="this.onerror=null; this.src='https://theanlegendary.github.io/run-py/images/tms_inventory_audit.png';" alt="TMS App Inventory Audit Summary" class="exhibit-img">
-                </div>
-
-                <div class="sticky-note-under" style="background: #f3e8ff; color: #6b21a8; border-color: #a855f7;">
-                    <div class="sticky-text-wrapper">
-                        <div class="en-el">📦 <b>EOD Audit Rule:</b> Zero un-scanned packages left before closing shift!</div>
-                        <div class="kh-el sticky-kh-text">📦 <b>ច្បាប់បិទវេន៖</b> ស្កេនទំនិញក្នុងស្តុកឱ្យអស់ មុនពេលបិទវេន!</div>
-                    </div>
-                    <div class="badge-tag-inline purple">📦 EOD AUDIT PASSED</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- FIXED PERMANENTLY VISIBLE BOOK FLIP NAVIGATION BAR -->
-        <div class="bottom-nav">
-            <div class="page-mark" id="pageMark">PAGE 01 / 05 &nbsp;·&nbsp; METFONE EXPRESS</div>
+    <!-- Romantic Stage Arena -->
+    <div class="stage">
+        <div class="lovers-container">
             
-            <div class="nav-controls-box">
-                <button class="book-turn-btn" id="prevBtn" onclick="prevSlide()" disabled>
-                    📖 <span>PREV PAGE</span>
-                </button>
-                <div class="slide-dots">
-                    <div class="dot active" id="dot1" onclick="goToSlide(1)"></div>
-                    <div class="dot" id="dot2" onclick="goToSlide(2)"></div>
-                    <div class="dot" id="dot3" onclick="goToSlide(3)"></div>
-                    <div class="dot" id="dot4" onclick="goToSlide(4)"></div>
-                    <div class="dot" id="dot5" onclick="goToSlide(5)"></div>
+            <!-- Python (The Dev Lover) -->
+            <div class="character-card">
+                <div class="speech-bubble" id="pythonBubble">"while True: I_Love_You() 💖"</div>
+                <div class="avatar-box python-box" onclick="ticklePython()">
+                    🐍
                 </div>
-                <button class="book-turn-btn" id="nextBtn" onclick="nextSlide()">
-                    <span>NEXT PAGE</span> 📖
-                </button>
+                <div class="char-name">Mr. Python</div>
+                <div class="char-role">Senior Romantic Coder 👓</div>
             </div>
+
+            <!-- Love Bridge & Heartbeat -->
+            <div class="love-bridge">
+                <div class="pulsing-heart" onclick="sendLovePulse(event)">💖</div>
+                <div class="connection-line">
+                    <div class="flying-packet">💌</div>
+                </div>
+                <div class="status-pill">HTTP 200 OK: FOREVER_IN_LOVE</div>
+            </div>
+
+            <!-- Cloud Server (The 24/7 Soulmate) -->
+            <div class="character-card">
+                <div class="speech-bubble" id="cloudBubble">"Your app is safe in my heart! ☁️"</div>
+                <div class="avatar-box cloud-box" onclick="tickleCloud()">
+                    ☁️
+                </div>
+                <div class="char-name">Miss Cloud Server</div>
+                <div class="char-role">24/7 Always Awake 🚀</div>
+            </div>
+
         </div>
 
-    </div>
+        <div class="sleeping-pc">
+            <span>💻💤 Laptop is sleeping peacefully at home</span>
+        </div>
 
-    <!-- Fullscreen Sharp Lightbox Modal -->
-    <div id="lightboxModal" class="lightbox-modal" onclick="closeLightbox()">
-        <div class="lightbox-box" onclick="event.stopPropagation()">
-            <button class="lightbox-close" onclick="closeLightbox()">CLOSE ✕</button>
-            <div style="font-weight: 900; font-size: 1.2rem; color: #0f172a;" id="lightboxTitle">Field Report Table Preview</div>
-            <div style="flex: 1; overflow: hidden; background: #ffffff; border: 2px solid var(--border-light); border-radius: 8px; padding: 8px;">
-                <img id="lightboxFullImg" src="images/thop001_branch_sharp.png" onerror="this.onerror=null; this.src='https://theanlegendary.github.io/run-py/images/thop001_branch_sharp.png';" class="lightbox-img-full">
-            </div>
+        <!-- Fun Interactive Buttons -->
+        <div class="action-buttons">
+            <button class="btn" onclick="sendLovePulse(event)">
+                <span>💌</span> Send Love Ping
+            </button>
+            <button class="btn btn-cyan" onclick="deployKiss(event)">
+                <span>💋</span> Deploy Kiss to Production
+            </button>
+            <button class="btn btn-yellow" onclick="generateLoveLetter()">
+                <span>📜</span> Random I.T. Love Quote
+            </button>
         </div>
     </div>
+
+    <!-- Live Metrics Grid -->
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-label">UPTIME TOGETHER</div>
+            <div class="metric-val" id="uptimeVal">99.999%</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">ROMANTIC LATENCY</div>
+            <div class="metric-val" style="color: #4ade80;">0.00 ms ⚡</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">LOVE HEARTBEAT</div>
+            <div class="metric-val" style="color: #ff2a7a;" id="loveCount">1,337 Pings</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">BUGS IN LOVE</div>
+            <div class="metric-val" style="color: #38bdf8;">0 (Only Features)</div>
+        </div>
+    </div>
+
+    <!-- Live Terminal Love Stream -->
+    <div class="terminal-container">
+        <div class="terminal-header">
+            <div class="dot dot-red"></div>
+            <div class="dot dot-yellow"></div>
+            <div class="dot dot-green"></div>
+            <div class="terminal-title">romantic_telemetry_live.log — Render Datacenter</div>
+        </div>
+        <div class="terminal-body" id="termBody">
+            <div class="log-line"><span class="log-time">[00:00:01]</span> <span class="log-info">[INIT]</span> Python initialized handshake with Cloud Server...</div>
+            <div class="log-line"><span class="log-time">[00:00:02]</span> <span class="log-success">[SUCCESS]</span> Status 200 OK: Heart connection established!</div>
+            <div class="log-line"><span class="log-time">[00:00:03]</span> <span class="log-heart">[ROMANCE]</span> git commit -m "You stole my heart, never rolling back"</div>
+            <div class="log-line"><span class="log-time">[00:00:04]</span> <span class="log-info">[ALERT]</span> Laptop went to sleep 😴. Cloud hosting keeping bot alive 24/7!</div>
+        </div>
+    </div>
+
+    <footer>
+        Crafted with <span>❤️</span> for Python, Cloud Hosting & Telecom I.T. Engineers
+    </footer>
 
     <script>
-        let currentSlide = 1;
-        let currentTabSlide1 = 'table1';
-        let currentTabSlide2 = 'table2';
-        let currentTabSlide3 = 'table1';
-        let currentTabSlide4 = 'table2';
-        let currentTabSlide5 = 'inv1';
-
-        const sharpTables = {
-            'table1': { src: 'images/thop001_branch_sharp.png', title: '1. អីវ៉ាន់ត្រូវយក (Pickup Table) — Report_THOP001_Branch' },
-            'table2': { src: 'images/svap001_delivery_sharp.png', title: '2. អីវ៉ាន់ត្រូវចែក (Delivery 10H KPI) — Report_SVAP001_Delivery' },
-            'table3': { src: 'images/svap001_transit_sharp.png', title: '3. ដាក់ទៅ MEGA (Send Mega / Transit) — Report_SVAP001_Transit' },
-            'table4': { src: 'images/svap001_branch_sharp.png', title: '4. មិនទាន់ចាត់ចែង (Not Assign Table) — Report_SVAP001_Branch' },
-            'inv1': { src: 'images/tms_inventory_audit.png', title: '1. ត្រួតពិនិត្យស្តុក (TMS App Inventory Audit Summary)' },
-            'inv2': { src: 'images/tms_inventory_scan.png', title: '2. ស្កេនទំនិញចូលស្តុក (TMS App Scan Package Check)' },
-            'inv3': { src: 'images/tms_inventory_scanned_list.png', title: '3. បញ្ជីទំនិញដែលបានស្កេន (TMS App Scanned Inventory Items)' }
-        };
-
-        function setLanguage(lang) {
-            document.body.className = 'mode-' + lang;
-            document.getElementById('btnBoth').classList.remove('active');
-            document.getElementById('btnEn').classList.remove('active');
-            document.getElementById('btnKh').classList.remove('active');
-
-            if (lang === 'both') document.getElementById('btnBoth').classList.add('active');
-            if (lang === 'en') document.getElementById('btnEn').classList.add('active');
-            if (lang === 'kh') document.getElementById('btnKh').classList.add('active');
+        // Generate Background Hearts
+        const heartsBg = document.getElementById('heartsBg');
+        const heartIcons = ['💖', '💕', '💗', '✨', '🌸', '🐍', '☁️', '⚡'];
+        
+        for(let i = 0; i < 22; i++) {
+            const h = document.createElement('div');
+            h.className = 'bg-heart';
+            h.innerText = heartIcons[Math.floor(Math.random() * heartIcons.length)];
+            h.style.left = Math.random() * 100 + 'vw';
+            h.style.animationDelay = (Math.random() * 10) + 's';
+            h.style.fontSize = (Math.random() * 18 + 14) + 'px';
+            heartsBg.appendChild(h);
         }
 
-        function goToSlide(slideNum) {
-            currentSlide = slideNum;
-            document.querySelectorAll('.slide-view').forEach(s => s.classList.remove('active'));
-            document.querySelectorAll('.dot').forEach(d => d.classList.remove('active'));
+        let pings = 1337;
+        const loveQuotes = [
+            "\"You are the CSS to my HTML — without you, I am unstyled and broken.\"",
+            "\"Are you an exception? Because I want to catch you and never let you go.\"",
+            "\"SELECT * FROM world WHERE person = 'YOU'; -> 1 Row Found (My Everything).\"",
+            "\"My love for you has no break condition: while(True) { love++; }\"",
+            "\"You auto-deployed straight into my heart without any merge conflicts.\"",
+            "\"Even if my laptop dies, my cloud loves you 24/7 with zero downtime.\""
+        ];
+
+        const pythonPhrases = [
+            "\"import love; love.forever() 💕\"",
+            "\"I will handle all your 500 errors! 🛡️\"",
+            "\"You make my CPU run at 100% ❤️\"",
+            "\"No bugs can tear us apart! 🐛🚫\""
+        ];
+
+        const cloudPhrases = [
+            "\"I will host you 24/7 forever! ☁️\"",
+            "\"Zero downtime for our relationship! 🚀\"",
+            "\"Unlimited bandwidth for your love! 📡\"",
+            "\"Scaling horizontally for more hugs! 🤗\""
+        ];
+
+        // Synthesize Cute Retro Sound Effects with Web Audio API
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playChime(freq = 587.33, duration = 0.15) {
+            try {
+                if(audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        function appendLog(msg, type = "heart") {
+            const tb = document.getElementById('termBody');
+            const now = new Date().toTimeString().split(' ')[0];
+            const div = document.createElement('div');
+            div.className = 'log-line';
             
-            document.getElementById('slide' + slideNum).classList.add('active');
-            document.getElementById('dot' + slideNum).classList.add('active');
+            let tag = '<span class="log-heart">[LOVE]</span>';
+            if(type === 'kiss') tag = '<span class="log-heart">[KISS 💋]</span>';
+            if(type === 'quote') tag = '<span class="log-info">[POETRY]</span>';
+            if(type === 'tickle') tag = '<span class="log-success">[TICKLE]</span>';
 
-            document.getElementById('slideTag').innerText = `Slide ${slideNum} of 5 · Ops tms guide`;
-            document.getElementById('pageMark').innerHTML = `PAGE 0${slideNum} / 05 &nbsp;·&nbsp; METFONE EXPRESS`;
-
-            document.getElementById('prevBtn').disabled = (slideNum === 1);
-            document.getElementById('nextBtn').disabled = (slideNum === 5);
+            div.innerHTML = `<span class="log-time">[${now}]</span> ${tag} ${msg}`;
+            tb.appendChild(div);
+            tb.scrollTop = tb.scrollHeight;
         }
 
-        function nextSlide() {
-            if (currentSlide < 5) goToSlide(currentSlide + 1);
+        function spawnFloatingHearts(e) {
+            const x = e.clientX || window.innerWidth / 2;
+            const y = e.clientY || window.innerHeight / 2;
+            
+            for(let i = 0; i < 6; i++) {
+                const h = document.createElement('div');
+                h.className = 'click-heart';
+                h.innerText = ['❤️', '💖', '💋', '✨', '💕'][Math.floor(Math.random() * 5)];
+                h.style.left = x + 'px';
+                h.style.top = y + 'px';
+                
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 90 + 40;
+                h.style.setProperty('--tx', Math.cos(angle) * distance + 'px');
+                h.style.setProperty('--ty', Math.sin(angle) * distance + 'px');
+                
+                document.body.appendChild(h);
+                setTimeout(() => h.remove(), 1000);
+            }
         }
 
-        function prevSlide() {
-            if (currentSlide > 1) goToSlide(currentSlide - 1);
+        function sendLovePulse(e) {
+            pings++;
+            document.getElementById('loveCount').innerText = pings.toLocaleString() + " Pings";
+            spawnFloatingHearts(e);
+            playChime(659.25, 0.2); // E5
+            setTimeout(() => playChime(880.00, 0.3), 100); // A5
+            appendLog(`Love Ping sent! Heartbeat acknowledged with 0.00ms latency.`);
         }
 
-        function switchExhibit(tabKey, btnElement) {
-            currentTabSlide1 = tabKey;
-            document.querySelectorAll('#slide1 .exhibit-tab').forEach(b => b.classList.remove('active'));
-            btnElement.classList.add('active');
-            document.getElementById('exhibitImg').src = sharpTables[tabKey].src;
+        function deployKiss(e) {
+            pings += 10;
+            document.getElementById('loveCount').innerText = pings.toLocaleString() + " Pings";
+            spawnFloatingHearts(e);
+            playChime(523.25, 0.1);
+            playChime(659.25, 0.15);
+            playChime(1046.50, 0.4);
+            appendLog(`Deployed romantic kiss to production! All servers blushing with pink LEDs. 💋`, 'kiss');
+            
+            document.getElementById('pythonBubble').innerText = "😘 *Blushing in Python*";
+            document.getElementById('cloudBubble').innerText = "🥰 *Overclocked Heart!*";
         }
 
-        function switchExhibitSlide2(tabKey, btnElement) {
-            currentTabSlide2 = tabKey;
-            document.querySelectorAll('#slide2 .exhibit-tab').forEach(b => b.classList.remove('active'));
-            btnElement.classList.add('active');
-            document.getElementById('exhibitImgSlide2').src = sharpTables[tabKey].src;
+        function generateLoveLetter() {
+            const quote = loveQuotes[Math.floor(Math.random() * loveQuotes.length)];
+            playChime(783.99, 0.25);
+            appendLog(quote, 'quote');
+            document.getElementById('pythonBubble').innerText = "📜 Reading love note...";
+            document.getElementById('cloudBubble').innerText = "💖 Awwwww!";
         }
 
-        function switchExhibitSlide3(tabKey, btnElement) {
-            currentTabSlide3 = tabKey;
-            document.querySelectorAll('#slide3 .exhibit-tab').forEach(b => b.classList.remove('active'));
-            btnElement.classList.add('active');
-            document.getElementById('exhibitImgSlide3').src = sharpTables[tabKey].src;
+        function ticklePython() {
+            const phrase = pythonPhrases[Math.floor(Math.random() * pythonPhrases.length)];
+            document.getElementById('pythonBubble').innerText = phrase;
+            playChime(587.33, 0.15);
+            appendLog(`Tickled Mr. Python: ${phrase}`, 'tickle');
         }
 
-        function switchExhibitSlide4(tabKey, btnElement) {
-            currentTabSlide4 = tabKey;
-            document.querySelectorAll('#slide4 .exhibit-tab').forEach(b => b.classList.remove('active'));
-            btnElement.classList.add('active');
-            document.getElementById('exhibitImgSlide4').src = sharpTables[tabKey].src;
+        function tickleCloud() {
+            const phrase = cloudPhrases[Math.floor(Math.random() * cloudPhrases.length)];
+            document.getElementById('cloudBubble').innerText = phrase;
+            playChime(880.00, 0.15);
+            appendLog(`Tickled Miss Cloud: ${phrase}`, 'tickle');
         }
 
-        function switchExhibitSlide5(tabKey, btnElement) {
-            currentTabSlide5 = tabKey;
-            document.querySelectorAll('#slide5 .exhibit-tab').forEach(b => b.classList.remove('active'));
-            btnElement.classList.add('active');
-            document.getElementById('exhibitImgSlide5').src = sharpTables[tabKey].src;
-        }
-
-        function openLightbox() {
-            let keyMap = { 1: currentTabSlide1, 2: currentTabSlide2, 3: currentTabSlide3, 4: currentTabSlide4, 5: currentTabSlide5 };
-            let key = keyMap[currentSlide] || 'inv1';
-            let data = sharpTables[key];
-            document.getElementById('lightboxFullImg').src = data.src;
-            document.getElementById('lightboxTitle').innerText = data.title;
-            document.getElementById('lightboxModal').classList.add('active');
-        }
-
-        function closeLightbox() {
-            document.getElementById('lightboxModal').classList.remove('active');
-        }
+        // Live Uptime Counter
+        let startTime = Date.now();
+        setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(elapsed / 3600);
+            const minutes = Math.floor((elapsed % 3600) / 60);
+            const seconds = elapsed % 60;
+            document.getElementById('uptimeVal').innerText = `100% (${hours}h ${minutes}m ${seconds}s)`;
+        }, 1000);
     </script>
 </body>
 </html>

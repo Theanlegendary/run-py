@@ -1,1187 +1,746 @@
 <!DOCTYPE html>
-<html lang="km">
+<html lang="en">
 <head>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
-    <title>Operationtrainningmfe</title>
-    <!-- Google Fonts: Inter, Kantumruy Pro, Merriweather -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700;800&family=Merriweather:ital,wght@0,400;0,700;0,900;1,400&display=swap" rel="stylesheet"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🐍 Python ❤️ Cloud Server — An I.T. Love Story</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* 3-Color Strict Harmonious Palette */
-            --c-red: #e11b22;         /* 1. Brand Accent */
-            --c-dark: #0f172a;        /* 2. Deep Slate */
-            --c-blue: #2563eb;        /* 3. Operational Blue */
-            
-            --c-body: #334155;
-            --c-muted: #64748b;
-            --bg-page: #faf9f6;
-            --bg-white: #ffffff;
-            --border-subtle: #eae8e1;
+            --bg-deep: #0f0c20;
+            --pink: #ff2a7a;
+            --pink-glow: rgba(255, 42, 122, 0.4);
+            --cyan: #00f0ff;
+            --yellow: #ffd000;
+            --purple: #8b5cf6;
+            --card-bg: rgba(26, 20, 51, 0.75);
+            --border-card: rgba(255, 42, 122, 0.25);
         }
 
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Kantumruy Pro', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            -webkit-font-smoothing: antialiased;
-            scroll-behavior: smooth;
+            box-sizing: border-box;
+            font-family: 'Fredoka', cursive, sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            background-color: var(--bg-page);
-            color: var(--c-body);
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-            font-size: 18px;
-            line-height: 1.65;
-        }
-
-        /* 1. DESKTOP LEFT SIDEBAR */
-        .sidebar {
-            width: 320px;
-            min-width: 320px;
-            background-color: var(--bg-white);
-            border-right: 1px solid var(--border-subtle);
-            height: 100vh;
+            background: radial-gradient(circle at 50% 20%, #2b1055, var(--bg-deep) 80%);
+            color: #fff;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
-            overflow-y: auto;
-            z-index: 100;
-        }
-
-        .sidebar-header {
-            padding: 36px 30px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .logo-img {
-            height: 52px;
-            object-fit: contain;
-            align-self: flex-start;
-        }
-
-        .nav-menu {
-            display: flex;
-            flex-direction: column;
-            padding: 8px 16px;
-            gap: 6px;
-            flex: 1;
-        }
-
-        .nav-link {
-            display: flex;
             align-items: center;
-            gap: 14px;
-            padding: 12px 18px;
-            color: var(--c-muted);
-            text-decoration: none;
-            font-size: 0.95rem;
-            font-weight: 600;
-            border-radius: 10px;
-            transition: all 0.2s ease;
+            overflow-x: hidden;
+            position: relative;
+            padding-bottom: 50px;
         }
 
-        .nav-link:hover {
-            color: var(--c-dark);
-            background: #f1f5f9;
-        }
-
-        .nav-link.active {
-            color: var(--c-red);
-            background: #fee2e2;
-            font-weight: 700;
-        }
-
-        .nav-circle-num {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.05);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            font-weight: 800;
-            flex-shrink: 0;
-        }
-
-        .nav-link.active .nav-circle-num {
-            background: var(--c-red);
-            color: #ffffff;
-        }
-
-        .sidebar-footer {
-            padding: 20px 30px;
-            border-top: 1px solid var(--border-subtle);
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        /* LANGUAGE SWITCH PILLS (EN / KH) */
-        .lang-switch-pills {
-            display: flex;
-            background: #f1f5f9;
-            border-radius: 24px;
-            padding: 4px;
-            width: 110px;
-        }
-
-        .lang-btn {
-            flex: 1;
-            border: none;
-            background: transparent;
-            color: var(--c-muted);
-            padding: 5px 0;
-            font-size: 0.85rem;
-            font-weight: 800;
-            border-radius: 20px;
-            cursor: pointer;
-            text-align: center;
-            transition: all 0.2s;
-        }
-
-        .lang-btn.active {
-            background: #ffffff;
-            color: var(--c-red);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        }
-
-        /* 2. MOBILE TOP APP BAR & HAMBURGER DRAWER */
-        .mobile-header-bar {
-            display: none;
+        /* Floating background hearts/particles */
+        .hearts-bg {
             position: fixed;
             top: 0;
             left: 0;
-            right: 0;
-            background: var(--bg-white);
-            border-bottom: 1px solid var(--border-subtle);
-            z-index: 300;
-            padding: 10px 16px;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-        }
-
-        .mobile-logo {
-            height: 36px;
-            object-fit: contain;
-        }
-
-        .mobile-right-controls {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .hamburger-btn {
-            background: #f1f5f9;
-            border: none;
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-            cursor: pointer;
-            padding: 0;
-        }
-
-        .hamburger-btn span {
-            display: block;
-            width: 20px;
-            height: 2px;
-            background: var(--c-dark);
-            border-radius: 2px;
-            transition: all 0.25s ease;
-        }
-
-        .hamburger-btn.open span:nth-child(1) {
-            transform: translateY(6px) rotate(45deg);
-        }
-        .hamburger-btn.open span:nth-child(2) {
-            opacity: 0;
-        }
-        .hamburger-btn.open span:nth-child(3) {
-            transform: translateY(-6px) rotate(-45deg);
-        }
-
-        /* MOBILE SLIDE-OUT DRAWER MENU */
-        .mobile-drawer-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, 0.5);
-            z-index: 350;
-            backdrop-filter: blur(3px);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .mobile-drawer-overlay.active {
-            display: block;
-            opacity: 1;
-        }
-
-        .mobile-drawer {
-            position: fixed;
-            top: 0;
-            right: -320px;
-            width: 290px;
+            width: 100vw;
             height: 100vh;
-            background: var(--bg-white);
-            z-index: 400;
-            box-shadow: -10px 0 30px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 24px 20px;
-            transition: right 0.3s ease;
-            overflow-y: auto;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
         }
 
-        .mobile-drawer.open {
-            right: 0;
+        .bg-heart {
+            position: absolute;
+            color: rgba(255, 42, 122, 0.15);
+            font-size: 24px;
+            animation: floatUp 12s linear infinite;
         }
 
-        .drawer-header {
-            display: flex;
+        @keyframes floatUp {
+            0% { transform: translateY(105vh) rotate(0deg) scale(0.8); opacity: 0; }
+            20% { opacity: 0.6; }
+            80% { opacity: 0.6; }
+            100% { transform: translateY(-10vh) rotate(360deg) scale(1.2); opacity: 0; }
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-top: 30px;
+            z-index: 10;
+            padding: 0 15px;
+        }
+
+        .badge {
+            display: inline-flex;
             align-items: center;
-            justify-content: space-between;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--border-subtle);
-            margin-bottom: 12px;
-        }
-
-        .drawer-title {
-            font-size: 1rem;
-            font-weight: 800;
-            color: var(--c-dark);
-        }
-
-        .drawer-close {
-            background: transparent;
-            border: none;
-            font-size: 1.5rem;
-            color: var(--c-muted);
-            cursor: pointer;
-            line-height: 1;
-        }
-
-        .drawer-menu {
-            display: flex;
-            flex-direction: column;
             gap: 8px;
-        }
-
-        .drawer-link {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 14px;
-            border-radius: 10px;
-            color: var(--c-dark);
-            text-decoration: none;
+            background: rgba(255, 42, 122, 0.15);
+            border: 1px solid var(--pink);
+            color: #ff85b3;
+            padding: 6px 18px;
+            border-radius: 50px;
+            font-size: 0.9rem;
             font-weight: 600;
-            font-size: 0.95rem;
-            background: #f8fafc;
-            transition: all 0.2s;
+            margin-bottom: 12px;
+            box-shadow: 0 0 15px var(--pink-glow);
+            animation: pulseBadge 2s infinite ease-in-out;
         }
 
-        .drawer-link.active {
-            background: #fee2e2;
-            color: var(--c-red);
+        @keyframes pulseBadge {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        h1 {
+            font-size: clamp(2rem, 5vw, 3.2rem);
             font-weight: 700;
+            background: linear-gradient(135deg, #fff 20%, #ff80bf 60%, var(--cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(255, 42, 122, 0.3);
+            line-height: 1.2;
         }
 
-        /* 3. MAIN SCROLLABLE CONTENT VIEWPORT (CENTERED & BIGGER) */
-        .content-viewport {
-            flex: 1;
-            height: 100vh;
-            overflow-y: auto;
-            display: flex;
-            justify-content: center;
-            padding: 56px 80px 450px;
+        .subtitle {
+            font-size: 1.1rem;
+            color: #c4b5fd;
+            margin-top: 8px;
         }
 
-        .article-container {
-            width: 100%;
-            max-width: 860px;
+        /* Romantic Stage Arena */
+        .stage {
+            position: relative;
+            width: min(92%, 850px);
+            background: var(--card-bg);
+            border: 2px solid var(--border-card);
+            border-radius: 28px;
+            margin-top: 30px;
+            padding: 40px 20px 30px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(255, 42, 122, 0.08);
+            backdrop-filter: blur(16px);
+            z-index: 10;
             display: flex;
             flex-direction: column;
-            gap: 80px;
+            align-items: center;
         }
 
-        /* CHAPTER SECTION */
-        .chapter-block {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            padding-bottom: 72px;
-            border-bottom: 1px solid var(--border-subtle);
-            scroll-margin-top: 56px;
-        }
-
-        #chap-5 {
-            min-height: 75vh;
-            border-bottom: none;
-        }
-
-        .chapter-tag {
+        .lovers-container {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 0.82rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            color: var(--c-red);
+            justify-content: space-around;
+            width: 100%;
+            position: relative;
+            min-height: 240px;
         }
 
-        .chapter-heading {
-            font-family: 'Merriweather', serif;
-            font-size: 2.6rem;
-            font-weight: 900;
-            color: var(--c-dark);
-            line-height: 1.25;
-            letter-spacing: -0.02em;
+        /* Characters */
+        .character-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 5;
         }
 
-        .chapter-lead {
-            font-size: 1.25rem;
-            line-height: 1.6;
-            color: var(--c-dark);
-            font-weight: 500;
+        .avatar-box {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 70px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
         }
 
-        /* INTRO PICTURES GRID & SUMMARY DETAIL */
-        .intro-gallery-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
+        .python-box {
+            border: 3px solid #3b82f6;
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.4);
+            animation: bouncePython 3s infinite ease-in-out;
+        }
+
+        .cloud-box {
+            border: 3px solid var(--pink);
+            box-shadow: 0 0 25px var(--pink-glow);
+            animation: bounceCloud 3s infinite ease-in-out 1.5s;
+        }
+
+        .avatar-box:hover {
+            transform: scale(1.15) rotate(5deg);
+        }
+
+        @keyframes bouncePython {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(-3deg); }
+        }
+
+        @keyframes bounceCloud {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(3deg); }
+        }
+
+        .char-name {
+            font-size: 1.3rem;
+            font-weight: 700;
             margin-top: 12px;
         }
 
-        .intro-picture-card {
-            background: #ffffff;
-            border: 1px solid var(--border-subtle);
-            border-radius: 18px;
-            overflow: hidden;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
-            display: flex;
-            flex-direction: column;
-            transition: transform 0.2s ease;
-        }
-
-        .intro-picture-card img {
-            width: 100%;
-            height: auto;
-            display: block;
-            object-fit: cover;
-        }
-
-        .intro-card-footer {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            background: #ffffff;
-            border-top: 1px solid var(--border-subtle);
-        }
-
-        .intro-badge {
-            align-self: flex-start;
-            background: #fee2e2;
-            color: var(--c-red);
-            font-size: 0.75rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            padding: 4px 10px;
-            border-radius: 12px;
-            letter-spacing: 0.05em;
-        }
-
-        .intro-card-title {
-            font-size: 1.15rem;
-            font-weight: 800;
-            color: var(--c-dark);
-            line-height: 1.35;
-        }
-
-        .intro-card-steps {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            font-size: 0.92rem;
-            color: var(--c-body);
-            line-height: 1.5;
-        }
-
-        .intro-step-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-        }
-
-        .intro-step-num {
-            font-weight: 800;
-            color: var(--c-red);
-            flex-shrink: 0;
-        }
-
-        /* Clean Circle Points */
-        .points-list {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            margin-top: 8px;
-        }
-
-        .point-row {
-            display: flex;
-            align-items: flex-start;
-            gap: 16px;
-            font-size: 1.05rem;
-            line-height: 1.6;
-        }
-
-        .point-circle {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--c-red);
-            margin-top: 9px;
-            flex-shrink: 0;
-        }
-
-        .point-circle.blue {
-            background: var(--c-blue);
-        }
-
-        .point-text strong {
-            font-weight: 700;
-            color: var(--c-dark);
-        }
-
-        /* 10-Hour Big Clean Highlight */
-        .ten-hour-box {
-            background: #ffffff;
-            border-left: 4px solid var(--c-red);
-            border-radius: 0 12px 12px 0;
-            padding: 24px 28px;
-            margin-top: 8px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.02);
-            border-top: 1px solid var(--border-subtle);
-            border-right: 1px solid var(--border-subtle);
-            border-bottom: 1px solid var(--border-subtle);
-        }
-
-        .ten-hour-box p {
-            font-size: 1.05rem;
-            color: var(--c-dark);
+        .char-role {
+            font-size: 0.85rem;
+            color: #a78bfa;
             font-weight: 600;
         }
 
-        /* DUAL VIDEO ROW FOR ROLES & ASSIGNMENT */
-        .dual-video-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-            margin-top: 16px;
+        .speech-bubble {
+            position: absolute;
+            top: -45px;
+            background: #fff;
+            color: #1e1b4b;
+            padding: 6px 14px;
+            border-radius: 18px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            white-space: nowrap;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            animation: popBubble 0.4s ease;
         }
 
-        /* TIKTOK 9:16 PHONE VIDEO CONTAINER */
-        .phone-mockup {
-            background: #ffffff;
-            border: 1px solid var(--border-subtle);
-            border-radius: 20px;
-            padding: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
-            width: 100%;
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: #fff transparent;
+        }
+
+        /* Love Connection Bridge in the Middle */
+        .love-bridge {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-        }
-
-        .phone-screen {
-            width: 100%;
-            aspect-ratio: 9 / 16;
-            background: #000000;
-            border-radius: 14px;
-            overflow: hidden;
-            position: relative;
-            display: flex;
             align-items: center;
             justify-content: center;
+            position: relative;
+            flex: 1;
+            padding: 0 10px;
         }
 
-        .phone-screen video {
+        .pulsing-heart {
+            font-size: 48px;
+            cursor: pointer;
+            animation: heartThrob 1.2s infinite;
+            filter: drop-shadow(0 0 15px #ff2a7a);
+            transition: transform 0.2s;
+            user-select: none;
+        }
+
+        .pulsing-heart:hover {
+            transform: scale(1.35);
+        }
+
+        @keyframes heartThrob {
+            0%, 100% { transform: scale(1); }
+            14% { transform: scale(1.25); }
+            28% { transform: scale(1); }
+            42% { transform: scale(1.2); }
+            70% { transform: scale(1); }
+        }
+
+        .connection-line {
             width: 100%;
-            height: 100%;
-            object-fit: contain;
-            display: block;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, var(--pink), var(--cyan));
+            margin-top: 10px;
+            position: relative;
+            border-radius: 2px;
+            box-shadow: 0 0 10px var(--pink);
         }
 
-        .phone-footer {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 6px 2px;
+        .flying-packet {
+            position: absolute;
+            top: -10px;
+            font-size: 14px;
+            animation: sendLovePacket 2.5s infinite linear;
         }
 
-        .phone-tag {
+        @keyframes sendLovePacket {
+            0% { left: 5%; opacity: 0; transform: scale(0.5); }
+            20% { opacity: 1; transform: scale(1.2); }
+            80% { opacity: 1; transform: scale(1.2); }
+            100% { left: 90%; opacity: 0; transform: scale(0.5); }
+        }
+
+        .status-pill {
+            margin-top: 15px;
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid var(--cyan);
+            color: var(--cyan);
+            padding: 4px 12px;
+            border-radius: 20px;
             font-size: 0.78rem;
             font-weight: 700;
-            color: var(--c-dark);
-            font-family: monospace;
+            letter-spacing: 0.5px;
+            font-family: 'JetBrains Mono', monospace;
         }
 
-        .phone-link {
+        /* Sleeping PC Box */
+        .sleeping-pc {
+            position: absolute;
+            bottom: 12px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,0,0,0.3);
+            border: 1px dashed rgba(255,255,255,0.2);
+            padding: 6px 14px;
+            border-radius: 12px;
+            font-size: 0.78rem;
+            color: #94a3b8;
+        }
+
+        /* Interactive Buttons */
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 25px;
+            width: 100%;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #ff2a7a, #8b5cf6);
+            color: white;
+            border: none;
+            padding: 12px 22px;
+            border-radius: 14px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 6px 20px rgba(255, 42, 122, 0.35);
+            transition: all 0.25s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 10px 25px rgba(255, 42, 122, 0.55);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-cyan {
+            background: linear-gradient(135deg, #0284c7, #06b6d4);
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.35);
+        }
+        .btn-cyan:hover {
+            box-shadow: 0 10px 25px rgba(6, 182, 212, 0.55);
+        }
+
+        .btn-yellow {
+            background: linear-gradient(135deg, #f59e0b, #e11d48);
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
+        }
+
+        /* Metrics Bar */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+            width: min(92%, 850px);
+            margin-top: 20px;
+            z-index: 10;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 16px 14px;
+            border-radius: 18px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        .metric-val {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+            margin-top: 4px;
+        }
+
+        .metric-label {
             font-size: 0.8rem;
-            font-weight: 700;
-            color: var(--c-blue);
-            text-decoration: none;
+            color: #a78bfa;
+            font-weight: 600;
         }
 
-        .phone-link:hover {
-            text-decoration: underline;
+        /* IT Love Code Terminal */
+        .terminal-container {
+            width: min(92%, 850px);
+            background: #080613;
+            border: 1px solid #332a58;
+            border-radius: 18px;
+            margin-top: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            z-index: 10;
         }
 
-        /* Language visibility: DEFAULT KHMER */
-        .en-text { display: none; }
-        .kh-text { display: block; }
-        
-        body:not(.lang-kh) .en-text { display: block; }
-        body:not(.lang-kh) .kh-text { display: none; }
-
-        body.lang-kh .chapter-heading {
-            font-family: 'Kantumruy Pro', sans-serif;
-            font-weight: 700;
+        .terminal-header {
+            background: #140f28;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #282046;
         }
 
-        /* 4. MOBILE RESPONSIVENESS (< 860px) */
-        @media (max-width: 860px) {
-            body {
+        .dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+        }
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+
+        .terminal-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-left: 6px;
+        }
+
+        .terminal-body {
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #38bdf8;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .log-line {
+            margin-bottom: 4px;
+        }
+        .log-time { color: #64748b; }
+        .log-heart { color: #ff2a7a; font-weight: bold; }
+        .log-success { color: #4ade80; font-weight: bold; }
+        .log-info { color: #facc15; }
+
+        /* Floating Confetti Hearts */
+        .click-heart {
+            position: absolute;
+            font-size: 28px;
+            pointer-events: none;
+            animation: burstHeart 1s forwards ease-out;
+            z-index: 100;
+        }
+
+        @keyframes burstHeart {
+            0% { transform: translate(0, 0) scale(0.5); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(1.5); opacity: 0; }
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 30px;
+            font-size: 0.88rem;
+            color: #64748b;
+            text-align: center;
+            z-index: 10;
+        }
+
+        footer span {
+            color: var(--pink);
+        }
+
+        @media (max-width: 600px) {
+            .lovers-container {
                 flex-direction: column;
-            }
-            .sidebar {
-                display: none;
-            }
-            .mobile-header-bar {
-                display: flex;
-            }
-            .content-viewport {
-                padding: 84px 16px 240px;
-                height: 100vh;
-            }
-            .chapter-block {
-                scroll-margin-top: 84px;
-                gap: 16px;
-                padding-bottom: 44px;
-            }
-            .chapter-heading {
-                font-size: 1.85rem;
-            }
-            .chapter-lead {
-                font-size: 1.05rem;
-            }
-            .point-row {
-                font-size: 0.95rem;
-                gap: 12px;
-            }
-            .intro-gallery-grid {
-                grid-template-columns: 1fr;
                 gap: 20px;
             }
-            .intro-card-footer {
-                padding: 16px;
+            .love-bridge {
+                width: 100%;
+                margin: 10px 0;
             }
-            .dual-video-grid {
-                grid-template-columns: 1fr;
-                gap: 20px;
+            .avatar-box {
+                width: 100px;
+                height: 100px;
+                font-size: 50px;
             }
-            .phone-mockup {
-                max-width: 100%;
-                margin: 10px auto 0;
+            .sleeping-pc {
+                position: static;
+                margin-top: 15px;
             }
         }
     </style>
 </head>
-<body class="lang-kh">
+<body>
 
-    <!-- MOBILE TOP HEADER WITH LOGO, EN/KH TOGGLE & HAMBURGER MENU -->
-    <header class="mobile-header-bar">
-        <img alt="Metfone Express" class="mobile-logo" src="./images/metfone_express_logo.png" onerror="this.src='https://opsexpress.metfone.com.kh/assets/images/logo.png'"/>
-        <div class="mobile-right-controls">
-            <div class="lang-switch-pills">
-                <button class="lang-btn" id="btnEnMob" onclick="setLanguage('en')">EN</button>
-                <button class="lang-btn active" id="btnKhMob" onclick="setLanguage('kh')">KH</button>
-            </div>
-            <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleDrawer()" aria-label="Toggle Menu">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-        </div>
+    <!-- Floating Background Hearts -->
+    <div class="hearts-bg" id="heartsBg"></div>
+
+    <header>
+        <div class="badge">☁️ 24/7 CLOUD HOSTED ON RENDER</div>
+        <h1>Python 🐍 & Cloud Server ☁️</h1>
+        <p class="subtitle">"The Ultimate I.T. Romance — Online Forever, Even When PC Sleeps! 💤"</p>
     </header>
 
-    <!-- MOBILE DRAWER BACKDROP & SLIDE-OUT MENU -->
-    <div class="mobile-drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
-    <div class="mobile-drawer" id="mobileDrawer">
-        <div>
-            <div class="drawer-header">
-                <span class="drawer-title">មាតិកាបណ្តុះបណ្តាល</span>
-                <button class="drawer-close" onclick="toggleDrawer()">✕</button>
+    <!-- Romantic Stage Arena -->
+    <div class="stage">
+        <div class="lovers-container">
+            
+            <!-- Python (The Dev Lover) -->
+            <div class="character-card">
+                <div class="speech-bubble" id="pythonBubble">"while True: I_Love_You() 💖"</div>
+                <div class="avatar-box python-box" onclick="ticklePython()">
+                    🐍
+                </div>
+                <div class="char-name">Mr. Python</div>
+                <div class="char-role">Senior Romantic Coder 👓</div>
             </div>
-            <nav class="drawer-menu">
-                <a href="#chap-0" class="drawer-link active" onclick="handleDrawerNav(this)">
-                    <span class="nav-circle-num">0</span>
-                    <span class="en-text">0. Introduce</span>
-                    <span class="kh-text">០. សេចក្តីផ្តើម (Infographics)</span>
-                </a>
-                <a href="#chap-1" class="drawer-link" onclick="handleDrawerNav(this)">
-                    <span class="nav-circle-num">1</span>
-                    <span class="en-text">1. KPI & Updates</span>
-                    <span class="kh-text">១. KPI & ស្ថានភាព</span>
-                </a>
-                <a href="#chap-2" class="drawer-link" onclick="handleDrawerNav(this)">
-                    <span class="nav-circle-num">2</span>
-                    <span class="en-text">2. 10-Hour Rule</span>
-                    <span class="kh-text">២. ច្បាប់ ១០ ម៉ោង</span>
-                </a>
-                <a href="#chap-3" class="drawer-link" onclick="handleDrawerNav(this)">
-                    <span class="nav-circle-num">3</span>
-                    <span class="en-text">3. Pending Inventory</span>
-                    <span class="kh-text">៣. ឥវ៉ាន់កកស្ទះ (Video)</span>
-                </a>
-                <a href="#chap-4" class="drawer-link" onclick="handleDrawerNav(this)">
-                    <span class="nav-circle-num">4</span>
-                    <span class="en-text">4. Roles & Assignment</span>
-                    <span class="kh-text">៤. ការចាត់តាំង & សិទ្ធិ (Video)</span>
-                </a>
-                <a href="#chap-5" class="drawer-link" onclick="handleDrawerNav(this)">
-                    <span class="nav-circle-num">5</span>
-                    <span class="en-text">5. Convenient Route</span>
-                    <span class="kh-text">៥. ខ្សែផ្លូវដឹក & យក</span>
-                </a>
-            </nav>
+
+            <!-- Love Bridge & Heartbeat -->
+            <div class="love-bridge">
+                <div class="pulsing-heart" onclick="sendLovePulse(event)">💖</div>
+                <div class="connection-line">
+                    <div class="flying-packet">💌</div>
+                </div>
+                <div class="status-pill">HTTP 200 OK: FOREVER_IN_LOVE</div>
+            </div>
+
+            <!-- Cloud Server (The 24/7 Soulmate) -->
+            <div class="character-card">
+                <div class="speech-bubble" id="cloudBubble">"Your app is safe in my heart! ☁️"</div>
+                <div class="avatar-box cloud-box" onclick="tickleCloud()">
+                    ☁️
+                </div>
+                <div class="char-name">Miss Cloud Server</div>
+                <div class="char-role">24/7 Always Awake 🚀</div>
+            </div>
+
         </div>
-        <div style="font-size: 0.78rem; color: var(--c-muted); text-align: center; border-top: 1px solid var(--border-subtle); padding-top: 14px;">
-            © 2026 Metfone Express Operations
+
+        <div class="sleeping-pc">
+            <span>💻💤 Laptop is sleeping peacefully at home</span>
+        </div>
+
+        <!-- Fun Interactive Buttons -->
+        <div class="action-buttons">
+            <button class="btn" onclick="sendLovePulse(event)">
+                <span>💌</span> Send Love Ping
+            </button>
+            <button class="btn btn-cyan" onclick="deployKiss(event)">
+                <span>💋</span> Deploy Kiss to Production
+            </button>
+            <button class="btn btn-yellow" onclick="generateLoveLetter()">
+                <span>📜</span> Random I.T. Love Quote
+            </button>
         </div>
     </div>
 
-    <!-- 1. DESKTOP LEFT SIDEBAR -->
-    <aside class="sidebar">
-        <div>
-            <div class="sidebar-header">
-                <img alt="Metfone Express" class="logo-img" src="./images/metfone_express_logo.png" onerror="this.src='https://opsexpress.metfone.com.kh/assets/images/logo.png'"/>
-            </div>
-
-            <nav class="nav-menu">
-                <a href="#chap-0" class="nav-link active" onclick="setActiveChapter(this)">
-                    <span class="nav-circle-num">0</span>
-                    <span class="en-text">Introduce</span>
-                    <span class="kh-text">សេចក្តីផ្តើម</span>
-                </a>
-                <a href="#chap-1" class="nav-link" onclick="setActiveChapter(this)">
-                    <span class="nav-circle-num">1</span>
-                    <span class="en-text">KPI & Updates</span>
-                    <span class="kh-text">KPI & ស្ថានភាព</span>
-                </a>
-                <a href="#chap-2" class="nav-link" onclick="setActiveChapter(this)">
-                    <span class="nav-circle-num">2</span>
-                    <span class="en-text">10-Hour Rule</span>
-                    <span class="kh-text">ច្បាប់ ១០ ម៉ោង</span>
-                </a>
-                <a href="#chap-3" class="nav-link" onclick="setActiveChapter(this)">
-                    <span class="nav-circle-num">3</span>
-                    <span class="en-text">Pending Inventory</span>
-                    <span class="kh-text">ឥវ៉ាន់កកស្ទះ (Video)</span>
-                </a>
-                <a href="#chap-4" class="nav-link" onclick="setActiveChapter(this)">
-                    <span class="nav-circle-num">4</span>
-                    <span class="en-text">Roles & Assignment</span>
-                    <span class="kh-text">ការចាត់តាំង & សិទ្ធិ (Video)</span>
-                </a>
-                <a href="#chap-5" class="nav-link" onclick="setActiveChapter(this)">
-                    <span class="nav-circle-num">5</span>
-                    <span class="en-text">Arrange in Convenient Route</span>
-                    <span class="kh-text">ការរៀបចំខ្សែផ្លូវដឹក & យក</span>
-                </a>
-            </nav>
+    <!-- Live Metrics Grid -->
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-label">UPTIME TOGETHER</div>
+            <div class="metric-val" id="uptimeVal">99.999%</div>
         </div>
-
-        <div class="sidebar-footer">
-            <div class="lang-switch-pills">
-                <button class="lang-btn" id="btnEn" onclick="setLanguage('en')">EN</button>
-                <button class="lang-btn active" id="btnKh" onclick="setLanguage('kh')">KH</button>
-            </div>
-            <div style="font-size: 0.75rem; color: var(--c-muted); text-align: center;">
-                © 2026 Metfone Express
-            </div>
+        <div class="metric-card">
+            <div class="metric-label">ROMANTIC LATENCY</div>
+            <div class="metric-val" style="color: #4ade80;">0.00 ms ⚡</div>
         </div>
-    </aside>
-
-    <!-- 2. MAIN STREAMLINED BOOK CONTENT -->
-    <main class="content-viewport" id="contentViewport">
-        <div class="article-container">
-
-            <!-- LESSON 0: INTRODUCE (2 INFOGRAPHIC PICTURES WITH SHORT TITLE & SHORT DETAILS FOR TELEGRAM GROUP) -->
-            <section class="chapter-block" id="chap-0">
-                <div class="chapter-tag">
-                    <span>Lesson 00</span>
-                </div>
-
-                <h2 class="chapter-heading en-text">Introduce</h2>
-                <h2 class="chapter-heading kh-text">សេចក្តីផ្តើម</h2>
-
-                <div class="chapter-lead en-text">
-                    Core operational principles for parcel pickup and delivery workflows.
-                </div>
-                <div class="chapter-lead kh-text">
-                    គោលការណ៍គ្រឹះស្តីពីដំណើរការប្រតិបត្តិការទទួលផ្ញើ និងដឹកជញ្ជូនបញ្ញើ។
-                </div>
-
-                <div class="intro-gallery-grid">
-                    <!-- Card 1: Pickup / Sending -->
-                    <div class="intro-picture-card">
-                        <img src="./images/intro_step1.jpg" alt="Operational Principle - Pickup"/>
-                        <div class="intro-card-footer">
-                            <span class="intro-badge en-text">Steps 01 - 03</span>
-                            <span class="intro-badge kh-text">ដំណាក់កាល ០១ - ០៣</span>
-                            
-                            <h3 class="intro-card-title en-text">Pickup & Dispatch Operations</h3>
-                            <h3 class="intro-card-title kh-text">គោលការណ៍ប្រតិបត្តិការផ្ញើ</h3>
-
-                            <div class="intro-card-steps en-text">
-                                <div class="intro-step-item"><span class="intro-step-num">1.</span> <span><b>Inspect Parcel:</b> Greet customer, check weight, size & packaging.</span></div>
-                                <div class="intro-step-item"><span class="intro-step-num">2.</span> <span><b>Create Bill:</b> Enter details accurately, attach label & confirm COD.</span></div>
-                                <div class="intro-step-item"><span class="intro-step-num">3.</span> <span><b>Dispatch:</b> Sort by route, ready 30m early & hand over to truck.</span></div>
-                            </div>
-                            <div class="intro-card-steps kh-text">
-                                <div class="intro-step-item"><span class="intro-step-num">១.</span> <span><b>ពិនិត្យឥវ៉ាន់៖</b> ស្វាគមន៍ភ្ញៀវ ផ្ទៀងផ្ទាត់ទម្ងន់ ទំហំ និងការវេចខ្ចប់។</span></div>
-                                <div class="intro-step-item"><span class="intro-step-num">២.</span> <span><b>បង្កើតបុងបញ្ញើ៖</b> បញ្ចូលលេខទូរស័ព្ទ បិទស្ទីកឃ័រ និងផ្ទៀង Fee/COD។</span></div>
-                                <div class="intro-step-item"><span class="intro-step-num">៣.</span> <span><b>ចាត់ចែងដឹកជញ្ជូន៖</b> រៀបចំទុក ៣០ នាទីមុនឡានមកដល់ & ស្កេនផ្ទេរ។</span></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Card 2: Delivery / Receiving -->
-                    <div class="intro-picture-card">
-                        <img src="./images/intro_step2.jpg" alt="Operational Principle - Delivery"/>
-                        <div class="intro-card-footer">
-                            <span class="intro-badge en-text">Steps 04 - 06</span>
-                            <span class="intro-badge kh-text">ដំណាក់កាល ០៤ - ០៦</span>
-                            
-                            <h3 class="intro-card-title en-text">Receiving & Delivery Operations</h3>
-                            <h3 class="intro-card-title kh-text">គោលការណ៍ប្រតិបត្តិការដឹក</h3>
-
-                            <div class="intro-card-steps en-text">
-                                <div class="intro-step-item"><span class="intro-step-num">4.</span> <span><b>Receive & Unload:</b> Verify branch code, scan from Mega Truck & assign.</span></div>
-                                <div class="intro-step-item"><span class="intro-step-num">5.</span> <span><b>Contact Customer:</b> Call customer 30 minutes before delivering.</span></div>
-                                <div class="intro-step-item"><span class="intro-step-num">6.</span> <span><b>Payment & Complete:</b> Scan KHQR / collect COD & update complete.</span></div>
-                            </div>
-                            <div class="intro-card-steps kh-text">
-                                <div class="intro-step-item"><span class="intro-step-num">៤.</span> <span><b>ទទួល & ផ្ទេរចូលសាខា៖</b> ផ្ទៀងកូដសាខា ស្កេនទទួលពីឡាន & ចាត់អ្នកដឹក។</span></div>
-                                <div class="intro-step-item"><span class="intro-step-num">៥.</span> <span><b>ទាក់ទងអតិថិជន៖</b> ខលប្រាប់ភ្ញៀវ ៣០ នាទីមុនចេញដំណើរទៅដឹក។</span></div>
-                                <div class="intro-step-item"><span class="intro-step-num">៦.</span> <span><b>ទូទាត់ប្រាក់ & បញ្ចប់៖</b> ស្កេន KHQR ប្រមូល COD & Update ជោគជ័យ។</span></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- LESSON 01: KPI & UPDATES -->
-            <section class="chapter-block" id="chap-1">
-                <div class="chapter-tag">
-                    <span>Lesson 01</span>
-                </div>
-
-                <h2 class="chapter-heading en-text">KPI & Status Updates</h2>
-                <h2 class="chapter-heading kh-text">KPI និងការ Update ស្ថានភាព</h2>
-
-                <div class="chapter-lead en-text">
-                    Pick up on time, deliver safely, and update the app immediately.
-                </div>
-                <div class="chapter-lead kh-text">
-                    ទៅយកទាន់ពេល ដឹកជញ្ជូនសុវត្ថិភាព និង Update លើ App ភ្លាមៗ។
-                </div>
-
-                <div class="points-list">
-                    <div class="point-row">
-                        <span class="point-circle"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Pickup:</strong>
-                            <strong class="kh-text">ការទៅយក៖</strong>
-                            <span class="en-text">Contact sender quickly, check package, and scan in the app right away.</span>
-                            <span class="kh-text">ទាក់ទងអ្នកផ្ញើឱ្យលឿន ពិនិត្យឥវ៉ាន់ និងស្កេនចូល App ភ្លាមៗ។</span>
-                        </div>
-                    </div>
-
-                    <div class="point-row">
-                        <span class="point-circle"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Delivery:</strong>
-                            <strong class="kh-text">ការដឹកជូន៖</strong>
-                            <span class="en-text">Call receiver ahead, deliver safely, and collect exact COD/fee.</span>
-                            <span class="kh-text">ទូរស័ព្ទទៅអ្នកទទួលជាមុន ប្រគល់ឥវ៉ាន់ និងប្រមូលប្រាក់ COD/ថ្លៃដឹកឱ្យត្រឹមត្រូវ។</span>
-                        </div>
-                    </div>
-
-                    <div class="point-row">
-                        <span class="point-circle"></span>
-                        <div class="point-text">
-                            <strong class="en-text">True Status:</strong>
-                            <strong class="kh-text">ស្ថានភាពពិត៖</strong>
-                            <span class="en-text">Always choose the real status (Picked Up, Delivered, or Failed with actual reason). Never guess.</span>
-                            <span class="kh-text">ជ្រើសរើសស្ថានភាពជាក់ស្តែង (បានទទួល បានដឹក ឬមិនបានសម្រេចដោយបញ្ជាក់មូលហេតុពិត)។ ហាមស្មាន។</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- LESSON 02: THE 10-HOUR RULE -->
-            <section class="chapter-block" id="chap-2">
-                <div class="chapter-tag">
-                    <span>Lesson 02</span>
-                </div>
-
-                <h2 class="chapter-heading en-text">The 10-Hour Rule</h2>
-                <h2 class="chapter-heading kh-text">ច្បាប់កំណត់ពេល ១០ ម៉ោង</h2>
-
-                <div class="chapter-lead en-text">
-                    Update the bill status within 10 hours of assignment.
-                </div>
-                <div class="chapter-lead kh-text">
-                    ត្រូវតែ Update ស្ថានភាពឥវ៉ាន់ក្នុងរង្វង់ ១០ ម៉ោងបន្ទាប់ពីទទួលការចាត់តាំង។
-                </div>
-
-                <div class="points-list">
-                    <div class="point-row">
-                        <span class="point-circle blue"></span>
-                        <div class="point-text">
-                            <strong class="en-text">10h Limit:</strong>
-                            <strong class="kh-text">កំហិត ១០h៖</strong>
-                            <span class="en-text">Timer starts the moment the bill is assigned to your account.</span>
-                            <span class="kh-text">ការរាប់ម៉ោងចាប់ផ្តើមភ្លាមៗនៅពេលឥវ៉ាន់ចូលក្នុងគណនីរបស់អ្នក។</span>
-                        </div>
-                    </div>
-
-                    <div class="point-row">
-                        <span class="point-circle blue"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Example:</strong>
-                            <strong class="kh-text">ករណីជាក់ស្តែង៖</strong>
-                            <span class="en-text">Assigned at <b>08:00 AM</b> ➔ Must update status before <b>06:00 PM</b> same day.</span>
-                            <span class="kh-text">ចាត់តាំងម៉ោង <b>០៨:០០ ព្រឹក</b> ➔ ត្រូវតែ Update មុនម៉ោង <b>០៦:០០ ល្ងាច</b> ថ្ងៃដដែល។</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="ten-hour-box">
-                    <p class="en-text">🟢 Within 10 Hours = On-Time | 🔴 Over 10 Hours = Overdue (KPI penalty)</p>
-                    <p class="kh-text">🟢 ក្នុងរង្វង់ ១០ ម៉ោង = ទាន់ពេល | 🔴 លើស ១០ ម៉ោង = យឺតយ៉ាវ (ខូច KPI)</p>
-                </div>
-            </section>
-
-            <!-- LESSON 03: PENDING INVENTORY -->
-            <section class="chapter-block" id="chap-3">
-                <div class="chapter-tag">
-                    <span>Lesson 03</span>
-                </div>
-
-                <h2 class="chapter-heading en-text">Pending Inventory</h2>
-                <h2 class="chapter-heading kh-text">ការគ្រប់គ្រងឥវ៉ាន់កកស្ទះ</h2>
-
-                <div class="chapter-lead en-text">
-                    Check and clear your route pending list every day.
-                </div>
-                <div class="chapter-lead kh-text">
-                    ពិនិត្យ និងដោះស្រាយឥវ៉ាន់សល់តាមផ្លូវដឹករបស់ខ្លួនជារៀងរាល់ថ្ងៃ។
-                </div>
-
-                <div class="points-list">
-                    <div class="point-row">
-                        <span class="point-circle"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Check App:</strong>
-                            <strong class="kh-text">មើលលើ App៖</strong>
-                            <span class="en-text">Review open and pending bills in your route throughout the day.</span>
-                            <span class="kh-text">តាមដានឥវ៉ាន់ Pending ក្នុងផ្លូវរបស់ខ្លួនឯងឱ្យបានញឹកញាប់។</span>
-                        </div>
-                    </div>
-
-                    <div class="point-row">
-                        <span class="point-circle"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Self-Management:</strong>
-                            <strong class="kh-text">ម្ចាស់ការខ្លួនឯង៖</strong>
-                            <span class="en-text">Proactively clear open bills without waiting for reminders.</span>
-                            <span class="kh-text">ចាត់ចែងដោះស្រាយឥវ៉ាន់ដែលនៅសល់ដោយខ្លួនឯង ដោយមិនរង់ចាំការដាស់តឿន។</span>
-                        </div>
-                    </div>
-
-                    <div class="point-row">
-                        <span class="point-circle"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Manager & CS Help:</strong>
-                            <strong class="kh-text">ការជួយពី Manager & CS៖</strong>
-                            <span class="en-text">Branch Manager and CS staff assist with re-assigning heavy volumes.</span>
-                            <span class="kh-text">ប្រធានសាខា និង CS ជួយសម្របសម្រួល និងបែងចែកឥវ៉ាន់ពេលមានចំនួនច្រើន។</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 9:16 Phone Video -->
-                <div class="phone-mockup" style="max-width: 350px; margin: 20px auto 0;">
-                    <div class="phone-footer">
-                        <span class="phone-tag">video: inventory</span>
-                        <a href="./videos/inventory.mp4" class="phone-link" target="_blank">Direct Link ↗</a>
-                    </div>
-                    <div class="phone-screen">
-                        <video id="vid-inventory" controls playsinline webkit-playsinline preload="metadata">
-                            <source src="./videos/inventory.mp4" type="video/mp4">
-                            Your browser does not support the video tag.
-                        </video>
-                    </div>
-                </div>
-            </section>
-
-            <!-- LESSON 04: USER ROLES & BILL ASSIGNMENT (MANAGER ASSIGN & SHIPPER SELF-ASSIGN TOGETHER) -->
-            <section class="chapter-block" id="chap-4">
-                <div class="chapter-tag">
-                    <span>Lesson 04</span>
-                </div>
-
-                <h2 class="chapter-heading en-text">Roles & Bill Assignment</h2>
-                <h2 class="chapter-heading kh-text">តួនាទី & ការចាត់តាំងវិក្កយបត្រ</h2>
-
-                <div class="chapter-lead en-text">
-                    Bills can be assigned by Managers or self-assigned by Shippers to earn commission.
-                </div>
-                <div class="chapter-lead kh-text">
-                    វិក្កយបត្រអាចចាត់តាំងដោយ Manager ឬ Shipper ចាត់តាំងមកខ្លួនឯងផ្ទាល់ដើម្បីទទួល Commission។
-                </div>
-
-                <div class="points-list">
-                    <div class="point-row">
-                        <span class="point-circle blue"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Manager / CS Assign:</strong>
-                            <strong class="kh-text">Manager/CS ចាត់តាំង៖</strong>
-                            <span class="en-text">Branch Manager or CS assigns open orders directly to shippers based on route capacity.</span>
-                            <span class="kh-text">Manager ឬ CS ចាត់តាំងឥវ៉ាន់ផ្ទាល់ទៅកាន់ Shipper តាមតំបន់ផ្លូវដឹក។</span>
-                        </div>
-                    </div>
-
-                    <div class="point-row">
-                        <span class="point-circle blue"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Shipper Self-Assign:</strong>
-                            <strong class="kh-text">Shipper ចាត់ខ្លួនឯង៖</strong>
-                            <span class="en-text">Shippers with assigned permissions can self-assign available bills directly in the app without asking.</span>
-                            <span class="kh-text">Shipper ដែលមានសិទ្ធិ អាចចាត់តាំងឥវ៉ាន់មកខ្លួនឯងបានភ្លាមៗលើ App ដោយមិនបាច់សុំការអនុញ្ញាតគ្រប់ពេលឡើយ។</span>
-                        </div>
-                    </div>
-
-                    <div class="point-row">
-                        <span class="point-circle blue"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Commission Earnings:</strong>
-                            <strong class="kh-text">កម្រៃជើងសារ (Commission)៖</strong>
-                            <span class="en-text">Commission is calculated based on the applicable bill amount for work handled and completed by your account.</span>
-                            <span class="kh-text">Commission ត្រូវបានគណនាផ្អែកលើទំហំទឹកប្រាក់នៃឥវ៉ាន់ជាក់ស្តែងដែលអ្នកបានបំពេញការងារជោគជ័យ។</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- DUAL 9:16 VIDEOS SIDE-BY-SIDE -->
-                <div class="dual-video-grid">
-                    <!-- Video: manager_assign -->
-                    <div class="phone-mockup">
-                        <div class="phone-footer">
-                            <span class="phone-tag">video: manager_assign</span>
-                            <a href="./videos/manager_assign.mp4" class="phone-link" target="_blank">Direct Link ↗</a>
-                        </div>
-                        <div class="phone-screen">
-                            <video id="vid-mgr" controls playsinline webkit-playsinline preload="metadata">
-                                <source src="./videos/manager_assign.mp4" type="video/mp4">
-                                Your browser does not support the video tag.
-                            </video>
-                        </div>
-                    </div>
-
-                    <!-- Video: shipper_assign -->
-                    <div class="phone-mockup">
-                        <div class="phone-footer">
-                            <span class="phone-tag">video: shipper_assign</span>
-                            <a href="./videos/shipper_assign.mp4" class="phone-link" target="_blank">Direct Link ↗</a>
-                        </div>
-                        <div class="phone-screen">
-                            <video id="vid-shp" controls playsinline webkit-playsinline preload="metadata">
-                                <source src="./videos/shipper_assign.mp4" type="video/mp4">
-                                Your browser does not support the video tag.
-                            </video>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- LESSON 05: ARRANGE BILLS IN CONVENIENT ROUTE (DELIVERY & PICKUP ROUTE) -->
-            <section class="chapter-block" id="chap-5">
-                <div class="chapter-tag">
-                    <span>Lesson 05</span>
-                </div>
-
-                <h2 class="chapter-heading en-text">Arrange Bills in Convenient Route</h2>
-                <h2 class="chapter-heading kh-text">ការរៀបចំវិក្កយបត្រតាមខ្សែផ្លូវងាយស្រួល (ដឹក & យក)</h2>
-
-                <div class="chapter-lead en-text">
-                    Organize your delivery and pickup bills in sequence before going out to save fuel, time, and stay inside the 10h SLA.
-                </div>
-                <div class="chapter-lead kh-text">
-                    រៀបចំវិក្កយបត្រដឹក (Delivery) និងទទួល (Pickup) ជាលំដាប់លំដោយមុនចេញដំណើរ ដើម្បីចំណេញសាំង ពេលវេលា និងទាន់ម៉ោង ១០h។
-                </div>
-
-                <div class="points-list">
-                    <div class="point-row">
-                        <span class="point-circle"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Combine Pickup & Delivery:</strong>
-                            <strong class="kh-text">បញ្ចូលផ្លូវដឹក និងទទួលជាមួយគ្នា៖</strong>
-                            <span class="en-text">Group nearby pickup points and delivery destinations located on the same street or neighborhood together.</span>
-                            <span class="kh-text">ប្រមូលកន្លែងទៅយក (Pickup) និងកន្លែងទៅដឹក (Delivery) ដែលនៅលើផ្លូវ ឬភូមិ/ឃុំក្បែរៗគ្នាជាមួយគ្នា។</span>
-                        </div>
-                    </div>
-
-                    <div class="point-row">
-                        <span class="point-circle"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Prioritize by Deadline:</strong>
-                            <strong class="kh-text">ផ្តល់អាទិភាពតាមម៉ោងកំណត់៖</strong>
-                            <span class="en-text">Place urgent pickups and bills close to the 10-hour limit at the beginning of your trip.</span>
-                            <span class="kh-text">ដាក់វិក្កយបត្រទទួលបន្ទាន់ និងវិក្កយបត្រជិតផុតកំណត់ ១០ ម៉ោងនៅដើមខ្សែផ្លូវ។</span>
-                        </div>
-                    </div>
-
-                    <div class="point-row">
-                        <span class="point-circle"></span>
-                        <div class="point-text">
-                            <strong class="en-text">Continuous Efficient Loop:</strong>
-                            <strong class="kh-text">ខ្សែផ្លូវធ្វើដំណើរជារង្វង់៖</strong>
-                            <span class="en-text">Plan a clean circular loop starting from the branch, completing stops in order, and returning without driving back-and-forth.</span>
-                            <span class="kh-text">រៀបចំខ្សែផ្លូវដើរជារង្វង់បន្តបន្ទាប់ពីសាខា ដោយបំពេញការងារតាមលំដាប់ និងមិនជិះកាត់ចុះកាត់ឡើងឡើយ។</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
+        <div class="metric-card">
+            <div class="metric-label">LOVE HEARTBEAT</div>
+            <div class="metric-val" style="color: #ff2a7a;" id="loveCount">1,337 Pings</div>
         </div>
-    </main>
+        <div class="metric-card">
+            <div class="metric-label">BUGS IN LOVE</div>
+            <div class="metric-val" style="color: #38bdf8;">0 (Only Features)</div>
+        </div>
+    </div>
 
-<script>
-    // Smooth Scroll spy for desktop sidebar & mobile drawer
-    const scrollContainer = document.getElementById('contentViewport');
-    const sections = document.querySelectorAll('.chapter-block');
-    const navItems = document.querySelectorAll('.nav-link');
-    const drawerLinks = document.querySelectorAll('.drawer-link');
+    <!-- Live Terminal Love Stream -->
+    <div class="terminal-container">
+        <div class="terminal-header">
+            <div class="dot dot-red"></div>
+            <div class="dot dot-yellow"></div>
+            <div class="dot dot-green"></div>
+            <div class="terminal-title">romantic_telemetry_live.log — Render Datacenter</div>
+        </div>
+        <div class="terminal-body" id="termBody">
+            <div class="log-line"><span class="log-time">[00:00:01]</span> <span class="log-info">[INIT]</span> Python initialized handshake with Cloud Server...</div>
+            <div class="log-line"><span class="log-time">[00:00:02]</span> <span class="log-success">[SUCCESS]</span> Status 200 OK: Heart connection established!</div>
+            <div class="log-line"><span class="log-time">[00:00:03]</span> <span class="log-heart">[ROMANCE]</span> git commit -m "You stole my heart, never rolling back"</div>
+            <div class="log-line"><span class="log-time">[00:00:04]</span> <span class="log-info">[ALERT]</span> Laptop went to sleep 😴. Cloud hosting keeping bot alive 24/7!</div>
+        </div>
+    </div>
 
-    scrollContainer.addEventListener('scroll', () => {
-        const scrollBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight;
+    <footer>
+        Crafted with <span>❤️</span> for Python, Cloud Hosting & Telecom I.T. Engineers
+    </footer>
+
+    <script>
+        // Generate Background Hearts
+        const heartsBg = document.getElementById('heartsBg');
+        const heartIcons = ['💖', '💕', '💗', '✨', '🌸', '🐍', '☁️', '⚡'];
         
-        // If scrolled near the bottom, always highlight the last chapter
-        if (scrollBottom < 160) {
-            navItems.forEach(item => item.classList.remove('active'));
-            drawerLinks.forEach(item => item.classList.remove('active'));
-            if (navItems.length) navItems[navItems.length - 1].classList.add('active');
-            if (drawerLinks.length) drawerLinks[drawerLinks.length - 1].classList.add('active');
-            return;
+        for(let i = 0; i < 22; i++) {
+            const h = document.createElement('div');
+            h.className = 'bg-heart';
+            h.innerText = heartIcons[Math.floor(Math.random() * heartIcons.length)];
+            h.style.left = Math.random() * 100 + 'vw';
+            h.style.animationDelay = (Math.random() * 10) + 's';
+            h.style.fontSize = (Math.random() * 18 + 14) + 'px';
+            heartsBg.appendChild(h);
         }
 
-        let currentSectionId = '';
-        const scrollPos = scrollContainer.scrollTop + (window.innerWidth <= 860 ? 100 : 180);
+        let pings = 1337;
+        const loveQuotes = [
+            "\"You are the CSS to my HTML — without you, I am unstyled and broken.\"",
+            "\"Are you an exception? Because I want to catch you and never let you go.\"",
+            "\"SELECT * FROM world WHERE person = 'YOU'; -> 1 Row Found (My Everything).\"",
+            "\"My love for you has no break condition: while(True) { love++; }\"",
+            "\"You auto-deployed straight into my heart without any merge conflicts.\"",
+            "\"Even if my laptop dies, my cloud loves you 24/7 with zero downtime.\""
+        ];
 
-        sections.forEach(sec => {
-            const top = sec.offsetTop;
-            const height = sec.offsetHeight;
-            if (scrollPos >= top && scrollPos < top + height) {
-                currentSectionId = sec.getAttribute('id');
+        const pythonPhrases = [
+            "\"import love; love.forever() 💕\"",
+            "\"I will handle all your 500 errors! 🛡️\"",
+            "\"You make my CPU run at 100% ❤️\"",
+            "\"No bugs can tear us apart! 🐛🚫\""
+        ];
+
+        const cloudPhrases = [
+            "\"I will host you 24/7 forever! ☁️\"",
+            "\"Zero downtime for our relationship! 🚀\"",
+            "\"Unlimited bandwidth for your love! 📡\"",
+            "\"Scaling horizontally for more hugs! 🤗\""
+        ];
+
+        // Synthesize Cute Retro Sound Effects with Web Audio API
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playChime(freq = 587.33, duration = 0.15) {
+            try {
+                if(audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        function appendLog(msg, type = "heart") {
+            const tb = document.getElementById('termBody');
+            const now = new Date().toTimeString().split(' ')[0];
+            const div = document.createElement('div');
+            div.className = 'log-line';
+            
+            let tag = '<span class="log-heart">[LOVE]</span>';
+            if(type === 'kiss') tag = '<span class="log-heart">[KISS 💋]</span>';
+            if(type === 'quote') tag = '<span class="log-info">[POETRY]</span>';
+            if(type === 'tickle') tag = '<span class="log-success">[TICKLE]</span>';
+
+            div.innerHTML = `<span class="log-time">[${now}]</span> ${tag} ${msg}`;
+            tb.appendChild(div);
+            tb.scrollTop = tb.scrollHeight;
+        }
+
+        function spawnFloatingHearts(e) {
+            const x = e.clientX || window.innerWidth / 2;
+            const y = e.clientY || window.innerHeight / 2;
+            
+            for(let i = 0; i < 6; i++) {
+                const h = document.createElement('div');
+                h.className = 'click-heart';
+                h.innerText = ['❤️', '💖', '💋', '✨', '💕'][Math.floor(Math.random() * 5)];
+                h.style.left = x + 'px';
+                h.style.top = y + 'px';
+                
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.random() * 90 + 40;
+                h.style.setProperty('--tx', Math.cos(angle) * distance + 'px');
+                h.style.setProperty('--ty', Math.sin(angle) * distance + 'px');
+                
+                document.body.appendChild(h);
+                setTimeout(() => h.remove(), 1000);
             }
-        });
-
-        if (currentSectionId) {
-            navItems.forEach(item => {
-                const href = item.getAttribute('href').substring(1);
-                item.classList.toggle('active', href === currentSectionId);
-            });
-            drawerLinks.forEach(item => {
-                const href = item.getAttribute('href').substring(1);
-                item.classList.toggle('active', href === currentSectionId);
-            });
         }
-    });
 
-    function setActiveChapter(element) {
-        navItems.forEach(item => item.classList.remove('active'));
-        element.classList.add('active');
-    }
-
-    // Mobile Hamburger Menu Drawer Toggle
-    function toggleDrawer() {
-        const drawer = document.getElementById('mobileDrawer');
-        const overlay = document.getElementById('drawerOverlay');
-        const hamburgerBtn = document.getElementById('hamburgerBtn');
-        const isOpen = drawer.classList.contains('open');
-
-        if (isOpen) {
-            drawer.classList.remove('open');
-            overlay.classList.remove('active');
-            hamburgerBtn.classList.remove('open');
-        } else {
-            drawer.classList.add('open');
-            overlay.classList.add('active');
-            hamburgerBtn.classList.add('open');
+        function sendLovePulse(e) {
+            pings++;
+            document.getElementById('loveCount').innerText = pings.toLocaleString() + " Pings";
+            spawnFloatingHearts(e);
+            playChime(659.25, 0.2); // E5
+            setTimeout(() => playChime(880.00, 0.3), 100); // A5
+            appendLog(`Love Ping sent! Heartbeat acknowledged with 0.00ms latency.`);
         }
-    }
 
-    function handleDrawerNav(element) {
-        drawerLinks.forEach(link => link.classList.remove('active'));
-        element.classList.add('active');
-        toggleDrawer();
-    }
-
-    // Language switcher (EN / KH)
-    function setLanguage(lang) {
-        const body = document.body;
-        const btnEn = document.getElementById('btnEn');
-        const btnKh = document.getElementById('btnKh');
-        const btnEnMob = document.getElementById('btnEnMob');
-        const btnKhMob = document.getElementById('btnKhMob');
-
-        if (lang === 'kh') {
-            body.classList.add('lang-kh');
-            if (btnKh) btnKh.classList.add('active');
-            if (btnEn) btnEn.classList.remove('active');
-            if (btnKhMob) btnKhMob.classList.add('active');
-            if (btnEnMob) btnEnMob.classList.remove('active');
-        } else {
-            body.classList.remove('lang-kh');
-            if (btnEn) btnEn.classList.add('active');
-            if (btnKh) btnKh.classList.remove('active');
-            if (btnEnMob) btnEnMob.classList.add('active');
-            if (btnKhMob) btnKhMob.classList.remove('active');
+        function deployKiss(e) {
+            pings += 10;
+            document.getElementById('loveCount').innerText = pings.toLocaleString() + " Pings";
+            spawnFloatingHearts(e);
+            playChime(523.25, 0.1);
+            playChime(659.25, 0.15);
+            playChime(1046.50, 0.4);
+            appendLog(`Deployed romantic kiss to production! All servers blushing with pink LEDs. 💋`, 'kiss');
+            
+            document.getElementById('pythonBubble').innerText = "😘 *Blushing in Python*";
+            document.getElementById('cloudBubble').innerText = "🥰 *Overclocked Heart!*";
         }
-    }
-</script>
 
+        function generateLoveLetter() {
+            const quote = loveQuotes[Math.floor(Math.random() * loveQuotes.length)];
+            playChime(783.99, 0.25);
+            appendLog(quote, 'quote');
+            document.getElementById('pythonBubble').innerText = "📜 Reading love note...";
+            document.getElementById('cloudBubble').innerText = "💖 Awwwww!";
+        }
+
+        function ticklePython() {
+            const phrase = pythonPhrases[Math.floor(Math.random() * pythonPhrases.length)];
+            document.getElementById('pythonBubble').innerText = phrase;
+            playChime(587.33, 0.15);
+            appendLog(`Tickled Mr. Python: ${phrase}`, 'tickle');
+        }
+
+        function tickleCloud() {
+            const phrase = cloudPhrases[Math.floor(Math.random() * cloudPhrases.length)];
+            document.getElementById('cloudBubble').innerText = phrase;
+            playChime(880.00, 0.15);
+            appendLog(`Tickled Miss Cloud: ${phrase}`, 'tickle');
+        }
+
+        // Live Uptime Counter
+        let startTime = Date.now();
+        setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(elapsed / 3600);
+            const minutes = Math.floor((elapsed % 3600) / 60);
+            const seconds = elapsed % 60;
+            document.getElementById('uptimeVal').innerText = `100% (${hours}h ${minutes}m ${seconds}s)`;
+        }, 1000);
+    </script>
 </body>
 </html>
