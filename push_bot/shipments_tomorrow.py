@@ -3,138 +3,99 @@ import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from datetime import datetime
 
-def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1", start_time="00:00", end_time="06:00"):
+def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
     """
     Builds CEO-Level Executive SHIPMENTS TOMORROW REPORT Excel file:
       - Sheet 1: SHIPMENTS TOMORROW REPORT (Left main table + Right Executive Summary table)
       - Sheet 2: base (Raw order dataset)
-    Filters orders created on current date between start_time (00:00) and end_time (06:00).
+    Reports all active transit orders (Status 306, 309, 302, 310, 311) destined for the target zone/branch.
     """
     import pandas as pd
-    wb_src = openpyxl.load_workbook(src_xlsx, data_only=True)
-    ws_src = wb_src.active
+    df = pd.read_excel(src_xlsx)
+    df.columns = [str(c).strip().upper() for c in df.columns]
 
-    headers = [str(ws_src.cell(1, c).value or "").strip() for c in range(1, ws_src.max_column + 1)]
-    col_map = {h.upper(): idx for idx, h in enumerate(headers, 1)}
+    # Find columns safely
+    col_order = next((c for c in df.columns if 'ORDER ID' in c or 'ORDER_NUMBER' in c), 'ORDER ID')
+    col_dest_prov = next((c for c in df.columns if 'DELIVERY PROVINCE' in c or 'DESTINATION_BRANCH' in c), 'DELIVERY PROVINCE')
+    col_dest_po = next((c for c in df.columns if 'DELIVERY POST' in c or 'DESTINATION_POST' in c), 'DELIVERY POST OFFICE')
+    col_orig_br = next((c for c in df.columns if 'ACTION POST OFFICE' in c or 'ORIGIN_BRANCH' in c), 'ACTION POST OFFICE')
+    col_orig_po = next((c for c in df.columns if 'CURRENT POST OFFICE' in c or 'ORIGIN_POST' in c), 'CURRENT POST OFFICE')
+    col_created = next((c for c in df.columns if 'CREATED DATE' in c or 'CREATED_AT' in c), 'CREATED DATE')
+    col_status = next((c for c in df.columns if 'CURRENT STATUS' in c or 'STATUS' in c), 'CURRENT STATUS')
+    col_weight = next((c for c in df.columns if 'WEIGHT' in c), 'WEIGHT (G)')
+    col_fee = next((c for c in df.columns if 'TOTAL FEE' in c or 'TOTAL_AMOUNT' in c), 'TOTAL FEE (USD) (4)=(1)+(2)-(3)')
+    col_vas = next((c for c in df.columns if 'VAS FEE' in c), 'VAS FEE (USD) (2)')
+    col_cod = next((c for c in df.columns if 'COD' in c), 'COD (USD)')
+    col_receiver = next((c for c in df.columns if 'RECEIVER' in c), 'RECEIVER')
+    col_service = next((c for c in df.columns if 'SERVICE' in c), 'SERVICE')
+    col_pay_meth = next((c for c in df.columns if 'PAYMENT METHOD' in c), 'PAYMENT METHOD')
 
-    ci_order   = col_map.get("ORDER ID", col_map.get("ORDER_NUMBER", 3))
-    ci_origin_br = col_map.get("ACTION POST OFFICE", col_map.get("ORIGIN_BRANCH", 36))
-    ci_origin_po = col_map.get("CURRENT POST OFFICE", col_map.get("ORIGIN_POST", 16))
-    ci_dest_prov = col_map.get("DELIVERY PROVINCE", col_map.get("DESTINATION_BRANCH", 13))
-    ci_dest_po   = col_map.get("DELIVERY POST OFFICE", col_map.get("DESTINATION_POST", 14))
-    ci_created   = col_map.get("CREATED DATE", col_map.get("CREATED_AT", 2))
-    ci_fee       = col_map.get("TOTAL FEE (USD)", col_map.get("TOTAL_AMOUNT (USD)", 20))
-    ci_vas_fee   = col_map.get("VAS FEE (USD) (2)", 18)
-    ci_cod       = col_map.get("COD (USD)", 21)
-    ci_weight    = col_map.get("WEIGHT (G)", col_map.get("ACTUAL_WEIGHT (G)", 8))
-    ci_status    = col_map.get("CURRENT STATUS", col_map.get("STATUES", 24))
-    ci_receiver  = col_map.get("RECEIVER", 5)
-    ci_service   = col_map.get("SERVICE", 6)
-    ci_pay_meth  = col_map.get("PAYMENT METHOD", 22)
+    # Status Code extraction
+    df['sc'] = df[col_status].astype(str).str.extract(r'^(\d{3})')[0]
+    
+    # Active transit shipments only (Status 306, 309, 302, 310, 311)
+    df_active = df[df['sc'].isin(['306', '309', '302', '310', '311'])].copy()
+
+    # Zone / Post office filtering
+    tgt = target_label.upper().replace(" ", "")
+    zone_by_prefix = {
+        "KAN": "ZONE1", "PNP": "ZONE1", "PRE": "ZONE1", "SVA": "ZONE1",
+        "KAM": "ZONE2", "KOH": "ZONE2", "SIH": "ZONE2", "SPE": "ZONE2", "TAK": "ZONE2", "KEP": "ZONE2",
+        "BAN": "ZONE3", "BAT": "ZONE3", "CHH": "ZONE3", "PUR": "ZONE3", "PAI": "ZONE3",
+        "ODD": "ZONE4", "PRH": "ZONE4", "SIE": "ZONE4", "THO": "ZONE4",
+        "CHA": "ZONE5", "KRA": "ZONE5", "TBK": "ZONE5", "ROT": "ZONE5", "MON": "ZONE5", "STU": "ZONE5"
+    }
+
+    df_active['dest_prov_clean'] = df_active[col_dest_prov].astype(str).str.strip().str.upper()
+    df_active['dest_po_clean'] = df_active[col_dest_po].astype(str).str.strip().str.upper()
+
+    if tgt.startswith("ZONE"):
+        target_zone_name = tgt if len(tgt) > 4 else "ZONE1"
+        df_active['zone'] = df_active['dest_prov_clean'].map(zone_by_prefix).fillna("ZONE1")
+        df_matched = df_active[df_active['zone'] == target_zone_name].copy()
+    elif len(tgt) >= 7 or (len(tgt) > 3 and tgt[3:4] in ("P", "A", "S")):
+        df_matched = df_active[df_active['dest_po_clean'] == tgt].copy()
+    elif tgt in ("ALL", "TOTAL", "MEGA"):
+        df_matched = df_active.copy()
+    else:
+        df_matched = df_active[df_active['dest_prov_clean'].str.startswith(tgt[:3])].copy()
 
     base_rows = []
     r_idx = 1
-    for r in range(2, ws_src.max_row + 1):
-        order_id = str(ws_src.cell(r, ci_order).value or "").strip()
-        if not order_id or order_id == "None":
+    for _, row in df_matched.iterrows():
+        order_id = str(row.get(col_order, '') or '').strip()
+        if not order_id or order_id == 'nan':
             continue
 
-        dest_prov = str(ws_src.cell(r, ci_dest_prov).value or "").strip().upper()
-        dest_po   = str(ws_src.cell(r, ci_dest_po).value or "").strip().upper()
-        orig_br   = str(ws_src.cell(r, ci_origin_br).value or "").strip().upper()
-        orig_po   = str(ws_src.cell(r, ci_origin_po).value or "").strip().upper()
-        created   = str(ws_src.cell(r, ci_created).value or "").strip()
-        status    = str(ws_src.cell(r, ci_status).value or "").strip()
-        receiver  = str(ws_src.cell(r, ci_receiver).value or "").strip()
-        service   = str(ws_src.cell(r, ci_service).value or "").strip().upper()
-        pay_meth  = str(ws_src.cell(r, ci_pay_meth).value or "").strip()
+        dest_prov = str(row.get(col_dest_prov, '') or '').strip().upper()
+        dest_po = str(row.get(col_dest_po, '') or '').strip().upper()
+        orig_br = str(row.get(col_orig_br, '') or '').strip().upper()
+        orig_po = str(row.get(col_orig_po, '') or '').strip().upper()
+        created = str(row.get(col_created, '') or '').strip()
+        status = str(row.get(col_status, '') or '').strip()
+        receiver = str(row.get(col_receiver, '') or '').strip()
+        service = str(row.get(col_service, '') or '').strip().upper()
+        pay_meth = str(row.get(col_pay_meth, '') or '').strip()
 
         try:
-            weight = float(ws_src.cell(r, ci_weight).value or 0)
+            weight = float(row.get(col_weight, 0) or 0)
         except (ValueError, TypeError):
             weight = 0.0
 
         try:
-            fee = float(ws_src.cell(r, ci_fee).value or 0)
+            fee = float(row.get(col_fee, 0) or 0)
         except (ValueError, TypeError):
             fee = 0.0
 
         try:
-            vas_fee = float(ws_src.cell(r, ci_vas_fee).value or 0)
+            vas_fee = float(row.get(col_vas, 0) or 0)
         except (ValueError, TypeError):
             vas_fee = 0.0
 
         try:
-            cod = float(ws_src.cell(r, ci_cod).value or 0)
+            cod = float(row.get(col_cod, 0) or 0)
         except (ValueError, TypeError):
             cod = 0.0
-
-        # Date & Time Filter: Today between start_time (00:00) and end_time (06:00)
-        today_str = datetime.now().strftime("%Y%m%d")
-        val_created = ws_src.cell(r, ci_created).value
-        row_date_str = ""
-        row_dt = None
-
-        if isinstance(val_created, datetime):
-            row_date_str = val_created.strftime("%Y%m%d")
-            row_dt = val_created
-        elif val_created:
-            s = str(val_created).strip()
-            try:
-                parsed_dt = pd.to_datetime(s, dayfirst=True, format='mixed', errors='coerce')
-                if pd.notna(parsed_dt):
-                    row_date_str = parsed_dt.strftime("%Y%m%d")
-                    row_dt = parsed_dt.to_pydatetime()
-            except Exception:
-                pass
-
-        if row_date_str and row_date_str != today_str:
-            continue
-
-        # Time interval check (00:00 to 06:00)
-        if row_dt is not None and start_time and end_time:
-            try:
-                st_h, st_m = [int(x) for x in start_time.split(":")]
-                et_h, et_m = [int(x) for x in end_time.split(":")]
-                row_minutes = row_dt.hour * 60 + row_dt.minute
-                start_minutes = st_h * 60 + st_m
-                end_minutes = et_h * 60 + et_m
-                if not (start_minutes <= row_minutes <= end_minutes):
-                    continue
-            except Exception:
-                pass
-
-        # Filter active transit orders (Status 306, 309, 302, 310, 311)
-        sc = status.split(" - ")[0].split()[0] if status else ""
-        if sc not in ("306", "309", "302", "310", "311"):
-            continue
-
-        # Zone, Branch, or Specific Post Office Target Filtering
-        tgt = target_label.upper().replace(" ", "")
-        zone_by_prefix = {
-            "KAN": "ZONE1", "PNP": "ZONE1", "PRE": "ZONE1", "SVA": "ZONE1",
-            "KAM": "ZONE2", "KOH": "ZONE2", "SIH": "ZONE2", "SPE": "ZONE2", "TAK": "ZONE2",
-            "BAN": "ZONE3", "BAT": "ZONE3", "CHH": "ZONE3", "PUR": "ZONE3",
-            "ODD": "ZONE4", "PRH": "ZONE4", "SIE": "ZONE4", "THO": "ZONE4",
-            "CHA": "ZONE5", "KRA": "ZONE5", "TBK": "ZONE5", "ROT": "ZONE5", "MON": "ZONE5", "STU": "ZONE5"
-        }
-
-        if tgt.startswith("ZONE"):
-            target_zone_name = tgt if len(tgt) > 4 else "ZONE1" # e.g. ZONE1
-            item_zone = zone_by_prefix.get(dest_prov, "ZONE1")
-            if item_zone != target_zone_name:
-                continue
-
-        elif len(tgt) >= 7 or (len(tgt) > 3 and tgt[3:4] in ("P", "A", "S")):
-            # Specific Post Office handle (e.g. PNPP014, PNPP010, SVAP001) -> MUST match dest_po exactly!
-            if dest_po != tgt:
-                continue
-
-        elif tgt not in ("ALL", "TOTAL", "MEGA"):
-            # 3-Letter Branch code (e.g. PNP, PRE, SVA, BAT)
-            branch_prefix = tgt[:3]
-            if dest_prov != branch_prefix and not dest_po.startswith(branch_prefix):
-                continue
 
 
         # Determine VAS Code & VAS Khmer Description
@@ -244,7 +205,13 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1", s
             "vas_code": vas_code_str,
             "vas_khmer": vas_khmer_str,
             "district": dist_name,
-            "zone": "Zone 3" if dest_prov in ("BAT", "SIE", "PUR") else ("Zone 5" if dest_prov in ("SIH", "KOH", "TAK") else "Zone 1")
+            "zone": {
+                "KAN": "Zone 1", "PNP": "Zone 1", "PRE": "Zone 1", "SVA": "Zone 1",
+                "KAM": "Zone 2", "KOH": "Zone 2", "SIH": "Zone 2", "SPE": "Zone 2", "TAK": "Zone 2", "KEP": "Zone 2",
+                "BAN": "Zone 3", "BAT": "Zone 3", "CHH": "Zone 3", "PUR": "Zone 3", "PAI": "Zone 3",
+                "ODD": "Zone 4", "PRH": "Zone 4", "SIE": "Zone 4", "THO": "Zone 4",
+                "CHA": "Zone 5", "KRA": "Zone 5", "TBK": "Zone 5", "ROT": "Zone 5", "MON": "Zone 5", "STU": "Zone 5"
+            }.get(dest_prov, "Zone 1")
         })
         r_idx += 1
 
