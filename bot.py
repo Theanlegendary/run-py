@@ -7420,7 +7420,287 @@ async def cmd_adminthean(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+@pm_required_handler
+async def cmd_fetch_shipped(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/fetchshipped [days] — Bulk-fetch real-time tracking for all shipped/returned orders.
+    Default: last 7 days. Max: 30 days. Exports full history Excel."""
+    await delete_group_command(update, context)
+    cfg = load_config()
+    api_cfg = cfg["api"]
+
+    args = (context.args or [])
+    try:
+        n_days = max(1, min(int(args[0]), 30)) if args else 7
+    except Exception:
+        n_days = 7
+
+    msg = await send_requester_text(update, context,
+        f"⏳ *Step 1/3* — Downloading export data (last {n_days} days)...",
+        parse_mode="Markdown")
+
+    import requests as _requests
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+
+    TRACKING_URL = "https://gw-express.metfone.com.kh/tms-tracking/api/v1/order-tracking"
+    HEADERS = {
+        "Authorization": f"Bearer {api_cfg['bearer_token']}",
+        "x-client-id": api_cfg.get("x_client_id", "TMS_ANDROID"),
+        "Referer": api_cfg.get("referer", "https://opsexpress.metfone.com.kh/"),
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "vi-VN",
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+        ),
+    }
+
+    SHIPPED_STATUSES = {"410", "520", "500", "510", "S410", "S520", "S500", "S510"}
+
+    try:
+        # ── Step 1: Download & filter export ──────────────────────────────────
+        tmpdir = tempfile.mkdtemp(prefix="shipped_")
+        track_report_dir(tmpdir)
+        stamp = datetime.now().strftime("%d%m_%H%M")
+        src = os.path.join(tmpdir, f"export_{stamp}.xlsx")
+        downloader.download_detail(api_cfg, src, force_refresh=True)
+
+        df = pd.read_excel(src, dtype=str)
+        df.columns = [str(c).strip() for c in df.columns]
+
+        # Detect key columns
+        order_col  = next((c for c in ['ORDER ID', 'ORDER_ID', 'BILL CODE', 'ORDER CODE'] if c in df.columns), None)
+        status_col = next((c for c in ['STATUS_CODE', 'CURRENT STATUS CODE', 'STATUS'] if c in df.columns), None)
+        date_col   = next((c for c in ['CREATED DATE', 'CURRENT TIME', 'STATUS TIME'] if c in df.columns), None)
+
+        if not order_col:
+            await edit_or_send_requester_text(msg, update, context,
+                "❌ Cannot find ORDER ID column in export data.")
+            return
+
+        # Filter by date range
+        cutoff = (datetime.now() - timedelta(days=n_days)).date()
+        if date_col:
+            df['_date'] = pd.to_datetime(df[date_col], dayfirst=True, format='mixed', errors='coerce').dt.date
+            df = df[df['_date'].notna() & (df['_date'] >= cutoff)]
+
+        # Filter shipped statuses
+        if status_col:
+            shipped_df = df[df[status_col].str.strip().isin(SHIPPED_STATUSES)].copy()
+        else:
+            shipped_df = df.copy()
+
+        order_ids = shipped_df[order_col].dropna().str.strip().unique().tolist()
+        total_orders = len(order_ids)
+
+        if total_orders == 0:
+            await edit_or_send_requester_text(msg, update, context,
+                f"⚠️ No shipped orders found in last {n_days} days.")
+            return
+
+        await edit_or_send_requester_text(msg, update, context,
+            f"⏳ *Step 2/3* — Fetching real-time tracking for `{total_orders:,}` orders...\n"
+            f"_(50 concurrent workers — please wait)_", parse_mode="Markdown")
+
+        # ── Step 2: Parallel tracking fetch ───────────────────────────────────
+        session = _requests.Session()
+        adapter = HTTPAdapter(
+            pool_connections=60, pool_maxsize=60,
+            max_retries=Retry(total=2, backoff_factor=0.2)
+        )
+        session.mount("https://", adapter)
+        session.headers.update(HEADERS)
+
+        def _fetch_one(oid):
+            try:
+                r = session.get(TRACKING_URL, params={"order_id": oid}, timeout=12)
+                if r.status_code != 200:
+                    return {"ORDER_ID": oid, "TRIPS": 0, "LATEST_STATUS": "",
+                            "LATEST_STATUS_NAME": "", "LATEST_TIME": "",
+                            "LATEST_LOCATION": "", "LATEST_DESC": "",
+                            "ASSIGNEE": "", "STATUS_HISTORY": "", "ERROR": f"HTTP {r.status_code}"}
+                data = r.json()
+                trips = data.get("trackingTrips", [])
+                if not trips:
+                    return {"ORDER_ID": oid, "TRIPS": 0, "LATEST_STATUS": "",
+                            "LATEST_STATUS_NAME": "", "LATEST_TIME": "",
+                            "LATEST_LOCATION": "", "LATEST_DESC": "",
+                            "ASSIGNEE": "", "STATUS_HISTORY": "", "ERROR": "No trips"}
+                latest = trips[0]
+                history = " → ".join(
+                    f"{t.get('status','')}@{(t.get('time') or '')[:10]}"
+                    for t in trips
+                )
+                return {
+                    "ORDER_ID":           oid,
+                    "TRIPS":              len(trips),
+                    "LATEST_STATUS":      latest.get("status", ""),
+                    "LATEST_STATUS_NAME": latest.get("statusName", ""),
+                    "LATEST_TIME":        latest.get("time", ""),
+                    "LATEST_LOCATION":    latest.get("location", ""),
+                    "LATEST_DESC":        latest.get("desc", ""),
+                    "ASSIGNEE":           latest.get("assigneeName", "") or latest.get("userFullName", ""),
+                    "STATUS_HISTORY":     history,
+                    "ERROR":              "",
+                }
+            except Exception as exc:
+                return {"ORDER_ID": oid, "TRIPS": 0, "LATEST_STATUS": "",
+                        "LATEST_STATUS_NAME": "", "LATEST_TIME": "",
+                        "LATEST_LOCATION": "", "LATEST_DESC": "",
+                        "ASSIGNEE": "", "STATUS_HISTORY": "", "ERROR": str(exc)}
+
+        results = []
+        with ThreadPoolExecutor(max_workers=50) as executor:
+            futures = {executor.submit(_fetch_one, oid): oid for oid in order_ids}
+            for fut in as_completed(futures):
+                results.append(fut.result())
+
+        # ── Step 3: Build Excel ────────────────────────────────────────────────
+        await edit_or_send_requester_text(msg, update, context,
+            f"⏳ *Step 3/3* — Building Excel ({len(results):,} rows)...", parse_mode="Markdown")
+
+        df_result = pd.DataFrame(results)
+
+        # Merge with export columns for context
+        keep_cols = [c for c in [
+            order_col, status_col, 'RECEIVER', 'SENDER', 'ZONE',
+            'POST OFFICE HANDLE', 'CURRENT POST OFFICE', 'CREATED DATE', '_date'
+        ] if c and c in shipped_df.columns]
+        if keep_cols:
+            df_export_slim = shipped_df[keep_cols].copy()
+            df_export_slim[order_col] = df_export_slim[order_col].astype(str).str.strip()
+            df_result["ORDER_ID"] = df_result["ORDER_ID"].astype(str).str.strip()
+            df_result = df_result.merge(
+                df_export_slim.rename(columns={order_col: "ORDER_ID"}),
+                on="ORDER_ID", how="left"
+            )
+
+        # Reorder: ORDER_ID first, then export cols, then tracking cols
+        front_cols = ["ORDER_ID"] + [c for c in df_result.columns
+                                      if c not in ("ORDER_ID",) and c in df_export_slim.columns]
+        back_cols  = [c for c in df_result.columns if c not in front_cols]
+        df_result  = df_result[front_cols + back_cols]
+
+        # ── Write styled Excel ─────────────────────────────────────────────────
+        out_xlsx = os.path.join(tmpdir, f"Shipped_Tracking_{n_days}d_{stamp}.xlsx")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = f"Shipped {n_days}d"
+        ws.freeze_panes = "A3"
+
+        HDR_FILL  = PatternFill("solid", fgColor="1E3A5F")
+        GRN_FILL  = PatternFill("solid", fgColor="D1FAE5")
+        RED_FILL  = PatternFill("solid", fgColor="FEE2E2")
+        ORG_FILL  = PatternFill("solid", fgColor="FEF3C7")
+        ALT_FILL  = PatternFill("solid", fgColor="F8FAFC")
+        SUM_FILL  = PatternFill("solid", fgColor="DBEAFE")
+
+        thin = Side(border_style="thin", color="CBD5E1")
+        bdr  = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        f_sum  = Font(name="Segoe UI", size=10, bold=True, color="1E3A5F")
+        f_hdr  = Font(name="Segoe UI", size=9,  bold=True, color="FFFFFF")
+        f_data = Font(name="Segoe UI", size=9)
+        f_done = Font(name="Segoe UI", size=9,  bold=True, color="065F46")
+        f_ret  = Font(name="Segoe UI", size=9,  bold=True, color="7C3AED")
+        f_err  = Font(name="Segoe UI", size=9,  color="991B1B")
+
+        cols = list(df_result.columns)
+        n_delivered = int((df_result["LATEST_STATUS"].isin(["410","S410"])).sum())
+        n_returned  = int((df_result["LATEST_STATUS"].isin(["520","S520"])).sum())
+        n_errors    = int((df_result["ERROR"].str.strip() != "").sum())
+
+        # Row 1: summary banner
+        ws.merge_cells(f"A1:{get_column_letter(len(cols))}1")
+        sc = ws.cell(1, 1,
+            f"🚚 Shipped Tracking — Last {n_days} Days  |  "
+            f"Total: {len(df_result):,}  |  "
+            f"✅ Delivered: {n_delivered:,}  |  "
+            f"🔄 Returned: {n_returned:,}  |  "
+            f"❌ Errors: {n_errors:,}  |  "
+            f"Generated: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        )
+        sc.font = f_sum
+        sc.fill = SUM_FILL
+        sc.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[1].height = 26
+
+        # Row 2: headers
+        for ci, col in enumerate(cols, 1):
+            c = ws.cell(2, ci, col.replace("_", " "))
+            c.font = f_hdr; c.fill = HDR_FILL
+            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            c.border = bdr
+        ws.row_dimensions[2].height = 28
+
+        # Data rows
+        DONE_ST = {"410","S410"}
+        RET_ST  = {"520","S520","500","S500","510","S510"}
+        for ri, row_data in enumerate(df_result.itertuples(index=False), 3):
+            st  = str(getattr(row_data, "LATEST_STATUS", "") or "").strip()
+            err = str(getattr(row_data, "ERROR", "") or "").strip()
+            if st in DONE_ST:
+                row_fill = GRN_FILL
+            elif st in RET_ST:
+                row_fill = ORG_FILL
+            elif err:
+                row_fill = RED_FILL
+            else:
+                row_fill = ALT_FILL if ri % 2 == 0 else None
+
+            for ci, col in enumerate(cols, 1):
+                val = getattr(row_data, col, "")
+                cell = ws.cell(ri, ci, "" if val is None else str(val))
+                cell.border = bdr
+                cell.alignment = Alignment(vertical="center")
+                if row_fill:
+                    cell.fill = row_fill
+                if col == "LATEST_STATUS" and st in DONE_ST:
+                    cell.font = f_done
+                elif col == "LATEST_STATUS" and st in RET_ST:
+                    cell.font = f_ret
+                elif col == "ERROR" and err:
+                    cell.font = f_err
+                else:
+                    cell.font = f_data
+
+        # Auto column widths
+        for ci, col in enumerate(cols, 1):
+            max_w = max(len(col) + 2,
+                *(len(str(ws.cell(r, ci).value or "")) for r in range(2, min(ri + 1, 100))))
+            ws.column_dimensions[get_column_letter(ci)].width = min(max_w + 2, 55)
+
+        wb.save(out_xlsx)
+
+        # ── Send ──────────────────────────────────────────────────────────────
+        caption = (
+            f"🚚 *Shipped Tracking — Last {n_days} Days*\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📦 Total fetched      : `{total_orders:,}`\n"
+            f"✅ Fetch success      : `{total_orders - n_errors:,}`\n"
+            f"❌ Fetch errors       : `{n_errors:,}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🟢 Delivered (410)    : `{n_delivered:,}`\n"
+            f"🟣 Returned (520/500) : `{n_returned:,}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 Range              : last `{n_days}` days\n"
+        )
+        await edit_or_send_requester_text(msg, update, context, caption, parse_mode="Markdown")
+        await send_requester_document(update, context, out_xlsx,
+            filename=os.path.basename(out_xlsx),
+            caption=f"📄 Shipped Tracking {n_days}d — {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+
+    except Exception as e:
+        log.exception("Error in /fetchshipped: %s", e)
+        await edit_or_send_requester_text(msg, update, context, f"❌ Error: {e}")
+
+
 def main():
+
     # Start the WebApp HTTP Server in a background daemon thread
     server_thread = threading.Thread(target=start_webapp_server, daemon=True)
     server_thread.start()
@@ -7496,6 +7776,10 @@ def main():
     app.add_handler(CommandHandler("export",     cmd_export))
     app.add_handler(CommandHandler("exportall2", cmd_export_all2))
     app.add_handler(CommandHandler("export_all2", cmd_export_all2))
+    app.add_handler(CommandHandler("fetchshipped",  cmd_fetch_shipped))
+    app.add_handler(CommandHandler("shipped",        cmd_fetch_shipped))
+    app.add_handler(CommandHandler("fetchship",      cmd_fetch_shipped))
+
     app.add_handler(CommandHandler("find",       cmd_find))
     app.add_handler(CommandHandler("ask",        cmd_ask))
     app.add_handler(CommandHandler("check",      cmd_check))
