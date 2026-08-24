@@ -4388,7 +4388,7 @@ def _write_post_office_export_excel_by_category(df, out_path, sheet_label, title
 async def send_pickup_branch_export(update, context, cfg, raw_args, all2_mode=False):
     first_arg = raw_args[0].lower() if raw_args else ""
     cat_mode = first_arg in ("po", "postoffice", "postoffices", "post_office", "office", "showroom", "showrooms", "agent", "agents", "dealer", "type", "types", "category", "categories", "divide", "split")
-    all_mode = cat_mode or (first_arg in ("all", "pickup", "pickups", "search", "branches"))
+    all_mode = cat_mode or (first_arg in ("all", "pickup", "pickups", "search", "branches", "all2", "pickup2", "pickups2", "branches2"))
     branch_args = raw_args[1:] if (all_mode or cat_mode) else raw_args
     branch_codes = _parse_export_branches(branch_args, cfg)
     if not branch_codes:
