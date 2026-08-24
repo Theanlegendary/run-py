@@ -7776,7 +7776,8 @@ def main():
     app.add_handler(CommandHandler("export",     cmd_export))
     app.add_handler(CommandHandler("exportall2", cmd_export_all2))
     app.add_handler(CommandHandler("export_all2", cmd_export_all2))
-    app.add_handler(CommandHandler("fetchshipped",  cmd_fetch_shipped))
+    app.add_handler(CommandHandler("fetchshipped",   cmd_fetch_shipped))
+    app.add_handler(CommandHandler("fetchshipped7d", cmd_fetch_shipped))
     app.add_handler(CommandHandler("shipped",        cmd_fetch_shipped))
     app.add_handler(CommandHandler("fetchship",      cmd_fetch_shipped))
 
