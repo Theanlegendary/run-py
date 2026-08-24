@@ -7472,9 +7472,9 @@ async def cmd_fetch_shipped(update: Update, context: ContextTypes.DEFAULT_TYPE):
         df = pd.read_excel(src, dtype=str)
         df.columns = [str(c).strip() for c in df.columns]
 
-        # Detect key columns
+        # Detect key columns — real export uses 'CURRENT STATUS' (e.g. '410 - Giao thành công')
         order_col  = next((c for c in ['ORDER ID', 'ORDER_ID', 'BILL CODE', 'ORDER CODE'] if c in df.columns), None)
-        status_col = next((c for c in ['STATUS_CODE', 'CURRENT STATUS CODE', 'STATUS'] if c in df.columns), None)
+        status_col = next((c for c in ['CURRENT STATUS', 'STATUS_CODE', 'CURRENT STATUS CODE', 'STATUS'] if c in df.columns), None)
         date_col   = next((c for c in ['CREATED DATE', 'CURRENT TIME', 'STATUS TIME'] if c in df.columns), None)
 
         if not order_col:
@@ -7488,9 +7488,12 @@ async def cmd_fetch_shipped(update: Update, context: ContextTypes.DEFAULT_TYPE):
             df['_date'] = pd.to_datetime(df[date_col], dayfirst=True, format='mixed', errors='coerce').dt.date
             df = df[df['_date'].notna() & (df['_date'] >= cutoff)]
 
-        # Filter shipped statuses
+        # Filter shipped statuses — CURRENT STATUS contains code + text e.g. "410 - Giao thành công"
+        # Use keyword match on the numeric code prefix so both "410" and "410 - ..." are caught
+        _SHIP_KW = ['410', '520', '500', '510', '201', '99', '100']
         if status_col:
-            shipped_df = df[df[status_col].str.strip().isin(SHIPPED_STATUSES)].copy()
+            _mask = df[status_col].astype(str).str.strip().str[:3].isin(_SHIP_KW)
+            shipped_df = df[_mask].copy()
         else:
             shipped_df = df.copy()
 
