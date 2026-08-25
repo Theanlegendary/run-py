@@ -940,15 +940,15 @@
                     </div>
                 </div>
 
-                <!-- 2. 4 BANNER FLOW IMAGES IN A SINGLE ROW -->
+                <!-- 2. 4 TRAINING VIDEOS WITH SUBTITLES -->
                 <div style="margin-top: 20px;">
-                    <div style="font-size: 1.15rem; font-weight: 800; color: var(--c-dark); margin-bottom: 8px;">
-                        <span class="en-text">4 Core Stages of Parcel Workflow:</span>
-                        <span class="kh-text">៤ ដំណាក់កាលសំខាន់នៃដំណើរការទំនិញ</span>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: var(--c-dark); margin-bottom: 8px;">
+                        <span class="en-text">Training Videos: 4 Core Stages</span>
+                        <span class="kh-text">វីដេអូបណ្តុះបណ្តាល៖ ៤ ដំណាក់កាលសំខាន់នៃដំណើរការទំនិញ</span>
                     </div>
 
                     <div class="flow-row-grid">
-                        <!-- Step 1 (Video inside card) -->
+                        <!-- Video 1: Creation -->
                         <div class="flow-card">
                             <div class="flow-video-wrap">
                                 <video controls playsinline preload="metadata" class="flow-banner-video">
@@ -959,14 +959,18 @@
                                 <span class="flow-step-badge">STAGE 01</span>
                                 <div class="flow-title en-text">01. Creation</div>
                                 <div class="flow-title kh-text">01. Creation | បង្កើតបុង</div>
-                                <div class="flow-desc en-text">Create order, input information, and generate Order ID.</div>
+                                <div class="flow-desc en-text">Create order, input sender/receiver information, and generate Order ID.</div>
                                 <div class="flow-desc kh-text">បង្កើតបុង បញ្ចូលព័ត៌មាន និងចេញលេខបុង។</div>
                             </div>
                         </div>
 
-                        <!-- Step 2 -->
+                        <!-- Video 2: Pickup -->
                         <div class="flow-card">
-                            <img src="./images/batp001_table_pickup.png" alt="2. Pickup" class="flow-banner-img"/>
+                            <div class="flow-video-wrap">
+                                <video controls playsinline preload="metadata" class="flow-banner-video">
+                                    <source src="./videos/Pickup.mp4" type="video/mp4"/>
+                                </video>
+                            </div>
                             <div class="flow-body">
                                 <span class="flow-step-badge" style="color: var(--c-blue);">STAGE 02</span>
                                 <div class="flow-title en-text">02. Pickup</div>
@@ -976,9 +980,13 @@
                             </div>
                         </div>
 
-                        <!-- Step 2 -->
+                        <!-- Video 3: Transit -->
                         <div class="flow-card">
-                            <img src="./images/batp001_table_transit.png" alt="3. Transit" class="flow-banner-img"/>
+                            <div class="flow-video-wrap">
+                                <video controls playsinline preload="metadata" class="flow-banner-video">
+                                    <source src="./videos/Transit.mp4" type="video/mp4"/>
+                                </video>
+                            </div>
                             <div class="flow-body">
                                 <span class="flow-step-badge" style="color: var(--c-amber);">STAGE 03</span>
                                 <div class="flow-title en-text">03. Transit</div>
@@ -988,13 +996,17 @@
                             </div>
                         </div>
 
-                        <!-- Step 3 -->
+                        <!-- Video 4: Delivery and Success -->
                         <div class="flow-card">
-                            <img src="./images/intro_step2.jpg" alt="4. Delivery" class="flow-banner-img"/>
+                            <div class="flow-video-wrap">
+                                <video controls playsinline preload="metadata" class="flow-banner-video">
+                                    <source src="./videos/Delivery%20and%20success.mp4" type="video/mp4"/>
+                                </video>
+                            </div>
                             <div class="flow-body">
                                 <span class="flow-step-badge" style="color: var(--c-green);">STAGE 04</span>
-                                <div class="flow-title en-text">04. Delivery</div>
-                                <div class="flow-title kh-text">04. Delivery | ដឹកប្រគល់</div>
+                                <div class="flow-title en-text">04. Delivery & Success</div>
+                                <div class="flow-title kh-text">04. Delivery | ដឹកប្រគល់ និងជោគជ័យ</div>
                                 <div class="flow-desc en-text">Assign driver 402 → Driver out for delivery 400 → Delivered 410.</div>
                                 <div class="flow-desc kh-text">ចាត់តាំងអ្នកដឹក 402 → អ្នកដឹកចេញចែក 400 → ដឹកជោគជ័យ 410។</div>
                             </div>
@@ -1003,42 +1015,6 @@
 
                     <div class="important-alert">
                         <span><strong>ចំណុចសំខាន់:</strong> បុងត្រូវ Update Status ឱ្យបានត្រឹមត្រូវតាមដំណាក់កាល ដើម្បីអាចតាមដានដំណើរការទំនិញបានច្បាស់លាស់។</span>
-                    </div>
-                </div>
-
-                <!-- 3. 2 VIDEOS IN SINGLE ROW -->
-                <div style="margin-top: 20px;">
-                    <div style="font-size: 1.15rem; font-weight: 800; color: var(--c-dark); margin-bottom: 8px;">
-                        <span class="en-text">Training Videos:</span>
-                        <span class="kh-text">វីដេអូបណ្តុះបណ្តាល</span>
-                    </div>
-
-                    <div class="dual-video-row">
-                        <!-- Video 1: Manager Assign -->
-                        <div>
-                            <div class="video-box-wrap">
-                                <video id="vid-mgr" controls playsinline preload="metadata">
-                                    <source src="./videos/manager_assign.mp4" type="video/mp4"/>
-                                </video>
-                            </div>
-                            <div class="video-caption">
-                                <span class="en-text">Video 1: Assign Driver. Status 402</span>
-                                <span class="kh-text">វីដេអូ ១៖ ការចាត់តាំងអ្នកដឹក. Status 402</span>
-                            </div>
-                        </div>
-
-                        <!-- Video 2: Shipper Delivery -->
-                        <div>
-                            <div class="video-box-wrap">
-                                <video id="vid-shp" controls playsinline preload="metadata">
-                                    <source src="./videos/shipper_assign.mp4" type="video/mp4"/>
-                                </video>
-                            </div>
-                            <div class="video-caption">
-                                <span class="en-text">Video 2: Delivery & Complete. 400 ➔ 410</span>
-                                <span class="kh-text">វីដេអូ ២៖ អ្នកដឹកចេញចែក និងបញ្ចប់ការដឹក. 400 → 410</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </section>
