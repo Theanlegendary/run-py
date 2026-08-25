@@ -685,14 +685,32 @@
         }
 
         .demo-card-badge {
-            font-size: 0.78rem;
+            font-size: 1.12rem;
             font-weight: 800;
-            padding: 4px 10px;
-            border-radius: 20px;
+            padding: 6px 16px;
+            border-radius: 10px;
             background: #f1f5f9;
             color: var(--c-dark);
             border: none;
+            letter-spacing: 0.02em;
+            display: inline-flex;
+            align-items: center;
         }
+
+        .status-tag {
+            font-size: 1.15rem;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 6px;
+            display: inline-block;
+            line-height: 1.3;
+        }
+
+        .status-tag-red { background: #fee2e2; color: #b91c1c; }
+        .status-tag-green { background: #dcfce7; color: #15803d; }
+        .status-tag-amber { background: #fef3c7; color: #b45309; }
+        .status-tag-purple { background: #f3e8ff; color: #7e22ce; }
+        .status-tag-blue { background: #eff6ff; color: #1d4ed8; }
 
         /* ── VISUAL SCREENSHOT GALLERY IN SLIDE 2 ───────────────────── */
         .demo-gallery-grid {
@@ -1118,8 +1136,8 @@
                                 <span class="flow-step-badge" style="color: var(--c-blue);">STAGE 02</span>
                                 <div class="flow-title en-text">02. Pickup</div>
                                 <div class="flow-title kh-text">02. Pickup | ទទួលទំនិញ</div>
-                                <div class="flow-desc en-text">Receive parcel from sender and scan Status 210.</div>
-                                <div class="flow-desc kh-text">ទទួលទំនិញពីអ្នកផ្ញើ និងធ្វើការស្កេន Status 210។</div>
+                                <div class="flow-desc en-text">Receive parcel from sender and scan <span class="status-tag status-tag-green">Status 210</span>.</div>
+                                <div class="flow-desc kh-text">ទទួលទំនិញពីអ្នកផ្ញើ និងធ្វើការស្កេន <span class="status-tag status-tag-green">Status 210</span>។</div>
                             </div>
                         </div>
 
@@ -1134,8 +1152,8 @@
                                 <span class="flow-step-badge" style="color: var(--c-amber);">STAGE 03</span>
                                 <div class="flow-title en-text">03. Transit</div>
                                 <div class="flow-title kh-text">03. Transit | បញ្ជូនទំនិញ</div>
-                                <div class="flow-desc en-text">Dispatch from branch to Hub/Mega and scan Status 306.</div>
-                                <div class="flow-desc kh-text">បញ្ជូនទំនិញពីសាខាទៅ Hub/Mega និងធ្វើការ Status 306។</div>
+                                <div class="flow-desc en-text">Dispatch from branch to Hub/Mega and scan <span class="status-tag status-tag-amber">Status 306</span>.</div>
+                                <div class="flow-desc kh-text">បញ្ជូនទំនិញពីសាខាទៅ Hub/Mega និងធ្វើការ <span class="status-tag status-tag-amber">Status 306</span>។</div>
                             </div>
                         </div>
 
@@ -1190,7 +1208,7 @@
                             <div class="demo-card-header">
                                 <div class="demo-card-title en-text">01. Create a Test Order</div>
                                 <div class="demo-card-title kh-text">01. បង្កើតបុងសាកល្បង</div>
-                                <span class="demo-card-badge" style="background:#fee2e2; color:var(--c-red); font-weight:800;">Status 100 / Pending</span>
+                                <span class="demo-card-badge" style="background:#fee2e2; color:#b91c1c; font-size:1.15rem; font-weight:800;">Status 100 / Pending</span>
                             </div>
                             <div class="demo-card-desc en-text">
                                 Input information: Sender, Receiver, Phone Number, Address, Weight, COD Amount. Then create order and inspect Order ID.
@@ -1212,7 +1230,7 @@
                             <div class="demo-card-header">
                                 <div class="demo-card-title en-text">02. Accept & Scan Parcel</div>
                                 <div class="demo-card-title kh-text">02. ស្កេនទទួលទំនិញ</div>
-                                <span class="demo-card-badge" style="background:#dcfce7; color:var(--c-green); font-weight:800;">Status 210</span>
+                                <span class="demo-card-badge" style="background:#dcfce7; color:#15803d; font-size:1.15rem; font-weight:800;"><span class="status-tag status-tag-green">Status 210</span></span>
                             </div>
                             <div class="demo-card-desc en-text">
                                 Use phone to scan Barcode on labeled parcel. Upon successful scan → verify that Status is updated to <strong>210</strong>.
@@ -1231,7 +1249,7 @@
                             <div class="demo-card-header">
                                 <div class="demo-card-title en-text">03. Dispatch to Hub / Mega</div>
                                 <div class="demo-card-title kh-text">03. បញ្ជូនទំនិញទៅ Hub / Mega</div>
-                                <span class="demo-card-badge" style="background:#fef3c7; color:var(--c-amber); font-weight:800;">Status 306</span>
+                                <span class="demo-card-badge" style="background:#fef3c7; color:#b45309; font-size:1.15rem; font-weight:800;"><span class="status-tag status-tag-amber">Status 306</span></span>
                             </div>
                             <div class="demo-card-desc en-text">
                                 Demonstrate parcel preparation for dispatch: Inspect waybill • Check quantity • Add parcels into manifest • Input vehicle information • Scan dispatch to Hub/Mega.
@@ -1250,17 +1268,17 @@
                             <div class="demo-card-header">
                                 <div class="demo-card-title en-text">04. Assign & Deliver</div>
                                 <div class="demo-card-title kh-text">04. ចាត់តាំង និងដឹកប្រគល់</div>
-                                <span class="demo-card-badge" style="background:#f3e8ff; color:var(--c-purple); font-weight:800;">402 ➔ 400 ➔ 410</span>
+                                <span class="demo-card-badge" style="background:#f3e8ff; color:#7e22ce; font-size:1.15rem; font-weight:800;">402 ➔ 400 ➔ 410</span>
                             </div>
                             <div class="demo-card-desc en-text">
-                                <strong>402</strong>. Assign waybill to delivery driver<br/>
-                                <strong>400</strong>. Driver out for delivery<br/>
-                                <strong>410</strong>. Successfully delivered
+                                <span class="status-tag status-tag-purple">402</span>. Assign waybill to delivery driver<br/>
+                                <span class="status-tag status-tag-blue">400</span>. Driver out for delivery<br/>
+                                <span class="status-tag status-tag-green">410</span>. Successfully delivered
                             </div>
                             <div class="demo-card-desc kh-text">
-                                <strong>402</strong>. ចាត់តាំងបុងទៅអ្នកដឹក<br/>
-                                <strong>400</strong>. អ្នកដឹកចេញចែក<br/>
-                                <strong>410</strong>. ដឹកប្រគល់ជោគជ័យ
+                                <span class="status-tag status-tag-purple">402</span>. ចាត់តាំងបុងទៅអ្នកដឹក<br/>
+                                <span class="status-tag status-tag-blue">400</span>. អ្នកដឹកចេញចែក<br/>
+                                <span class="status-tag status-tag-green">410</span>. ដឹកប្រគល់ជោគជ័យ
                             </div>
                         </div>
                     </div>
@@ -1342,10 +1360,10 @@
                         <div class="practice-item-content">
                             <div class="practice-item-title en-text">TASK 03. Print & Scan Sequence</div>
                             <div class="practice-item-title kh-text">TASK 03. ព្រីន និងស្កេន</div>
-                            <div class="practice-item-desc en-text">Execute sequence: Create → Print → 210 → 306 → 402 → 400 → 410. Check Status at every stage before proceeding.</div>
+                            <div class="practice-item-desc en-text">Execute sequence: Create → Print → 210 → 306 → <span class="status-tag status-tag-purple">402</span> → <span class="status-tag status-tag-blue">400</span> → <span class="status-tag status-tag-green">410</span>. Check Status at every stage before proceeding.</div>
                             <div class="practice-item-desc kh-text">
                                 អនុវត្តតាមលំដាប់៖<br/>
-                                <strong>Create → Print → 210 → 306 → 402 → 400 → 410</strong><br/>
+                                <strong>Create → Print → 210 → 306 → <span class="status-tag status-tag-purple">402</span> → <span class="status-tag status-tag-blue">400</span> → <span class="status-tag status-tag-green">410</span></strong><br/>
                                 ត្រូវពិនិត្យ Status នៅរាល់ដំណាក់កាល មុនបន្តទៅជំហានបន្ទាប់។
                             </div>
                         </div>
@@ -1360,9 +1378,9 @@
                             <div class="practice-item-desc en-text">Discuss operational issues and resolutions: 420 (Waiting), 472 (Issues & Resolution), 520 (Customer Return).</div>
                             <div class="practice-item-desc kh-text">
                                 ពិភាក្សាអំពីបញ្ហាដែលអាចជួបក្នុងការងារ និងរបៀបដោះស្រាយ ដូចជា៖<br/>
-                                • <strong>420</strong>. បុងកំពុងរង់ចាំ<br/>
-                                • <strong>472</strong>. បុងមានបញ្ហា និងត្រូវការដោះស្រាយ<br/>
-                                • <strong>520</strong>. អតិថិជនបដិសេធទទួលទំនិញ / បង្វែរទំនិញ
+                                • <span class="status-tag status-tag-amber">420</span>. បុងកំពុងរង់ចាំ<br/>
+                                • <span class="status-tag status-tag-red">472</span>. បុងមានបញ្ហា និងត្រូវការដោះស្រាយ<br/>
+                                • <span class="status-tag status-tag-purple">520</span>. អតិថិជនបដិសេធទទួលទំនិញ / បង្វែរទំនិញ
                             </div>
                         </div>
                     </div>
