@@ -5,8 +5,8 @@
     { "source": "/", "destination": "/Operationtrainningmfe/index.html" },
     { "source": "/Operationtrainningmfe", "destination": "/Operationtrainningmfe/index.html" },
     { "source": "/operationtrainningmfe", "destination": "/Operationtrainningmfe/index.html" },
-    { "source": "/training3", "destination": "/Operationtrainningmfe/index.html" },
-    { "source": "/trainning3", "destination": "/Operationtrainningmfe/index.html" },
+    { "source": "/training3", "destination": "/training3/index.html" },
+    { "source": "/trainning3", "destination": "/training3/index.html" },
     { "source": "/training2", "destination": "/training2/index.html" },
     { "source": "/training", "destination": "/training/index.html" }
   ]
