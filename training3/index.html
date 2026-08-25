@@ -316,7 +316,9 @@
             overflow-y: auto;
             display: flex;
             justify-content: center;
-            padding: 56px 80px 450px;
+            padding: 56px 80px 700px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
         }
 
         .article-container {
@@ -338,7 +340,8 @@
         }
 
         #slide-3 {
-            min-height: 60vh;
+            min-height: 90vh;
+            padding-bottom: 150px;
             border-bottom: none;
         }
 
@@ -717,7 +720,9 @@
             .sidebar { display: none; }
             .mobile-header-bar { display: flex; }
             .content-viewport {
-                padding: 72px 20px 300px;
+                padding: 72px 20px 500px;
+                scroll-behavior: smooth;
+                -webkit-overflow-scrolling: touch;
             }
             .portal-grid, .dual-video-row, .demo-gallery-grid, .practice-grid {
                 grid-template-columns: 1fr;
