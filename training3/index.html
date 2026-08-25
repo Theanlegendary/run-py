@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
-    <title>Metfone Express Operations — System Training Portal (Training 3)</title>
+    <title>Metfone Express Operations — System Training (3 Slides)</title>
     <!-- Google Fonts: Inter, Kantumruy Pro, Merriweather -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700;800&family=Merriweather:ital,wght@0,400;0,700;0,900;1,400&display=swap" rel="stylesheet"/>
     <style>
@@ -12,8 +12,8 @@
             --c-red: #e11b22;         /* 1. Brand Accent */
             --c-dark: #0f172a;        /* 2. Deep Slate */
             --c-blue: #2563eb;        /* 3. Operational Blue */
-            --c-green: #16a34a;       /* Success Green */
-            --c-amber: #d97706;       /* Warning Amber */
+            --c-green: #16a34a;       /* 4. Success Green */
+            --c-amber: #d97706;       /* 5. Warning Amber */
             
             --c-body: #334155;
             --c-muted: #64748b;
@@ -41,10 +41,10 @@
             line-height: 1.65;
         }
 
-        /* 1. DESKTOP LEFT SIDEBAR */
+        /* 1. DESKTOP LEFT SIDEBAR (3 SLIDES) */
         .sidebar {
-            width: 330px;
-            min-width: 330px;
+            width: 320px;
+            min-width: 320px;
             background-color: var(--bg-white);
             border-right: 1px solid var(--border-subtle);
             height: 100vh;
@@ -56,7 +56,7 @@
         }
 
         .sidebar-header {
-            padding: 32px 28px 18px;
+            padding: 36px 28px 20px;
             display: flex;
             flex-direction: column;
             gap: 14px;
@@ -74,7 +74,7 @@
             gap: 6px;
             background: #fee2e2;
             color: var(--c-red);
-            font-size: 0.76rem;
+            font-size: 0.78rem;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -87,7 +87,7 @@
             display: flex;
             flex-direction: column;
             padding: 8px 16px;
-            gap: 6px;
+            gap: 8px;
             flex: 1;
         }
 
@@ -95,12 +95,12 @@
             display: flex;
             align-items: center;
             gap: 14px;
-            padding: 11px 16px;
+            padding: 14px 18px;
             color: var(--c-muted);
             text-decoration: none;
-            font-size: 0.92rem;
+            font-size: 0.95rem;
             font-weight: 600;
-            border-radius: 10px;
+            border-radius: 12px;
             transition: all 0.2s ease;
         }
 
@@ -116,14 +116,14 @@
         }
 
         .nav-circle-num {
-            width: 24px;
-            height: 24px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             background: rgba(0, 0, 0, 0.06);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.75rem;
+            font-size: 0.85rem;
             font-weight: 800;
             flex-shrink: 0;
         }
@@ -134,7 +134,7 @@
         }
 
         .sidebar-footer {
-            padding: 20px 28px;
+            padding: 24px 28px;
             border-top: 1px solid var(--border-subtle);
             display: flex;
             flex-direction: column;
@@ -221,15 +221,9 @@
             transition: all 0.25s ease;
         }
 
-        .hamburger-btn.open span:nth-child(1) {
-            transform: translateY(6px) rotate(45deg);
-        }
-        .hamburger-btn.open span:nth-child(2) {
-            opacity: 0;
-        }
-        .hamburger-btn.open span:nth-child(3) {
-            transform: translateY(-6px) rotate(-45deg);
-        }
+        .hamburger-btn.open span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+        .hamburger-btn.open span:nth-child(2) { opacity: 0; }
+        .hamburger-btn.open span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
         /* MOBILE SLIDE-OUT DRAWER MENU */
         .mobile-drawer-overlay {
@@ -243,10 +237,7 @@
             transition: opacity 0.3s ease;
         }
 
-        .mobile-drawer-overlay.active {
-            display: block;
-            opacity: 1;
-        }
+        .mobile-drawer-overlay.active { display: block; opacity: 1; }
 
         .mobile-drawer {
             position: fixed;
@@ -265,9 +256,7 @@
             overflow-y: auto;
         }
 
-        .mobile-drawer.open {
-            right: 0;
-        }
+        .mobile-drawer.open { right: 0; }
 
         .drawer-header {
             display: flex;
@@ -279,7 +268,7 @@
         }
 
         .drawer-title {
-            font-size: 1rem;
+            font-size: 1.05rem;
             font-weight: 800;
             color: var(--c-dark);
         }
@@ -296,7 +285,7 @@
         .drawer-menu {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
         }
 
         .drawer-link {
@@ -331,71 +320,71 @@
 
         .article-container {
             width: 100%;
-            max-width: 880px;
+            max-width: 900px;
             display: flex;
             flex-direction: column;
-            gap: 72px;
+            gap: 80px;
         }
 
-        /* CHAPTER SECTION */
-        .chapter-block {
+        /* SLIDE BLOCK */
+        .slide-block {
             display: flex;
             flex-direction: column;
-            gap: 24px;
+            gap: 26px;
             padding-bottom: 72px;
             border-bottom: 1px solid var(--border-subtle);
             scroll-margin-top: 56px;
         }
 
-        #chap-5 {
+        #slide-3 {
             min-height: 60vh;
             border-bottom: none;
         }
 
-        .chapter-tag {
+        .slide-tag {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.82rem;
+            font-size: 0.85rem;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.12em;
             color: var(--c-red);
         }
 
-        .chapter-heading {
+        .slide-heading {
             font-family: 'Merriweather', serif;
             font-size: 2.5rem;
             font-weight: 900;
             color: var(--c-dark);
-            line-height: 1.28;
+            line-height: 1.25;
             letter-spacing: -0.02em;
         }
 
-        .chapter-lead {
+        .slide-lead {
             font-size: 1.2rem;
             line-height: 1.65;
             color: var(--c-dark);
             font-weight: 500;
         }
 
-        /* DUAL PORTAL CARDS (CHAPTER 0) */
+        /* DUAL PORTAL CARDS (SLIDE 1) */
         .portal-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 24px;
-            margin-top: 12px;
+            margin-top: 8px;
         }
 
         .portal-card {
             background: #ffffff;
             border: 1.5px solid var(--border-subtle);
             border-radius: 18px;
-            padding: 28px 24px;
+            padding: 24px 22px;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 14px;
             transition: all 0.2s ease;
         }
 
@@ -404,23 +393,18 @@
             box-shadow: 0 12px 30px rgba(0, 0, 0, 0.07);
         }
 
-        .portal-card.red-border {
-            border-top: 4px solid var(--c-red);
-        }
-
-        .portal-card.blue-border {
-            border-top: 4px solid var(--c-blue);
-        }
+        .portal-card.red-border { border-top: 4px solid var(--c-red); }
+        .portal-card.blue-border { border-top: 4px solid var(--c-blue); }
 
         .portal-header-badge {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             font-weight: 800;
             text-transform: uppercase;
             padding: 4px 10px;
-            border-radius: 10px;
+            border-radius: 8px;
             width: fit-content;
         }
 
@@ -430,7 +414,7 @@
         .badge-amber { background: #fef3c7; color: var(--c-amber); }
 
         .portal-title {
-            font-size: 1.3rem;
+            font-size: 1.25rem;
             font-weight: 800;
             color: var(--c-dark);
             line-height: 1.3;
@@ -439,15 +423,15 @@
         .feature-bullets {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            font-size: 0.95rem;
+            gap: 8px;
+            font-size: 0.92rem;
             color: var(--c-body);
         }
 
         .feature-item {
             display: flex;
             align-items: flex-start;
-            gap: 10px;
+            gap: 8px;
         }
 
         .feature-icon {
@@ -461,15 +445,15 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            margin-top: 8px;
-            padding: 12px 18px;
+            margin-top: 6px;
+            padding: 10px 16px;
             background: #f8fafc;
             border: 1px solid var(--border-subtle);
             border-radius: 10px;
             color: var(--c-dark);
             text-decoration: none;
             font-weight: 700;
-            font-size: 0.9rem;
+            font-size: 0.88rem;
             transition: all 0.2s;
         }
 
@@ -479,7 +463,105 @@
             border-color: var(--c-red);
         }
 
-        /* 4-STAGE PIPELINE CARDS */
+        /* ── 4 BANNER FLOW IN SINGLE ROW ────────────────────────────── */
+        .flow-row-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin-top: 14px;
+        }
+
+        .flow-card {
+            background: #ffffff;
+            border: 1.5px solid var(--border-subtle);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s ease;
+        }
+
+        .flow-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        }
+
+        .flow-banner-img {
+            width: 100%;
+            height: 110px;
+            object-fit: cover;
+            background: #f1f5f9;
+            display: block;
+        }
+
+        .flow-body {
+            padding: 14px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .flow-step-badge {
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--c-red);
+            letter-spacing: 0.05em;
+        }
+
+        .flow-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: var(--c-dark);
+            line-height: 1.3;
+        }
+
+        .flow-desc {
+            font-size: 0.8rem;
+            color: var(--c-muted);
+            line-height: 1.4;
+        }
+
+        /* ── 2 VIDEOS IN SINGLE ROW ─────────────────────────────────── */
+        .dual-video-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 14px;
+        }
+
+        .video-box-wrap {
+            background: #000000;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            max-height: 240px;
+            display: block;
+            background: #000;
+        }
+
+        .video-caption {
+            background: #ffffff;
+            border: 1px solid var(--border-subtle);
+            border-top: none;
+            border-bottom-left-radius: 14px;
+            border-bottom-right-radius: 14px;
+            padding: 12px 16px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--c-dark);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* SLIDE 2 & 3 COMPONENTS */
         .stage-box {
             background: #ffffff;
             border: 1px solid var(--border-subtle);
@@ -507,11 +589,10 @@
             border: 1px solid var(--border-subtle);
         }
 
-        /* Clean Circle Points */
         .points-list {
             display: flex;
             flex-direction: column;
-            gap: 18px;
+            gap: 16px;
             margin-top: 6px;
         }
 
@@ -541,38 +622,6 @@
             font-weight: 700;
         }
 
-        /* VIDEO & MEDIA SECTION */
-        .video-box-wrap {
-            background: #000000;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.12);
-            position: relative;
-            margin-top: 12px;
-        }
-
-        video {
-            width: 100%;
-            height: auto;
-            max-height: 480px;
-            display: block;
-            background: #000;
-        }
-
-        .video-caption {
-            background: #ffffff;
-            border: 1px solid var(--border-subtle);
-            border-top: none;
-            border-bottom-left-radius: 16px;
-            border-bottom-right-radius: 16px;
-            padding: 16px 20px;
-            font-size: 0.92rem;
-            color: var(--c-muted);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
         /* BILINGUAL VISIBILITY */
         body.lang-kh .en-text { display: none !important; }
         body.lang-kh .kh-text { display: block !important; }
@@ -585,7 +634,7 @@
         body:not(.lang-kh) span.en-text { display: inline !important; }
         body:not(.lang-kh) span.kh-text { display: none !important; }
 
-        body.lang-kh .chapter-heading {
+        body.lang-kh .slide-heading {
             font-family: 'Kantumruy Pro', sans-serif;
             font-weight: 800;
             line-height: 1.35;
@@ -598,10 +647,13 @@
             .content-viewport {
                 padding: 72px 20px 300px;
             }
-            .portal-grid {
+            .portal-grid, .dual-video-row {
                 grid-template-columns: 1fr;
             }
-            .chapter-heading {
+            .flow-row-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .slide-heading {
                 font-size: 1.9rem;
             }
         }
@@ -625,92 +677,62 @@
         </div>
     </header>
 
-    <!-- MOBILE DRAWER -->
+    <!-- MOBILE DRAWER (3 SLIDES) -->
     <div class="mobile-drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
     <aside class="mobile-drawer" id="mobileDrawer">
         <div>
             <div class="drawer-header">
-                <span class="drawer-title">Navigation Menu</span>
+                <span class="drawer-title">Training 3.0 Slides</span>
                 <button class="drawer-close" onclick="toggleDrawer()">&times;</button>
             </div>
             <nav class="drawer-menu">
-                <a class="drawer-link active" href="#chap-0" onclick="handleDrawerNav(this)">
-                    <span class="nav-circle-num">0</span>
-                    <span class="en-text">Portals Overview</span>
-                    <span class="kh-text">សេចក្តីផ្តើមអំពីប្រព័ន្ធ</span>
-                </a>
-                <a class="drawer-link" href="#chap-1" onclick="handleDrawerNav(this)">
+                <a class="drawer-link active" href="#slide-1" onclick="handleDrawerNav(this)">
                     <span class="nav-circle-num">1</span>
-                    <span class="en-text">Order Creation</span>
-                    <span class="kh-text">ការបង្កើតបុង (Tạo đơn)</span>
+                    <span class="en-text">1️⃣ Quick Introduction (5–10 mins)</span>
+                    <span class="kh-text">1️⃣ សេចក្តីផ្តើម (5–10 នាទី)</span>
                 </a>
-                <a class="drawer-link" href="#chap-2" onclick="handleDrawerNav(this)">
+                <a class="drawer-link" href="#slide-2" onclick="handleDrawerNav(this)">
                     <span class="nav-circle-num">2</span>
-                    <span class="en-text">Shipment Acceptance</span>
-                    <span class="kh-text">ការទទួលទំនិញ & យក</span>
+                    <span class="en-text">2️⃣ Live Demonstration (Main Part)</span>
+                    <span class="kh-text">2️⃣ ការបង្ហាញផ្ទាល់លើប្រព័ន្ធ</span>
                 </a>
-                <a class="drawer-link" href="#chap-3" onclick="handleDrawerNav(this)">
+                <a class="drawer-link" href="#slide-3" onclick="handleDrawerNav(this)">
                     <span class="nav-circle-num">3</span>
-                    <span class="en-text">Transportation & Transit</span>
-                    <span class="kh-text">ការដឹកជញ្ជូន & ផ្ទេរ</span>
-                </a>
-                <a class="drawer-link" href="#chap-4" onclick="handleDrawerNav(this)">
-                    <span class="nav-circle-num">4</span>
-                    <span class="en-text">Delivery & Handover</span>
-                    <span class="kh-text">ការចែកទំនិញ & បញ្ជូន</span>
-                </a>
-                <a class="drawer-link" href="#chap-5" onclick="handleDrawerNav(this)">
-                    <span class="nav-circle-num">5</span>
-                    <span class="en-text">Live Demo & Training SOP</span>
-                    <span class="kh-text">ការអនុវត្តផ្ទាល់ជាក់ស្តែង</span>
+                    <span class="en-text">3️⃣ Staff Practice (Hands-on)</span>
+                    <span class="kh-text">3️⃣ បុគ្គលិកអនុវត្តជាក់ស្តែង</span>
                 </a>
             </nav>
         </div>
         <div style="font-size: 0.8rem; color: var(--c-muted); text-align: center;">
-            Metfone Express Operational Training 3.0
+            Metfone Express Training 3.0
         </div>
     </aside>
 
-    <!-- 1. DESKTOP LEFT SIDEBAR -->
+    <!-- 1. DESKTOP LEFT SIDEBAR (3 SLIDES) -->
     <aside class="sidebar">
         <div>
             <div class="sidebar-header">
                 <img alt="Metfone Express" class="logo-img" src="./images/metfone_express_logo.png" onerror="this.src='https://opsexpress.metfone.com.kh/assets/images/logo.png'"/>
                 <div class="portal-tag">
-                    <span>⚡ TRAINING 3.0</span>
+                    <span>⚡ 3 SLIDES TRAINING</span>
                 </div>
             </div>
             
             <nav class="nav-menu">
-                <a class="nav-link active" href="#chap-0" onclick="setActiveChapter(this)">
-                    <span class="nav-circle-num">0</span>
-                    <span class="en-text">Portals Overview</span>
-                    <span class="kh-text">សេចក្តីផ្តើមអំពីប្រព័ន្ធ</span>
-                </a>
-                <a class="nav-link" href="#chap-1" onclick="setActiveChapter(this)">
+                <a class="nav-link active" href="#slide-1" onclick="setActiveChapter(this)">
                     <span class="nav-circle-num">1</span>
-                    <span class="en-text">Order Creation</span>
-                    <span class="kh-text">ការបង្កើតបុង (Tạo đơn)</span>
+                    <span class="en-text">1️⃣ Quick Introduction</span>
+                    <span class="kh-text">1️⃣ សេចក្តីផ្តើម (5–10m)</span>
                 </a>
-                <a class="nav-link" href="#chap-2" onclick="setActiveChapter(this)">
+                <a class="nav-link" href="#slide-2" onclick="setActiveChapter(this)">
                     <span class="nav-circle-num">2</span>
-                    <span class="en-text">Shipment Acceptance</span>
-                    <span class="kh-text">ការទទួលទំនិញ & យក</span>
+                    <span class="en-text">2️⃣ Live Demonstration</span>
+                    <span class="kh-text">2️⃣ ការបង្ហាញផ្ទាល់លើប្រព័ន្ធ</span>
                 </a>
-                <a class="nav-link" href="#chap-3" onclick="setActiveChapter(this)">
+                <a class="nav-link" href="#slide-3" onclick="setActiveChapter(this)">
                     <span class="nav-circle-num">3</span>
-                    <span class="en-text">Transportation & Transit</span>
-                    <span class="kh-text">ការដឹកជញ្ជូន & ផ្ទេរ</span>
-                </a>
-                <a class="nav-link" href="#chap-4" onclick="setActiveChapter(this)">
-                    <span class="nav-circle-num">4</span>
-                    <span class="en-text">Delivery & Handover</span>
-                    <span class="kh-text">ការចែកទំនិញ & បញ្ជូន</span>
-                </a>
-                <a class="nav-link" href="#chap-5" onclick="setActiveChapter(this)">
-                    <span class="nav-circle-num">5</span>
-                    <span class="en-text">Live Demo & Practice</span>
-                    <span class="kh-text">ការអនុវត្តផ្ទាល់ជាក់ស្តែង</span>
+                    <span class="en-text">3️⃣ Staff Practice</span>
+                    <span class="kh-text">3️⃣ បុគ្គលិកអនុវត្តជាក់ស្តែង</span>
                 </a>
             </nav>
         </div>
@@ -731,61 +753,56 @@
     <main class="content-viewport" id="contentViewport">
         <div class="article-container">
 
-            <!-- ── CHAPTER 0: PORTALS OVERVIEW ────────────────────────── -->
-            <section class="chapter-block" id="chap-0">
-                <div class="chapter-tag">
-                    <span>CHAPTER 00</span>
+            <!-- ── SLIDE 1: QUICK INTRODUCTION (5-10 MINS) ───────────── -->
+            <section class="slide-block" id="slide-1">
+                <div class="slide-tag">
+                    <span>SLIDE 01</span>
                     <span>•</span>
-                    <span class="en-text">SYSTEM OVERVIEW</span>
-                    <span class="kh-text">សេចក្តីផ្តើមអំពីប្រព័ន្ធ</span>
+                    <span class="en-text">1️⃣ QUICK INTRODUCTION (5–10 MINS)</span>
+                    <span class="kh-text">1️⃣ សេចក្តីផ្តើម និងប្រព័ន្ធសំខាន់ (5–10 នាទី)</span>
                 </div>
                 
-                <h1 class="chapter-heading en-text">Metfone Express Portals Overview</h1>
-                <h1 class="chapter-heading kh-text">ទិដ្ឋភាពទូទៅនៃប្រព័ន្ធ Metfone Express</h1>
+                <h1 class="slide-heading en-text">1️⃣ Portals & 4-Step Parcel Lifecycle</h1>
+                <h1 class="slide-heading kh-text">1️⃣ ទិដ្ឋភាពទូទៅនៃប្រព័ន្ធ & ៤ ដំណាក់កាលនៃទំនិញ</h1>
 
-                <div class="chapter-lead en-text">
-                    Metfone Express operates two interconnected digital platforms: the Customer Portal (Web & App) for booking and tracking, and the Operations (OPS) Portal for end-to-end parcel handling.
+                <div class="slide-lead en-text">
+                    Overview of the two operational platforms (Customer App & OPS Web) and the end-to-end 4 lifecycle stages of every shipment.
                 </div>
-                <div class="chapter-lead kh-text">
-                    ប្រព័ន្ធ Metfone Express ដំណើរការលើប្រព័ន្ធឌីជីថលសំខាន់ចំនួនពីរ៖ ប្រព័ន្ធសម្រាប់អតិថិជន (Customer App/Web) ដើម្បីបង្កើតការបញ្ជាទិញ និងប្រព័ន្ធប្រតិបត្តិការ (OPS Web) សម្រាប់បុគ្គលិកគ្រប់គ្រងទំនិញពីដើមដល់ចប់។
+                <div class="slide-lead kh-text">
+                    ទិដ្ឋភាពទូទៅនៃប្រព័ន្ធទាំងពីរ (Customer App & OPS Web) និង ៤ ដំណាក់កាលនៃដំណើរការទំនិញពីការបង្កើតដល់ការប្រគល់ជោគជ័យ។
                 </div>
 
-                <!-- DUAL CARDS -->
+                <!-- 1. DUAL PORTALS OVERVIEW -->
                 <div class="portal-grid">
                     <div class="portal-card red-border">
                         <div class="portal-header-badge badge-red">
-                            <span>📱 1. CUSTOMER APP & WEB</span>
+                            <span>📱 CUSTOMER APP</span>
                         </div>
-                        <h2 class="portal-title en-text">Customer Portal</h2>
+                        <h2 class="portal-title en-text">Customer App / Web</h2>
                         <h2 class="portal-title kh-text">ប្រព័ន្ធសម្រាប់អតិថិជន</h2>
 
                         <div class="feature-bullets">
                             <div class="feature-item">
                                 <span class="feature-icon">✓</span>
-                                <span class="en-text">Self-service single and bulk order creation.</span>
-                                <span class="kh-text">បង្កើតបុងដឹកជញ្ជូនដោយខ្លួនឯង (បង្កើតម្តងមួយ ឬច្រើនក្នុងពេលតែមួយ)។</span>
+                                <span class="en-text">Where customers & merchants create orders.</span>
+                                <span class="kh-text">កន្លែងអតិថិជន និងអ្នកលក់បង្កើតបុងបញ្ជាទិញ។</span>
                             </div>
                             <div class="feature-item">
                                 <span class="feature-icon">✓</span>
-                                <span class="en-text">Live parcel tracking and delivery status history.</span>
-                                <span class="kh-text">តាមដានទីតាំងកញ្ចប់ទំនិញ និងប្រវត្តិដឹកជញ្ជូនតាមពេលវេលាជាក់ស្តែង (Real-time)។</span>
-                            </div>
-                            <div class="feature-item">
-                                <span class="feature-icon">✓</span>
-                                <span class="en-text">Shipping fee calculation & COD collection status.</span>
-                                <span class="kh-text">គណនាថ្លៃដឹកជញ្ជូន និងត្រួតពិនិត្យទឹកប្រាក់ COD យ៉ាងងាយស្រួល។</span>
+                                <span class="en-text">Live real-time parcel tracking & COD audit.</span>
+                                <span class="kh-text">តាមដានទីតាំងទំនិញជាក់ស្តែង និងផ្ទៀងផ្ទាត់ប្រាក់ COD។</span>
                             </div>
                         </div>
 
                         <a href="https://opsexpress.metfone.com.kh/" target="_blank" class="portal-btn">
-                            <span class="en-text">Open Customer Web ↗</span>
-                            <span class="kh-text">បើកមើល Customer Web ↗</span>
+                            <span class="en-text">Open Customer Portal ↗</span>
+                            <span class="kh-text">បើកមើល Customer App/Web ↗</span>
                         </a>
                     </div>
 
                     <div class="portal-card blue-border">
                         <div class="portal-header-badge badge-blue">
-                            <span>🖥️ 2. OPERATIONS (OPS) WEB</span>
+                            <span>🖥️ OPERATIONS (OPS) WEB</span>
                         </div>
                         <h2 class="portal-title en-text">Operations Web Portal</h2>
                         <h2 class="portal-title kh-text">ប្រព័ន្ធគ្រប់គ្រងប្រតិបត្តិការ (OPS)</h2>
@@ -793,358 +810,258 @@
                         <div class="feature-bullets">
                             <div class="feature-item">
                                 <span class="feature-icon" style="color: var(--c-blue);">✓</span>
-                                <span class="en-text">Counter order creation and thermal waybill label printing.</span>
-                                <span class="kh-text">បង្កើតបុងនៅបញ្ជរសាខា និងព្រីនស្លាកលេខកូដបារ (Waybill Sticker)។</span>
+                                <span class="en-text">Where staff manage deliveries & scan bills.</span>
+                                <span class="kh-text">កន្លែងបុគ្គលិកចាត់តាំងអ្នកដឹក និងស្កេនបុងទំនិញ។</span>
                             </div>
                             <div class="feature-item">
                                 <span class="feature-icon" style="color: var(--c-blue);">✓</span>
-                                <span class="en-text">Courier pickup and delivery driver dispatching (402/400).</span>
-                                <span class="kh-text">ចាត់តាំងអ្នកទៅយកទំនិញ (Pickup) និងអ្នកចេញដឹកជញ្ជូន (Assign Deliver)។</span>
-                            </div>
-                            <div class="feature-item">
-                                <span class="feature-icon" style="color: var(--c-blue);">✓</span>
-                                <span class="en-text">Hub manifests, Mega sorting, and real-time KPI auditing.</span>
-                                <span class="kh-text">គ្រប់គ្រងការផ្ទេរទំនិញតាម Hub/Mega និងរបាយការណ៍ត្រួតពិនិត្យ KPI។</span>
+                                <span class="en-text">URL: opsexpress.metfone.com.kh</span>
+                                <span class="kh-text">គេហទំព័រ៖ opsexpress.metfone.com.kh</span>
                             </div>
                         </div>
 
                         <a href="https://opsexpress.metfone.com.kh/" target="_blank" class="portal-btn">
-                            <span class="en-text">Open OPS Web Portal ↗</span>
-                            <span class="kh-text">បើកមើល OPS Web ↗</span>
+                            <span class="en-text">Open OPS Web App ↗</span>
+                            <span class="kh-text">បើកមើល OPS Web Portal ↗</span>
                         </a>
                     </div>
                 </div>
+
+                <!-- 2. 4 BANNER FLOW IMAGES IN A SINGLE ROW -->
+                <div style="margin-top: 18px;">
+                    <div style="font-size: 1.1rem; font-weight: 800; color: var(--c-dark); margin-bottom: 6px;">
+                        <span class="en-text">🔄 4-Step Parcel Lifecycle Flow:</span>
+                        <span class="kh-text">🔄 ដំណើរការ ៤ ដំណាក់កាលនៃកញ្ចប់ទំនិញ (Creation ➔ Pickup ➔ Transit ➔ Delivery):</span>
+                    </div>
+
+                    <div class="flow-row-grid">
+                        <!-- Step 1 -->
+                        <div class="flow-card">
+                            <img src="./images/intro_step1.jpg" alt="1. Creation" class="flow-banner-img"/>
+                            <div class="flow-body">
+                                <span class="flow-step-badge">STEP 01</span>
+                                <div class="flow-title en-text">1. Order Creation</div>
+                                <div class="flow-title kh-text">១. បង្កើតបុង</div>
+                                <div class="flow-desc en-text">Customer / staff books order & generates Order ID.</div>
+                                <div class="flow-desc kh-text">បង្កើតបុង និងចេញលេខសម្គាល់ទំនិញ។</div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2 -->
+                        <div class="flow-card">
+                            <img src="./images/batp001_table_pickup.png" alt="2. Pickup" class="flow-banner-img"/>
+                            <div class="flow-body">
+                                <span class="flow-step-badge" style="color: var(--c-blue);">STEP 02</span>
+                                <div class="flow-title en-text">2. Pickup Scan</div>
+                                <div class="flow-title kh-text">២. ទទួលទំនិញ</div>
+                                <div class="flow-desc en-text">Accept parcel & scan Status 210 with thermal waybill.</div>
+                                <div class="flow-desc kh-text">ទទួលទំនិញ និងស្កេន Status 210។</div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3 -->
+                        <div class="flow-card">
+                            <img src="./images/batp001_table_transit.png" alt="3. Transit" class="flow-banner-img"/>
+                            <div class="flow-body">
+                                <span class="flow-step-badge" style="color: var(--c-amber);">STEP 03</span>
+                                <div class="flow-title en-text">3. Transit / Mega</div>
+                                <div class="flow-title kh-text">៣. ដឹកជញ្ជូន</div>
+                                <div class="flow-desc en-text">Route between Hubs & Mega (Status 306 handover).</div>
+                                <div class="flow-desc kh-text">ផ្ទេរទំនិញតាម Hub/Mega (Status 306)។</div>
+                            </div>
+                        </div>
+
+                        <!-- Step 4 -->
+                        <div class="flow-card">
+                            <img src="./images/intro_step2.jpg" alt="4. Delivery" class="flow-banner-img"/>
+                            <div class="flow-body">
+                                <span class="flow-step-badge" style="color: var(--c-green);">STEP 04</span>
+                                <div class="flow-title en-text">4. Final Delivery</div>
+                                <div class="flow-title kh-text">៤. ចែកទំនិញ</div>
+                                <div class="flow-desc en-text">Assign driver (402) & deliver to customer (410).</div>
+                                <div class="flow-desc kh-text">ចាត់តាំងអ្នកដឹក (402) & ដឹកជោគជ័យ (410)។</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 2 VIDEOS IN A SINGLE ROW -->
+                <div style="margin-top: 18px;">
+                    <div style="font-size: 1.1rem; font-weight: 800; color: var(--c-dark); margin-bottom: 6px;">
+                        <span class="en-text">📹 Video Instructions: Dispatch & Delivery Operations:</span>
+                        <span class="kh-text">📹 វីដេអូបង្រៀនប្រតិបត្តិការចាត់តាំង & ចែកទំនិញ៖</span>
+                    </div>
+
+                    <div class="dual-video-row">
+                        <div>
+                            <div class="video-box-wrap">
+                                <video id="vid-mgr" controls playsinline preload="metadata">
+                                    <source src="./videos/manager_assign.mp4" type="video/mp4"/>
+                                </video>
+                            </div>
+                            <div class="video-caption">
+                                <span class="en-text">📹 Video 1: Manager Assign (Status 402)</span>
+                                <span class="kh-text">📹 វីដេអូ ១៖ ការចាត់តាំងដឹក (Status 402)</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="video-box-wrap">
+                                <video id="vid-shp" controls playsinline preload="metadata">
+                                    <source src="./videos/shipper_assign.mp4" type="video/mp4"/>
+                                </video>
+                            </div>
+                            <div class="video-caption">
+                                <span class="en-text">📹 Video 2: Driver Delivery (Status 400 ➔ 410)</span>
+                                <span class="kh-text">📹 វីដេអូ ២៖ អ្នកដឹកចេញចែក (Status 400 ➔ 410)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
-            <!-- ── CHAPTER 1: ORDER CREATION ──────────────────────────── -->
-            <section class="chapter-block" id="chap-1">
-                <div class="chapter-tag">
-                    <span>CHAPTER 01</span>
+            <!-- ── SLIDE 2: LIVE DEMONSTRATION (THE MAIN PART) ────────── -->
+            <section class="slide-block" id="slide-2">
+                <div class="slide-tag">
+                    <span>SLIDE 02</span>
                     <span>•</span>
-                    <span class="en-text">STEP 1: CREATION</span>
-                    <span class="kh-text">ជំហានទី ១៖ បង្កើតបុង</span>
+                    <span class="en-text">2️⃣ LIVE DEMONSTRATION (THE MAIN PART)</span>
+                    <span class="kh-text">2️⃣ ការបង្ហាញផ្ទាល់លើប្រព័ន្ធ (ផ្នែកចម្បង)</span>
                 </div>
 
-                <h1 class="chapter-heading en-text">Order Creation (បង្កើតបុង / Tạo đơn)</h1>
-                <h1 class="chapter-heading kh-text">ការបង្កើតបុង (Order Creation)</h1>
+                <h1 class="slide-heading en-text">2️⃣ Live System Demonstration</h1>
+                <h1 class="slide-heading kh-text">2️⃣ ការបង្ហាញផ្ទាល់លើផ្ទាំងកញ្ចក់បញ្ចាំង (Live Demo)</h1>
 
-                <div class="chapter-lead en-text">
-                    How orders are booked into the system either by merchants via mobile app/web or directly by post office counter staff.
+                <div class="slide-lead en-text">
+                    Live end-to-end demonstration on the projector screen just like practiced before: creating a test order, printing waybills, and scanning statuses.
                 </div>
-                <div class="chapter-lead kh-text">
-                    របៀបបង្កើតការបញ្ជាទិញចូលក្នុងប្រព័ន្ធ ដោយអតិថិជនតាមរយៈទូរស័ព្ទដៃ ឬដោយបុគ្គលិកផ្ទាល់នៅបញ្ជរសាខាប្រៃសណីយ៍។
+                <div class="slide-lead kh-text">
+                    ការបង្ហាញផ្ទាល់នៅលើកញ្ចក់បញ្ចាំង (Projector) ដូចដែលបានហាត់សមពីមុន៖ បង្កើតបុងសាកល្បង ព្រីនស្ទីគ័រ និងស្កេនតាមដំណាក់កាល។
                 </div>
 
-                <div class="stage-box">
+                <div class="stage-box" style="border-top: 4px solid var(--c-red);">
                     <div class="stage-badge-row">
-                        <span class="portal-header-badge badge-red">STEP 01 — ORDER BOOKING</span>
-                        <span class="status-pill">Status 100 / Pending</span>
+                        <span class="portal-header-badge badge-red">LIVE DEMO WORKFLOW</span>
+                        <span class="status-pill">Head Office Projector Demo</span>
                     </div>
 
                     <div class="points-list">
                         <div class="point-row">
                             <span class="point-circle"></span>
                             <div class="point-text">
-                                <strong class="en-text">Sender & Receiver Information:</strong>
-                                <strong class="kh-text">ព័ត៌មានអ្នកផ្ញើ និងអ្នកទទួល៖</strong>
-                                <span class="en-text">Fill in accurate phone numbers, recipient name, detailed address, province, and target delivery post office.</span>
-                                <span class="kh-text">បញ្ចូលលេខទូរស័ព្ទត្រឹមត្រូវ ឈ្មោះអ្នកទទួល អាសយដ្ឋានលម្អិត ខេត្ត/ក្រុង និងប៉ុស្តិ៍ប្រៃសណីយ៍ទទួលខុសត្រូវ។</span>
+                                <strong class="en-text">1. Create a Test Order:</strong>
+                                <strong class="kh-text">១. បង្កើតបុងសាកល្បង (Create a Test Order)៖</strong>
+                                <span class="en-text">Create a sample bill live on the system with Sender, Receiver, COD, and weight.</span>
+                                <span class="kh-text">បង្កើតបុងគំរូជាក់ស្តែងនៅលើប្រព័ន្ធ ដោយបញ្ចូលឈ្មោះអ្នកផ្ញើ អ្នកទទួល ទឹកប្រាក់ COD និងទម្ងន់។</span>
                             </div>
                         </div>
 
                         <div class="point-row">
                             <span class="point-circle"></span>
                             <div class="point-text">
-                                <strong class="en-text">Parcel Specifications & COD:</strong>
-                                <strong class="kh-text">ទម្ងន់ ទំហំ និងប្រាក់ COD៖</strong>
-                                <span class="en-text">Input actual weight (grams), parcel dimensions (L*W*H), cash on delivery (COD amount in USD/KHR), and VAS services (e.g. NTN).</span>
-                                <span class="kh-text">បញ្ចូលទម្ងន់ជាក់ស្តែង (ក្រាម) ទំហំក្បាលប្រអប់ (បណ្តោយ*ទទឹង*កម្ពស់) ទឹកប្រាក់ COD និងសេវាបន្ថែម (VAS)។</span>
+                                <strong class="en-text">2. Print the Bill (Waybill):</strong>
+                                <strong class="kh-text">២. ព្រីនស្លាកលេខកូដបារ (Print Waybill Label)៖</strong>
+                                <span class="en-text">Use the thermal printer brought from PNPP014 to print out the real adhesive barcode sticker.</span>
+                                <span class="kh-text">ប្រើប្រាស់ម៉ាស៊ីនព្រីនដែលយកមកពីសាខា PNPP014 ដើម្បីព្រីនស្ទីគ័រលេខកូដបារជាក់ស្តែង។</span>
                             </div>
                         </div>
 
                         <div class="point-row">
                             <span class="point-circle"></span>
                             <div class="point-text">
-                                <strong class="en-text">Waybill Barcode Generation:</strong>
-                                <strong class="kh-text">ការបង្កើតលេខកូដបារ (Order ID):</strong>
-                                <span class="en-text">The system automatically generates a unique 10-digit Order ID (e.g. 3204185976) and tracking barcode for real-time tracking.</span>
-                                <span class="kh-text">ប្រព័ន្ធនឹងបង្កើតលេខបុងសម្គាល់ ១០ ខ្ទង់ (ឧ. 3204185976) និងកូដបារស្វ័យប្រវត្តសម្រាប់តាមដានទំនិញ។</span>
+                                <strong class="en-text">3. Accept & Scan (Status 210):</strong>
+                                <strong class="kh-text">៣. ស្កេនទទួលទំនិញ (Accept & Scan Status 210)៖</strong>
+                                <span class="en-text">Scan the barcode into the mobile app as "Received / Pickup Done".</span>
+                                <span class="kh-text">ស្កេនលេខកូដបារចូលក្នុងប្រព័ន្ធទូរស័ព្ទដៃជា "បានទទួលទំនិញ / Pickup Done" (Status 210)។</span>
+                            </div>
+                        </div>
+
+                        <div class="point-row">
+                            <span class="point-circle"></span>
+                            <div class="point-text">
+                                <strong class="en-text">4. Transit / Handover (Status 306):</strong>
+                                <strong class="kh-text">៤. ផ្ទេរទំនិញទៅ Hub/Mega (Transit Status 306)៖</strong>
+                                <span class="en-text">Demonstrate how to put parcels into manifests and send to Mega / Hub.</span>
+                                <span class="kh-text">បង្ហាញពីរបៀបបញ្ចូលទំនិញក្នុងបញ្ជីរថយន្ត និងផ្ទេរទៅកាន់ Mega / Hub (Status 306)។</span>
+                            </div>
+                        </div>
+
+                        <div class="point-row">
+                            <span class="point-circle"></span>
+                            <div class="point-text">
+                                <strong class="en-text">5. Assign & Deliver (Status 402 ➔ 410):</strong>
+                                <strong class="kh-text">៥. ចាត់តាំង និងចែកទំនិញ (Assign & Deliver 402 ➔ 410)៖</strong>
+                                <span class="en-text">Show how to assign a driver (Status 402), dispatch out for delivery (Status 400), and complete final delivery confirmation (Status 410).</span>
+                                <span class="kh-text">បង្ហាញពីការចាត់តាំងអ្នកដឹក (Status 402) ចេញចែក (Status 400) និងស្កេនបញ្ចប់ការដឹកជញ្ជូនជោគជ័យ (Status 410)។</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- ── CHAPTER 2: SHIPMENT ACCEPTANCE ─────────────────────── -->
-            <section class="chapter-block" id="chap-2">
-                <div class="chapter-tag">
-                    <span>CHAPTER 02</span>
+            <!-- ── SLIDE 3: STAFF PRACTICE (HANDS-ON) ─────────────────── -->
+            <section class="slide-block" id="slide-3">
+                <div class="slide-tag">
+                    <span>SLIDE 03</span>
                     <span>•</span>
-                    <span class="en-text">STEP 2: PICKUP & ACCEPTANCE</span>
-                    <span class="kh-text">ជំហានទី ២៖ ទទួលទំនិញ</span>
+                    <span class="en-text">3️⃣ STAFF PRACTICE (HANDS-ON)</span>
+                    <span class="kh-text">3️⃣ បុគ្គលិកអនុវត្តជាក់ស្តែង (HANDS-ON)</span>
                 </div>
 
-                <h1 class="chapter-heading en-text">Shipment Acceptance & Pickup</h1>
-                <h1 class="chapter-heading kh-text">ការទទួលទំនិញ & យក (Shipment Acceptance)</h1>
+                <h1 class="slide-heading en-text">3️⃣ Staff Hands-on Practice Session</h1>
+                <h1 class="slide-heading kh-text">3️⃣ វគ្គអនុវត្តផ្ទាល់ដៃសម្រាប់បុគ្គលិក</h1>
 
-                <div class="chapter-lead en-text">
-                    Couriers pick up parcels from customers or customers hand over parcels at branch counters. Barcode labels are printed and scanned as Status 210.
+                <div class="slide-lead en-text">
+                    Let staff and trainees try creating orders, printing labels, and scanning on test accounts so they master their daily operational duties.
                 </div>
-                <div class="chapter-lead kh-text">
-                    អ្នករត់សំបុត្រទៅយកទំនិញពីអតិថិជន ឬអតិថិជនយកមកផ្ញើផ្ទាល់នៅសាខា។ ស្លាកកូដបារត្រូវព្រីន និងស្កេនចូលជា Status 210។
-                </div>
-
-                <div class="stage-box">
-                    <div class="stage-badge-row">
-                        <span class="portal-header-badge badge-blue">STEP 02 — PICKUP SCAN</span>
-                        <span class="status-pill" style="background:#eff6ff; color:var(--c-blue); border-color:#bfdbfe;">Status 210 (Pickup Done)</span>
-                    </div>
-
-                    <div class="points-list">
-                        <div class="point-row">
-                            <span class="point-circle"></span>
-                            <div class="point-text">
-                                <strong class="en-text">Waybill Thermal Label Printing:</strong>
-                                <strong class="kh-text">ការព្រីនស្លាកលេខកូដបារ (Thermal Label):</strong>
-                                <span class="en-text">Print standard adhesive shipping waybill stickers (100x150mm) and firmly affix to the parcel surface.</span>
-                                <span class="kh-text">ព្រីនក្រដាសស្ទីគ័រថ្លៃដឹកជញ្ជូនស្តង់ដារ (ទំហំ 100x150mm) ហើយបិទឱ្យជាប់លើផ្ទៃកញ្ចប់ទំនិញ។</span>
-                            </div>
-                        </div>
-
-                        <div class="point-row">
-                            <span class="point-circle"></span>
-                            <div class="point-text">
-                                <strong class="en-text">Status 210 Barcode Scanning:</strong>
-                                <strong class="kh-text">ការស្កេនទទួលទំនិញ Status 210៖</strong>
-                                <span class="en-text">Courier uses the mobile app scanner to confirm parcel pickup. Timestamp and responsible branch handle are recorded immediately.</span>
-                                <span class="kh-text">អ្នកដឹកជញ្ជូនប្រើទូរស័ព្ទដៃស្កេនកូដបារដើម្បីបញ្ជាក់ថាបានទទួលទំនិញរួចរាល់។ ម៉ោងនិងសាខាទទួលខុសត្រូវត្រូវកត់ត្រាភ្លាមៗ។</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ── CHAPTER 3: TRANSPORTATION & TRANSIT ─────────────────── -->
-            <section class="chapter-block" id="chap-3">
-                <div class="chapter-tag">
-                    <span>CHAPTER 03</span>
-                    <span>•</span>
-                    <span class="en-text">STEP 3: TRANSPORTATION</span>
-                    <span class="kh-text">ជំហានទី ៣៖ ដឹកជញ្ជូន & ផ្ទេរ</span>
-                </div>
-
-                <h1 class="chapter-heading en-text">Transportation & Hub Transit</h1>
-                <h1 class="chapter-heading kh-text">ការដឹកជញ្ជូន & ផ្ទេរទំនិញ (Transportation & Transit)</h1>
-
-                <div class="chapter-lead en-text">
-                    Consolidating parcels into vehicle manifests, routing between Provincial Hubs and the Mega Sorting Center with Status 306 handover scans.
-                </div>
-                <div class="chapter-lead kh-text">
-                    ការប្រមូលផ្តុំកញ្ចប់ទំនិញដាក់ចូលក្នុងបញ្ជីរថយន្ត ដឹកជញ្ជូនឆ្លងកាត់ Hub ប្រចាំខេត្ត និងមជ្ឈមណ្ឌលចែកកញ្ចប់ទំនិញ Mega Sorting Center។
-                </div>
-
-                <div class="stage-box">
-                    <div class="stage-badge-row">
-                        <span class="portal-header-badge badge-amber">STEP 03 — HUB & MEGA ROUTING</span>
-                        <span class="status-pill" style="background:#fffbeb; color:var(--c-amber); border-color:#fde68a;">Status 306 (Handover)</span>
-                    </div>
-
-                    <div class="points-list">
-                        <div class="point-row">
-                            <span class="point-circle"></span>
-                            <div class="point-text">
-                                <strong class="en-text">Manifest Creation & Loading:</strong>
-                                <strong class="kh-text">ការបង្កើតបញ្ជីរថយន្ត និងផ្ទុកទំនិញ៖</strong>
-                                <span class="en-text">Create outbound transit trips, link parcels into manifest lists, and record vehicle license plates.</span>
-                                <span class="kh-text">បង្កើតខ្សែរត់ដឹកជញ្ជូន ភ្ជាប់លេខបុងទាំងអស់ចូលក្នុងបញ្ជី និងកត់ត្រាស្លាកលេខរថយន្តដឹកជញ្ជូន។</span>
-                            </div>
-                        </div>
-
-                        <div class="point-row">
-                            <span class="point-circle"></span>
-                            <div class="point-text">
-                                <strong class="en-text">Mega Center Sorting & Inbound Scan:</strong>
-                                <strong class="kh-text">ការស្កេនទទួល និងបែងចែកនៅ Mega៖</strong>
-                                <span class="en-text">Upon arrival at Mega/Hub, operators scan Status 306 (Handover confirmation) and sort parcels to destination provincial bags.</span>
-                                <span class="kh-text">ពេលទំនិញទៅដល់ Mega/Hub បុគ្គលិកស្កេន Status 306 (ទទួលការផ្ទេរ) ហើយបែងចែកតាមទិសដៅខេត្តនីមួយៗ។</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- VIDEO PLAYER -->
-                <div class="video-box-wrap">
-                    <video id="vid-inventory" controls playsinline preload="metadata">
-                        <source src="./videos/inventory.mp4" type="video/mp4"/>
-                        Your browser does not support HTML5 video.
-                    </video>
-                </div>
-                <div class="video-caption">
-                    <span class="en-text">📹 Video Tutorial: Hub Sorting & Inventory Management</span>
-                    <span class="kh-text">📹 វីដេអូបង្រៀន៖ ការបែងចែកទំនិញ និងគ្រប់គ្រងស្តុកនៅ Hub</span>
-                    <span style="font-weight: 700; color: var(--c-blue);">Status 306 Flow</span>
-                </div>
-            </section>
-
-            <!-- ── CHAPTER 4: DELIVERY & HANDOVER ─────────────────────── -->
-            <section class="chapter-block" id="chap-4">
-                <div class="chapter-tag">
-                    <span>CHAPTER 04</span>
-                    <span>•</span>
-                    <span class="en-text">STEP 4: FINAL DELIVERY</span>
-                    <span class="kh-text">ជំហានទី ៤៖ ចែកទំនិញ</span>
-                </div>
-
-                <h1 class="chapter-heading en-text">Delivery & Final Handover</h1>
-                <h1 class="chapter-heading kh-text">ការចែកទំនិញ & បញ្ជូន (Delivery & Handover)</h1>
-
-                <div class="chapter-lead en-text">
-                    Arrival at destination branch, driver task assignment, out for delivery dispatch, and customer handover confirmation.
-                </div>
-                <div class="chapter-lead kh-text">
-                    ទំនិញមកដល់សាខាគោលដៅ ចាត់តាំងអ្នកដឹកជញ្ជូន ចេញទៅដឹក និងប្រគល់ទំនិញជូនអតិថិជនដោយជោគជ័យ។
-                </div>
-
-                <div class="stage-box">
-                    <div class="stage-badge-row">
-                        <span class="portal-header-badge badge-green">STEP 04 — DELIVERY COMPLETION</span>
-                        <span class="status-pill" style="background:#f0fdf4; color:var(--c-green); border-color:#bbf7d0;">Status 410 (Shipped)</span>
-                    </div>
-
-                    <div class="points-list">
-                        <div class="point-row">
-                            <span class="point-circle"></span>
-                            <div class="point-text">
-                                <strong class="en-text">Status 402 — Assign to Driver:</strong>
-                                <strong class="kh-text">Status 402 — ចាត់តាំងអ្នកដឹក (Assign Deliver)៖</strong>
-                                <span class="en-text">Branch manager assigns arrival parcels to local delivery couriers based on geographical delivery zones.</span>
-                                <span class="kh-text">ប្រធានសាខាចាត់តាំងកញ្ចប់ទំនិញទៅឱ្យបុគ្គលិកដឹកជញ្ជូនតាមតំបន់ភូមិសាស្រ្តដែលទទួលខុសត្រូវ។</span>
-                            </div>
-                        </div>
-
-                        <div class="point-row">
-                            <span class="point-circle"></span>
-                            <div class="point-text">
-                                <strong class="en-text">Status 400 — Out for Delivery:</strong>
-                                <strong class="kh-text">Status 400 — កំពុងចេញដឹក (Out for Delivery)៖</strong>
-                                <span class="en-text">Courier accepts the batch and starts delivery trip. Customer receives automated tracking SMS/notification.</span>
-                                <span class="kh-text">អ្នកដឹកទទួលយកបញ្ជីទំនិញ ហើយចាប់ផ្តើមចេញដំណើរ។ អតិថិជនទទួលបានសារដំណឹងតាមដាន។</span>
-                            </div>
-                        </div>
-
-                        <div class="point-row">
-                            <span class="point-circle"></span>
-                            <div class="point-text">
-                                <strong class="en-text">Status 410 — Delivery Successful (Giao thành công):</strong>
-                                <strong class="kh-text">Status 410 — ដឹកជញ្ជូនជោគជ័យ (Shipped/Delivered)៖</strong>
-                                <span class="en-text">Upon handing over parcel and collecting COD payment, courier scans Status 410. Order is completed.</span>
-                                <span class="kh-text">ពេលប្រគល់ទំនិញ និងទទួលប្រាក់ COD រួចរាល់ អ្នកដឹកស្កេន Status 410។ ការដឹកជញ្ជូនត្រូវបានបញ្ចប់ជាស្ថាពរ។</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- VIDEO PLAYER DUAL -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px;">
-                    <div>
-                        <div class="video-box-wrap">
-                            <video id="vid-mgr" controls playsinline preload="metadata">
-                                <source src="./videos/manager_assign.mp4" type="video/mp4"/>
-                            </video>
-                        </div>
-                        <div class="video-caption">
-                            <span class="en-text">📹 Manager Assign (Status 402)</span>
-                            <span class="kh-text">📹 ការចាត់តាំងដឹក (Status 402)</span>
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="video-box-wrap">
-                            <video id="vid-shp" controls playsinline preload="metadata">
-                                <source src="./videos/shipper_assign.mp4" type="video/mp4"/>
-                            </video>
-                        </div>
-                        <div class="video-caption">
-                            <span class="en-text">📹 Driver Delivery (Status 400/410)</span>
-                            <span class="kh-text">📹 អ្នកដឹកចេញចែក (Status 400/410)</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ── CHAPTER 5: LIVE DEMO & TRAINING SOP ─────────────────── -->
-            <section class="chapter-block" id="chap-5">
-                <div class="chapter-tag">
-                    <span>CHAPTER 05</span>
-                    <span>•</span>
-                    <span class="en-text">LIVE DEMO & PRACTICE</span>
-                    <span class="kh-text">ការអនុវត្តផ្ទាល់ជាក់ស្តែង</span>
-                </div>
-
-                <h1 class="chapter-heading en-text">Live System Demonstration & Practice</h1>
-                <h1 class="chapter-heading kh-text">ការអនុវត្តផ្ទាល់ក្នុងវគ្គបណ្តុះបណ្តាល</h1>
-
-                <div class="chapter-lead en-text">
-                    Step-by-step practical demonstration agenda for training sessions at Head Office.
-                </div>
-                <div class="chapter-lead kh-text">
-                    របៀបវារៈនៃការធ្វើបទបង្ហាញ និងការអនុវត្តផ្ទាល់នៅលើប្រព័ន្ធជាក់ស្តែងក្នុងវគ្គបណ្តុះបណ្តាលនៅការិយាល័យកណ្តាល។
+                <div class="slide-lead kh-text">
+                    ឱ្យបុគ្គលិកទាំងអស់ចូលប្រើគណនីសាកល្បង បង្កើតបុង ព្រីនស្លាក និងស្កេនដោយផ្ទាល់ដៃ ដើម្បីធានាភាពស្ទាត់ជំនាញក្នុងការបំពេញការងារប្រចាំថ្ងៃ។
                 </div>
 
                 <div class="stage-box" style="border-top: 4px solid var(--c-green);">
                     <div class="stage-badge-row">
-                        <span class="portal-header-badge badge-green">LIVE TRAINING DEMO STEPS</span>
-                        <span class="status-pill">Head Office Session</span>
+                        <span class="portal-header-badge badge-green">PRACTICE CHECKLIST</span>
+                        <span class="status-pill">Individual Hands-on Tasks</span>
                     </div>
 
                     <div class="points-list">
                         <div class="point-row">
                             <span class="point-circle" style="background: var(--c-green);"></span>
                             <div class="point-text">
-                                <strong class="en-text">1. Live Order Booking on Projector:</strong>
-                                <strong class="kh-text">១. បង្កើតការបញ្ជាទិញផ្ទាល់លើផ្ទាំង Projector៖</strong>
-                                <span class="en-text">Create sample orders live through Customer App and OPS Web interface.</span>
-                                <span class="kh-text">បង្កើតបុងសាកល្បងជាក់ស្តែងតាម Customer App និងប្រព័ន្ធ OPS Web។</span>
+                                <strong class="en-text">Task A — Test Account Login:</strong>
+                                <strong class="kh-text">លំហាត់ A — ចូលប្រើប្រាស់គណនីសាកល្បង៖</strong>
+                                <span class="en-text">Every participant logs into OPS Web and Mobile Courier App using assigned training credentials.</span>
+                                <span class="kh-text">បុគ្គលិកគ្រប់រូបចូលប្រើប្រាស់ប្រព័ន្ធ OPS Web និងកម្មវិធីទូរស័ព្ទដៃដោយប្រើគណនីបណ្តុះបណ្តាល។</span>
                             </div>
                         </div>
 
                         <div class="point-row">
                             <span class="point-circle" style="background: var(--c-green);"></span>
                             <div class="point-text">
-                                <strong class="en-text">2. Thermal Waybill Printing:</strong>
-                                <strong class="kh-text">២. ព្រីនស្លាកលេខកូដបារជាក់ស្តែង៖</strong>
-                                <span class="en-text">Print live barcode label stickers using the thermal printer brought from PNPP014.</span>
-                                <span class="kh-text">ព្រីនស្ទីគ័រលេខកូដបារផ្ទាល់ចេញពីម៉ាស៊ីនព្រីនដែលបានយកមកពីសាខា PNPP014។</span>
+                                <strong class="en-text">Task B — Create Individual Test Bill:</strong>
+                                <strong class="kh-text">លំហាត់ B — បង្កើតបុងទំនិញសាកល្បងដោយខ្លួនឯង៖</strong>
+                                <span class="en-text">Each trainee creates 1 pickup order and 1 drop-off counter order with complete parcel details.</span>
+                                <span class="kh-text">បុគ្គលិកម្នាក់ៗបង្កើតបុងទៅយក (Pickup) ១ និងបុងផ្ញើនៅបញ្ជរ ១ ដោយបញ្ចូលព័ត៌មានពេញលេញ។</span>
                             </div>
                         </div>
 
                         <div class="point-row">
                             <span class="point-circle" style="background: var(--c-green);"></span>
                             <div class="point-text">
-                                <strong class="en-text">3. Mobile Scanner App Acceptance:</strong>
-                                <strong class="kh-text">៣. ស្កេនទទួលទំនិញតាមទូរស័ព្ទដៃ៖</strong>
-                                <span class="en-text">Demonstrate mobile app barcode scanning for pickup acceptance (Status 210).</span>
-                                <span class="kh-text">បង្ហាញការស្កេនលេខកូដបារតាមទូរស័ព្ទដៃដើម្បីទទួលទំនិញ (Status 210)។</span>
+                                <strong class="en-text">Task C — Label Printing & Scanning Run:</strong>
+                                <strong class="kh-text">លំហាត់ C — ព្រីនស្ទីគ័រ និងស្កេនបញ្ចប់ដំណើរការ៖</strong>
+                                <span class="en-text">Practice test label printing, scan Status 210, assign driver (402), and complete simulated delivery (410).</span>
+                                <span class="kh-text">អនុវត្តព្រីនស្លាកកូដបារ ស្កេន Status 210 ចាត់តាំងអ្នកដឹក (402) និងស្កេនបញ្ចប់ការដឹក (410)។</span>
                             </div>
                         </div>
 
                         <div class="point-row">
                             <span class="point-circle" style="background: var(--c-green);"></span>
                             <div class="point-text">
-                                <strong class="en-text">4. Driver Assignment & Final Delivery:</strong>
-                                <strong class="kh-text">៤. ចាត់តាំងអ្នកដឹក និងបញ្ចប់ការដឹកជញ្ជូន៖</strong>
-                                <span class="en-text">Assign bill to driver (402), dispatch (400), and complete final delivery confirmation (410).</span>
-                                <span class="kh-text">ចាត់តាំងទៅអ្នកដឹក (402) បញ្ជូនចេញដឹក (400) និងស្កេនបញ្ចប់ការដឹកជោគជ័យ (410)។</span>
-                            </div>
-                        </div>
-
-                        <div class="point-row">
-                            <span class="point-circle" style="background: var(--c-green);"></span>
-                            <div class="point-text">
-                                <strong class="en-text">5. Hands-on Staff Practice:</strong>
-                                <strong class="kh-text">៥. បុគ្គលិកអនុវត្តជាក់ស្តែងគ្រប់ៗគ្នា៖</strong>
-                                <span class="en-text">All trainees log in to test accounts and execute full workflow independently.</span>
-                                <span class="kh-text">បុគ្គលិកទាំងអស់ចូលប្រើគណនីសាកល្បង និងអនុវត្តដំណើរការទាំងមូលដោយផ្ទាល់ដៃ។</span>
+                                <strong class="en-text">Task D — Q&A & Error Handling:</strong>
+                                <strong class="kh-text">លំហាត់ D — សំណួរ-ចម្លើយ និងការដោះស្រាយបញ្ហា៖</strong>
+                                <span class="en-text">Address common field errors (Status 420 store waiting, 472 issue resolution, 520 customer return) and best practices.</span>
+                                <span class="kh-text">解ឆ្លើយសំណួរអំពីបញ្ហាជួបប្រទះ (Status 420 រង់ចាំ, 472 ដោះស្រាយបញ្ហា, 520 ភ្ញៀវបង្វែរទំនិញ) និងបទពិសោធន៍ល្អៗ។</span>
                             </div>
                         </div>
                     </div>
@@ -1155,9 +1072,9 @@
     </main>
 
 <script>
-    // Smooth Scroll spy for desktop sidebar & mobile drawer
+    // Smooth Scroll spy for desktop sidebar & mobile drawer (3 Slides)
     const scrollContainer = document.getElementById('contentViewport');
-    const sections = document.querySelectorAll('.chapter-block');
+    const sections = document.querySelectorAll('.slide-block');
     const navItems = document.querySelectorAll('.nav-link');
     const drawerLinks = document.querySelectorAll('.drawer-link');
 
