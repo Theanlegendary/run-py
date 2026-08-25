@@ -764,21 +764,82 @@
             line-height: 1.35;
         }
 
-        /* Responsive Breakpoints */
+        /* ── ENHANCED RESPONSIVE SYSTEM ────────────────────────── */
+        @media (max-width: 1200px) {
+            .flow-row-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 16px;
+            }
+        }
+
         @media (max-width: 960px) {
             .sidebar { display: none; }
             .mobile-header-bar { display: flex; }
             .content-viewport {
-                padding: 72px 20px 500px;
+                padding: 76px 20px 500px;
             }
-            .portal-grid, .dual-video-row, .demo-gallery-grid, .practice-grid {
+            .portal-grid, .demo-gallery-grid {
                 grid-template-columns: 1fr;
-            }
-            .flow-row-grid {
-                grid-template-columns: 1fr 1fr;
             }
             .slide-heading {
                 font-size: 1.9rem;
+            }
+            .slide-block {
+                gap: 22px;
+                padding-bottom: 60px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                font-size: 16px;
+            }
+            .content-viewport {
+                padding: 68px 14px 400px;
+            }
+            .slide-heading {
+                font-size: 1.55rem;
+                line-height: 1.3;
+            }
+            .slide-lead {
+                font-size: 1.02rem;
+                line-height: 1.6;
+            }
+            .flow-row-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            .flow-banner-video, .flow-video-wrap {
+                height: 240px;
+            }
+            .flow-banner-img {
+                height: 240px;
+            }
+            .portal-card {
+                padding: 18px 16px;
+            }
+            .demo-card {
+                padding: 16px 14px;
+                gap: 14px;
+            }
+            .demo-card-num {
+                width: 36px;
+                height: 36px;
+                font-size: 1rem;
+                border-radius: 10px;
+            }
+            .practice-list-item {
+                padding: 16px 14px;
+                gap: 12px;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .demo-gallery-img {
+                height: 200px;
+            }
+            .important-alert {
+                padding: 12px 14px;
+                font-size: 0.9rem;
             }
         }
     </style>
