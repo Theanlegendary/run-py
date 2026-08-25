@@ -377,11 +377,13 @@ def build_mega_pivot(rows, pivot_cfg, zone_cfg):
 
 def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
     """
-    Renders pivot table matching exact Zone 4 report screenshot design:
-      - Dark Navy (#0B132B) Top Banner with Date Stamp
-      - Double Header Bar: Date columns + TOTAL (#0F3976) + Fee($) (#166534) + COD($) (#166534) + URGENT (#B91C1C)
-      - Data Rows with Light Green fill (#E6F4EA) for Fee/COD and Light Red (#FCE8E6) for Urgent
-      - Bold Red GRAND TOTAL row (#B91C1C)
+    Renders an Executive CEO-level Mega Hub Dashboard:
+      - Premium Dark Obsidian (#0F172A) Top Banner & Grand Total Footer
+      - Sleek Slate Header Bar (#1E293B)
+      - Smart Date Handling with crisp typography
+      - Emerald Green financial metrics (Fee/COD)
+      - Coral Red Urgent indicators
+      - High-contrast executive summary layout
     """
     fee_tree    = extra_data[0] if extra_data and len(extra_data) > 0 else defaultdict(lambda: defaultdict(float))
     cod_tree    = extra_data[1] if extra_data and len(extra_data) > 1 else defaultdict(lambda: defaultdict(float))
@@ -389,29 +391,35 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
 
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "PENDING BILL"
+    ws.title = "EXECUTIVE MEGA PIVOT"
 
     fn = "Segoe UI"
     banner_font = Font(name=fn, size=11, bold=True, color="FFFFFF")
     hdr_font    = Font(name=fn, size=10, bold=True, color="FFFFFF")
-    hub_font    = Font(name=fn, size=10, bold=True, color="FFFFFF")
+    handle_font = Font(name=fn, size=10, bold=True, color="0F172A")
     data_font   = Font(name=fn, size=10, color="0F172A")
-    blue_font   = Font(name=fn, size=10, color="1E40AF")
-    fee_font    = Font(name=fn, size=10, color="166534", bold=True)
-    urg_font    = Font(name=fn, size=10, color="B91C1C", bold=True)
-    tot_red_font= Font(name=fn, size=10, bold=True, color="B91C1C")
+    blue_font   = Font(name=fn, size=10, color="1E40AF", bold=True)
+    fee_font    = Font(name=fn, size=10, color="047857", bold=True)
+    urg_font    = Font(name=fn, size=10, color="DC2626", bold=True)
+    tot_font    = Font(name=fn, size=10, bold=True, color="0F172A")
+    gt_font     = Font(name=fn, size=10, bold=True, color="FFFFFF")
+    gt_urg_font = Font(name=fn, size=10, bold=True, color="FCA5A5")
 
-    # Header Fills matching Zone 4 screenshot
-    banner_fill  = PatternFill("solid", fgColor="0B132B")  # Dark Navy
-    hdr_navy     = PatternFill("solid", fgColor="111827")  # Deep Header
-    tot_hdr_fill = PatternFill("solid", fgColor="0F3976")  # Navy Blue for TOTAL
-    fee_hdr_fill = PatternFill("solid", fgColor="166534")  # Forest Green for Fee($) / COD($)
-    urg_hdr_fill = PatternFill("solid", fgColor="B91C1C")  # Dark Red for URGENT
+    # Executive Palette Fills
+    banner_fill   = PatternFill("solid", fgColor="0F172A") # Dark Obsidian
+    hdr_slate     = PatternFill("solid", fgColor="1E293B") # Slate Header
+    tot_hdr_fill  = PatternFill("solid", fgColor="1E40AF") # Royal Blue
+    fee_hdr_fill  = PatternFill("solid", fgColor="065F46") # Deep Emerald
+    urg_hdr_fill  = PatternFill("solid", fgColor="991B1B") # Deep Crimson
 
-    # Data Background Fills matching Zone 4 screenshot
-    fee_cell_fill = PatternFill("solid", fgColor="E6F4EA") # Light Green fill for Fee / COD
-    urg_cell_fill = PatternFill("solid", fgColor="FCE8E6") # Light Red fill for Urgent
-    tot_row_fill  = PatternFill("solid", fgColor="F1F5F9") # Soft Grey Total Row
+    fee_cell_fill = PatternFill("solid", fgColor="ECFDF5") # Soft Emerald Tint
+    urg_cell_fill = PatternFill("solid", fgColor="FEE2E2") # Soft Coral Tint
+    tot_cell_fill = PatternFill("solid", fgColor="EFF6FF") # Soft Blue Tint
+    gt_row_fill   = PatternFill("solid", fgColor="0F172A") # Executive Dark Footer
+
+    # Subtle Border
+    thin_border = Side(style="thin", color="CBD5E1")
+    cell_border = Border(left=thin_border, right=thin_border, top=thin_border, bottom=thin_border)
 
     # Detect current hub label & status code
     hub_keys = [h for h in ["MEGA1", "DVCMEGA1"] if h in tree and tree[h]]
@@ -427,21 +435,21 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
     cod_col = fee_col + 1
     urg_col = cod_col + 1
 
-    # 1. Top Banner Row 1 (Merged across all columns to prevent text clipping)
+    # 1. Top Banner Row 1
     stamp_str = datetime.now().strftime("%d/%m/%Y %H:%M")
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=urg_col)
-    ws.cell(1, 1, f"DAILY REPORT — {hub_title}  {stamp_str}").font = banner_font
-    ws.cell(1, 1).fill = banner_fill
-    ws.cell(1, 1).alignment = _LEFT
-    ws.row_dimensions[1].height = 24
-
+    top_cell = ws.cell(1, 1, f"📊 EXECUTIVE MEGA HUB REPORT — {hub_title}  |  {stamp_str}")
+    top_cell.font = banner_font
+    top_cell.fill = banner_fill
+    top_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[1].height = 28
 
     # 2. Row 2: Headers
-    ws.cell(2, 1, "HANDLE").font = hdr_font
-    ws.cell(2, 1).fill = hdr_navy
-    ws.cell(2, 1).border = _BORDER
-    ws.cell(2, 1).alignment = _CENTER
-
+    h_cell = ws.cell(2, 1, "PROVINCE / HANDLE")
+    h_cell.font = hdr_font
+    h_cell.fill = hdr_slate
+    h_cell.border = cell_border
+    h_cell.alignment = _CENTER
 
     col_idx_map = {}
     for idx, dk in enumerate(day_keys):
@@ -449,38 +457,38 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
         col_idx_map[dk] = col_num
         cell = ws.cell(2, col_num, f"{dk[1]:02d}/{dk[0]:02d}")
         cell.font = hdr_font
-        cell.fill = hdr_navy
-        cell.border = _BORDER
+        cell.fill = hdr_slate
+        cell.border = cell_border
         cell.alignment = _CENTER
 
     c_tot_hdr = ws.cell(2, tot_col, "TOTAL")
     c_tot_hdr.font = hdr_font
     c_tot_hdr.fill = tot_hdr_fill
-    c_tot_hdr.border = _BORDER
+    c_tot_hdr.border = cell_border
     c_tot_hdr.alignment = _CENTER
 
-    c_fee_hdr = ws.cell(2, fee_col, "Fee($)")
+    c_fee_hdr = ws.cell(2, fee_col, "Fee ($)")
     c_fee_hdr.font = hdr_font
     c_fee_hdr.fill = fee_hdr_fill
-    c_fee_hdr.border = _BORDER
+    c_fee_hdr.border = cell_border
     c_fee_hdr.alignment = _CENTER
 
-    c_cod_hdr = ws.cell(2, cod_col, "COD($)")
+    c_cod_hdr = ws.cell(2, cod_col, "COD ($)")
     c_cod_hdr.font = hdr_font
     c_cod_hdr.fill = fee_hdr_fill
-    c_cod_hdr.border = _BORDER
+    c_cod_hdr.border = cell_border
     c_cod_hdr.alignment = _CENTER
 
     c_urg_hdr = ws.cell(2, urg_col, "URGENT")
     c_urg_hdr.font = hdr_font
     c_urg_hdr.fill = urg_hdr_fill
-    c_urg_hdr.border = _BORDER
+    c_urg_hdr.border = cell_border
     c_urg_hdr.alignment = _CENTER
 
     for c in range(1, urg_col + 1):
         ws.cell(1, c).fill = banner_fill
 
-    ws.row_dimensions[2].height = 24
+    ws.row_dimensions[2].height = 26
 
     r = 3
     grand_col_totals = defaultdict(int)
@@ -489,9 +497,8 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
     grand_overall_cod = 0.0
     grand_overall_urgent = 0
 
-    row_bg_even = PatternFill("solid", fgColor="F8FAFC") # Soft Slate-Grey Tint
-    row_bg_odd  = PatternFill("solid", fgColor="FFFFFF") # White
-    tot_row_fill= PatternFill("solid", fgColor="E2E8F0") # Rich Slate-Grey Total Row
+    row_bg_even = PatternFill("solid", fgColor="F8FAFC") # Crisp Ice Tint
+    row_bg_odd  = PatternFill("solid", fgColor="FFFFFF") # Pure White
 
     for hub in hub_keys:
         prov_dict = tree.get(hub, {})
@@ -510,9 +517,9 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
             ws.row_dimensions[r].height = 22
 
             c_prov = ws.cell(r, 1, prov)
-            c_prov.font = data_font
+            c_prov.font = handle_font
             c_prov.fill = row_bg
-            c_prov.border = _BORDER
+            c_prov.border = cell_border
             c_prov.alignment = _CENTER
 
             row_sum = 0
@@ -521,8 +528,8 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
                 val = prov_dict[prov].get(dk, 0)
                 cell = ws.cell(r, col_num)
                 cell.fill = row_bg
-                cell.border = _BORDER
-                cell.font = blue_font
+                cell.border = cell_border
+                cell.font = blue_font if val > 0 else data_font
                 cell.alignment = _CENTER
                 if val > 0:
                     cell.value = val
@@ -530,42 +537,41 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
                     hub_col_totals[dk] += val
                     grand_col_totals[dk] += val
 
-
             p_fee = fee_tree[hub].get(prov, 0.0)
             p_cod = cod_tree[hub].get(prov, 0.0)
             p_urg = urgent_tree[hub].get(prov, 0)
 
-            # TOTAL cell (Bold Red)
+            # TOTAL cell
             t_cell = ws.cell(r, tot_col, row_sum if row_sum > 0 else "")
-            t_cell.font = tot_red_font
+            t_cell.font = tot_font
+            t_cell.fill = tot_cell_fill if row_sum > 0 else row_bg
             t_cell.alignment = _CENTER
-            t_cell.border = _BORDER
+            t_cell.border = cell_border
 
-            # Fee($) cell (Light Green fill, Green text)
+            # Fee($) cell
             f_cell = ws.cell(r, fee_col, round(p_fee, 2) if p_fee > 0 else "")
             f_cell.font = fee_font
-            f_cell.fill = fee_cell_fill
+            f_cell.fill = fee_cell_fill if p_fee > 0 else row_bg
             f_cell.alignment = _CENTER
-            f_cell.border = _BORDER
+            f_cell.border = cell_border
             if p_fee > 0:
                 f_cell.number_format = "$#,##0.00"
 
-            # COD($) cell (Light Green fill, Green text)
+            # COD($) cell
             c_cell = ws.cell(r, cod_col, round(p_cod, 2) if p_cod > 0 else "")
             c_cell.font = fee_font
-            c_cell.fill = fee_cell_fill
+            c_cell.fill = fee_cell_fill if p_cod > 0 else row_bg
             c_cell.alignment = _CENTER
-            c_cell.border = _BORDER
+            c_cell.border = cell_border
             if p_cod > 0:
                 c_cell.number_format = "$#,##0.00"
 
-            # URGENT cell (Light Red fill & Dark Red text ONLY when p_urg > 0)
+            # URGENT cell
             u_cell = ws.cell(r, urg_col, p_urg if p_urg > 0 else "")
             u_cell.font = urg_font
             u_cell.fill = urg_cell_fill if p_urg > 0 else row_bg
             u_cell.alignment = _CENTER
-            u_cell.border = _BORDER
-
+            u_cell.border = cell_border
 
             hub_total_orders += row_sum
             hub_total_fee += p_fee
@@ -578,20 +584,21 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
         grand_overall_cod += hub_total_cod
         grand_overall_urgent += hub_total_urgent
 
-    # GRAND TOTAL Row
-    ws.row_dimensions[r].height = 24
-    ws.cell(r, 1, "GRAND TOTAL").font = tot_red_font
-    ws.cell(r, 1).fill = tot_row_fill
-    ws.cell(r, 1).border = _BORDER
-    ws.cell(r, 1).alignment = _CENTER
+    # GRAND TOTAL Row (Executive Dark Obsidian Bar)
+    ws.row_dimensions[r].height = 26
+    gt_title = ws.cell(r, 1, "GRAND TOTAL")
+    gt_title.font = gt_font
+    gt_title.fill = gt_row_fill
+    gt_title.border = cell_border
+    gt_title.alignment = _CENTER
 
     for idx, dk in enumerate(day_keys):
         col_num = col_idx_map[dk]
         val = grand_col_totals.get(dk, 0)
         cell = ws.cell(r, col_num)
-        cell.fill = tot_row_fill
-        cell.font = tot_red_font
-        cell.border = _BORDER
+        cell.fill = gt_row_fill
+        cell.font = gt_font
+        cell.border = cell_border
         cell.alignment = _CENTER
         if val > 0:
             cell.value = val
@@ -599,38 +606,37 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
     gt_c = ws.cell(r, tot_col, grand_overall_orders)
     gt_c.fill = tot_hdr_fill
     gt_c.font = Font(name=fn, size=10, bold=True, color="FFFFFF")
-    gt_c.border = _BORDER
+    gt_c.border = cell_border
     gt_c.alignment = _CENTER
 
     gf_c = ws.cell(r, fee_col, round(grand_overall_fee, 2))
-    gf_c.fill = fee_cell_fill
-    gf_c.font = fee_font
+    gf_c.fill = fee_hdr_fill
+    gf_c.font = Font(name=fn, size=10, bold=True, color="FFFFFF")
     gf_c.alignment = _CENTER
-    gf_c.border = _BORDER
+    gf_c.border = cell_border
     gf_c.number_format = "$#,##0.00"
 
     gc_c = ws.cell(r, cod_col, round(grand_overall_cod, 2))
-    gc_c.fill = fee_cell_fill
-    gc_c.font = fee_font
+    gc_c.fill = fee_hdr_fill
+    gc_c.font = Font(name=fn, size=10, bold=True, color="FFFFFF")
     gc_c.alignment = _CENTER
-    gc_c.border = _BORDER
+    gc_c.border = cell_border
     gc_c.number_format = "$#,##0.00"
 
-
     gu_c = ws.cell(r, urg_col, grand_overall_urgent)
-    gu_c.fill = urg_cell_fill
-    gu_c.font = urg_font
+    gu_c.fill = urg_hdr_fill
+    gu_c.font = Font(name=fn, size=10, bold=True, color="FFFFFF")
     gu_c.alignment = _CENTER
-    gu_c.border = _BORDER
+    gu_c.border = cell_border
 
     # Column Widths
-    ws.column_dimensions["A"].width = 18
+    ws.column_dimensions["A"].width = 22
     for c in range(2, tot_col):
-        ws.column_dimensions[get_column_letter(c)].width = 7
-    ws.column_dimensions[get_column_letter(tot_col)].width = 10
-    ws.column_dimensions[get_column_letter(fee_col)].width = 14
-    ws.column_dimensions[get_column_letter(cod_col)].width = 14
-    ws.column_dimensions[get_column_letter(urg_col)].width = 10
+        ws.column_dimensions[get_column_letter(c)].width = 8
+    ws.column_dimensions[get_column_letter(tot_col)].width = 11
+    ws.column_dimensions[get_column_letter(fee_col)].width = 15
+    ws.column_dimensions[get_column_letter(cod_col)].width = 15
+    ws.column_dimensions[get_column_letter(urg_col)].width = 11
 
     wb.save(out_path)
     return out_path, grand_overall_orders
