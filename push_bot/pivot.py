@@ -342,19 +342,32 @@ def build_mega_pivot(rows, pivot_cfg, zone_cfg):
         except (ValueError, TypeError):
             pass
 
-        created_val  = row[COL_CREATED_DATE]
-        created_date = None
-        if isinstance(created_val, datetime):
-            created_date = created_val.date()
-        elif created_val:
-            s = str(created_val).strip().split(" ")[0]
+        act_val = row[24] if len(row) > 24 and row[24] else row[COL_CREATED_DATE]
+        act_date = None
+        if isinstance(act_val, datetime):
+            act_date = act_val.date()
+        elif act_val:
+            s = str(act_val).strip().split(" ")[0]
             for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%d-%m-%Y"):
                 try:
-                    created_date = datetime.strptime(s, fmt).date()
+                    act_date = datetime.strptime(s, fmt).date()
                     break
                 except ValueError:
                     continue
-        if created_date and (today - created_date).days > 1:
+        if not act_date and row[COL_CREATED_DATE]:
+            c_val = row[COL_CREATED_DATE]
+            if isinstance(c_val, datetime):
+                act_date = c_val.date()
+            elif c_val:
+                s = str(c_val).strip().split(" ")[0]
+                for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%d-%m-%Y"):
+                    try:
+                        act_date = datetime.strptime(s, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+
+        if act_date and (today - act_date).days >= 1:
             urgent_tree[hub_label][prov] += 1
 
     day_keys = sorted(day_keys_seen)

@@ -142,8 +142,8 @@ def build_mega_detail(source_path, out_path, cfg):
             action_date = _parse_created(row[CI_CREATED], _dt)
 
         age = (today - action_date).days if action_date else 0
-        # MEGA SLA Rule: Hold >= 2 days (older than yesterday) is Urgent
-        is_urgent = age >= 2
+        # MEGA SLA Rule: age 0 days is normal, 1 or more is urgent
+        is_urgent = age >= 1
 
         action_user = str(row[CI_ACTION_USER] or "").strip() if len(row) > CI_ACTION_USER else ""
 
