@@ -534,7 +534,7 @@
         }
 
         /* ── VIDEOS IN GRID ROW ─────────────────────────────────────── */
-        .video-grid-row {
+        .dual-video-row {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 16px;
@@ -740,7 +740,7 @@
             .content-viewport {
                 padding: 72px 20px 500px;
             }
-            .portal-grid, .video-grid-row, .demo-gallery-grid, .practice-grid {
+            .portal-grid, .dual-video-row, .demo-gallery-grid, .practice-grid {
                 grid-template-columns: 1fr;
             }
             .flow-row-grid {
@@ -948,9 +948,13 @@
                     </div>
 
                     <div class="flow-row-grid">
-                        <!-- Step 1 -->
+                        <!-- Step 1 (Video inside card) -->
                         <div class="flow-card">
-                            <img src="./images/intro_step1.jpg" alt="1. Creation" class="flow-banner-img"/>
+                            <div class="flow-video-wrap">
+                                <video controls playsinline preload="metadata" class="flow-banner-video">
+                                    <source src="./videos/creation.mp4" type="video/mp4"/>
+                                </video>
+                            </div>
                             <div class="flow-body">
                                 <span class="flow-step-badge">STAGE 01</span>
                                 <div class="flow-title en-text">01. Creation</div>
@@ -1009,21 +1013,8 @@
                         <span class="kh-text">វីដេអូបណ្តុះបណ្តាល</span>
                     </div>
 
-                    <div class="video-grid-row">
-                        <!-- Video 1: Creation -->
-                        <div>
-                            <div class="video-box-wrap">
-                                <video id="vid-crt" controls playsinline preload="metadata">
-                                    <source src="./videos/creation.mp4" type="video/mp4"/>
-                                </video>
-                            </div>
-                            <div class="video-caption">
-                                <span class="en-text">Video 1: Order Creation. Creation</span>
-                                <span class="kh-text">វីដេអូ ១៖ របៀបបង្កើតបុង. Creation</span>
-                            </div>
-                        </div>
-
-                        <!-- Video 2: Manager Assign -->
+                    <div class="dual-video-row">
+                        <!-- Video 1: Manager Assign -->
                         <div>
                             <div class="video-box-wrap">
                                 <video id="vid-mgr" controls playsinline preload="metadata">
@@ -1031,12 +1022,12 @@
                                 </video>
                             </div>
                             <div class="video-caption">
-                                <span class="en-text">Video 2: Assign Driver. Status 402</span>
-                                <span class="kh-text">វីដេអូ ២៖ ការចាត់តាំងអ្នកដឹក. Status 402</span>
+                                <span class="en-text">Video 1: Assign Driver. Status 402</span>
+                                <span class="kh-text">វីដេអូ ១៖ ការចាត់តាំងអ្នកដឹក. Status 402</span>
                             </div>
                         </div>
 
-                        <!-- Video 3: Shipper Delivery -->
+                        <!-- Video 2: Shipper Delivery -->
                         <div>
                             <div class="video-box-wrap">
                                 <video id="vid-shp" controls playsinline preload="metadata">
@@ -1044,8 +1035,8 @@
                                 </video>
                             </div>
                             <div class="video-caption">
-                                <span class="en-text">Video 3: Delivery & Complete. 400 ➔ 410</span>
-                                <span class="kh-text">វីដេអូ ៣៖ ចេញចែក និងបញ្ចប់ការដឹក. 400 → 410</span>
+                                <span class="en-text">Video 2: Delivery & Complete. 400 ➔ 410</span>
+                                <span class="kh-text">វីដេអូ ២៖ អ្នកដឹកចេញចែក និងបញ្ចប់ការដឹក. 400 → 410</span>
                             </div>
                         </div>
                     </div>
