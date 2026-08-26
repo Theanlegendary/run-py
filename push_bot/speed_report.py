@@ -38,6 +38,7 @@ def parse_time(val):
 def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None):
     """
     Builds the Fast Delivery Speed Bonus Report (/tomorrow layout):
+      - Duration calculated from Branch Arrival / Handover (Status 306) to Delivered (Status 410)
       - Sheet 1: Left Table = Detailed Delivery Bills, Right Table = Executive Summary Table
       - Sheet 2: base = Complete raw audit dataset
     """
@@ -54,7 +55,12 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     col_created = next((c for c in df.columns if 'CREATED DATE' in c), 'CREATED DATE')
     col_receiver = next((c for c in df.columns if 'RECEIVER' in c), 'RECEIVER')
     col_action_time = next((c for c in df.columns if 'ACTION TIME' in c or 'CURRENT TIME' in c), 'CURRENT TIME')
+    
+    # Accurate Branch Arrival / Handover columns
+    col_306_last = next((c for c in df.columns if '306' in c and ('STORE' in c or 'AGENT' in c) and 'LAST' in c), None)
+    col_306_first = next((c for c in df.columns if '306' in c and ('STORE' in c or 'AGENT' in c or 'HUB' in c)), None)
     col_400_time = next((c for c in df.columns if '400' in c or 'OUT' in c or 'ASSIGN' in c), None)
+    col_210_time = next((c for c in df.columns if '210' in c), None)
 
     today = report_date or datetime.now().date()
     tgt = "".join(c for c in str(target_label).upper() if c.isalnum() or c in ("-", "_")).strip()
@@ -134,11 +140,24 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
         order_id = str(row.get(col_order, '')).strip()
         t410 = parse_time(row.get(col_action_time)) or parse_time(row.get(col_created))
-        t400 = parse_time(row.get(col_400_time)) if col_400_time else None
-        if not t400 and t410:
-            t400 = parse_time(row.get(col_created))
+        
+        # Determine exact Branch Handover / Arrival time
+        t_start = None
+        if col_306_last and pd.notna(row.get(col_306_last)):
+            t_start = parse_time(row.get(col_306_last))
+        if not t_start and col_306_first and pd.notna(row.get(col_306_first)):
+            t_start = parse_time(row.get(col_306_first))
+        if not t_start and col_400_time and pd.notna(row.get(col_400_time)):
+            t_start = parse_time(row.get(col_400_time))
+        if not t_start and col_210_time and pd.notna(row.get(col_210_time)):
+            t_start = parse_time(row.get(col_210_time))
+        if not t_start:
+            t_start = parse_time(row.get(col_created))
 
-        duration_hours = (t410 - t400).total_seconds() / 3600.0 if (t410 and t400 and t410 >= t400) else 1.5
+        if t410 and t_start and t410 >= t_start:
+            duration_hours = (t410 - t_start).total_seconds() / 3600.0
+        else:
+            duration_hours = 1.5
 
         summary_data[po]["total_delivered"] += 1
 
@@ -176,7 +195,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             "destination_post": deliv_po,
             "assigned_branch": po,
             "created_at": str(row.get(col_created, '')),
-            "t400": str(t400 or ""),
+            "t_start": str(t_start or ""),
             "t410": str(t410 or ""),
             "duration": dur_str,
             "duration_hours": round(duration_hours, 2),
@@ -398,7 +417,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     base_headers = [
         "No", "Order Number", "Customer", "Origin Branch", "Origin Post",
         "Destination Branch", "Destination Post", "Assigned Branch", "Created At",
-        "Out for Delivery (400)", "Delivered (410)", "Duration", "Hours (Dec)",
+        "Branch Arrival (306/400)", "Delivered (410)", "Duration", "Hours (Dec)",
         "Speed Category", "Rate ($/Bill)"
     ]
 
@@ -423,7 +442,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             item["destination_post"],
             item["assigned_branch"],
             item["created_at"],
-            item["t400"],
+            item["t_start"],
             item["t410"],
             item["duration"],
             item["duration_hours"],
