@@ -1614,7 +1614,7 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @pm_required_handler
 async def cmd_penalty(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Generates Stagnant Inventory & Handover Penalty Report."""
+    """Generates Stagnant Inventory & Handover Penalty Report (/tomorrow style)."""
     await delete_group_command(update, context)
     cfg = load_config()
 
@@ -1634,15 +1634,16 @@ async def cmd_penalty(update: Update, context: ContextTypes.DEFAULT_TYPE):
         out_xlsx = os.path.join(tmpdir, f"INVENTORY_PENALTY_REPORT_{stamp}_{safe_label}.xlsx")
         tot_ho, tot_del, tot_pen_cnt, tot_fine = penalty_report.build_penalty_report(src, out_xlsx, target_label=target_label)
 
-        caption = (
-            f"📊 *INVENTORY PENALTY REPORT ({target_label.upper()})*\n"
-            f"📦 Handover Bills: `{tot_ho}`\n"
-            f"🚚 Delivery Bills: `{tot_del}`\n"
-            f"⚠️ Penalized Bills: `{tot_pen_cnt}`\n"
-            f"💰 Total Fine: `-${tot_fine:.2f}`\n\n"
-            f"_• Excused Green: 420, 472 ($0 fine)_\n"
-            f"_• SLA Penalty: 1-2d (-$0.10), >3d (-$0.40)_"
-        )
+        # 1. Render Summary Image for Instant Telegram Mobile Viewing (matching /tomorrow style)
+        try:
+            img_buf = penalty_report.render_penalty_summary_image(out_xlsx)
+            img_buf.name = f"PENALTY_SUMMARY_{safe_label}.png"
+            await send_requester_photo(update, context, img_buf)
+        except Exception as e_img:
+            log.warning("Could not render penalty summary image: %s", e_img)
+
+        # 2. Send Excel Document (Sheet 1: Summary Table, Sheet 2: base dataset)
+        caption = f"📊 *INVENTORY PENALTY REPORT ({target_label.upper()})*\n📦 Handover Bills: `{tot_ho}`\n🚚 Delivery Bills: `{tot_del}`\n⚠️ Penalized Bills: `{tot_pen_cnt}`\n💰 Total Fine: `-${tot_fine:.2f}`\n\n_• Excused Green: 420, 472 ($0 fine)_\n_• SLA Penalty: 1-2d (-$0.10), >3d (-$0.40)_"
         await send_requester_document(update, context, out_xlsx, filename=os.path.basename(out_xlsx), caption=caption)
         await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent INVENTORY PENALTY REPORT ({target_label}).")
     except Exception as e:
@@ -1652,7 +1653,7 @@ async def cmd_penalty(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @pm_required_handler
 async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Generates Fast Delivery Speed Bonus Report (Status 410)."""
+    """Generates Fast Delivery Speed Bonus Report (/tomorrow style)."""
     await delete_group_command(update, context)
     cfg = load_config()
 
@@ -1672,21 +1673,23 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         out_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{safe_label}.xlsx")
         tot_del, tot_u2, tot_24, tot_o8, tot_pay = speed_report.build_speed_report(src, out_xlsx, target_label=target_label)
 
+        # 1. Render Summary Image for Instant Telegram Mobile Viewing (matching /tomorrow style)
+        try:
+            img_buf = speed_report.render_speed_summary_image(out_xlsx)
+            img_buf.name = f"SPEED_SUMMARY_{safe_label}.png"
+            await send_requester_photo(update, context, img_buf)
+        except Exception as e_img:
+            log.warning("Could not render speed summary image: %s", e_img)
+
+        # 2. Send Excel Document (Sheet 1: Summary Table, Sheet 2: base dataset)
         fast_pct = ((tot_u2 + tot_24) / tot_del * 100) if tot_del > 0 else 0
-        caption = (
-            f"⏱️ *FAST DELIVERY SPEED REPORT ({target_label.upper()})*\n"
-            f"📦 Total Delivered: `{tot_del}`\n"
-            f"🟢 < 2 Hours (+50%): `{tot_u2}`\n"
-            f"🔵 2 - 4 Hours (+25%): `{tot_24}`\n"
-            f"🔴 > 8 Hours (-25%): `{tot_o8}`\n"
-            f"⚡ Fast Rate (<4h): `{fast_pct:.1f}%`\n"
-            f"💵 Total Commission: `${tot_pay:.2f}`"
-        )
+        caption = f"⏱️ *FAST DELIVERY SPEED REPORT ({target_label.upper()})*\n📦 Total Delivered: `{tot_del}`\n🟢 < 2 Hours (+50%): `{tot_u2}`\n🔵 2 - 4 Hours (+25%): `{tot_24}`\n🔴 > 8 Hours (-25%): `{tot_o8}`\n⚡ Fast Rate (<4h): `{fast_pct:.1f}%`\n💵 Total Commission: `${tot_pay:.2f}`"
         await send_requester_document(update, context, out_xlsx, filename=os.path.basename(out_xlsx), caption=caption)
         await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent FAST DELIVERY SPEED REPORT ({target_label}).")
     except Exception as e:
         log.exception("Error in /speed command: %s", e)
         await edit_or_send_requester_text(msg, update, context, f"❌ Error generating speed report: {e}")
+
 
 @pm_required_handler
 async def cmd_delayed(update: Update, context: ContextTypes.DEFAULT_TYPE):

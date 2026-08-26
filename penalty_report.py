@@ -1,5 +1,6 @@
 import os
 import sys
+import io
 from datetime import datetime, date
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -20,78 +21,90 @@ def parse_date(val):
     return None
 
 def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
+    """
+    Builds the Executive Stagnant Inventory & Handover Penalty Report (/tomorrow style):
+      - Sheet 1: INVENTORY PENALTY REPORT (Summary Table + Executive Subtotals)
+      - Sheet 2: base (Full Raw / Audit Dataset)
+    """
     os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
-    """
-    Builds the Stagnant Inventory & Handover Penalty Report.
-    Rules:
-      - Excused Green Statuses (NO penalty): 420 (Reschedule/Waiting), 472 (Problem resolving)
-      - Age < 1 day: Safe ($0)
-      - Age 1-2 days: Fine -$0.10/bill
-      - Age > 3 days: Max Fine -$0.40/bill
-    """
     df = pd.read_excel(src_xlsx)
     df.columns = [str(c).strip().upper() for c in df.columns]
 
     col_order = next((c for c in df.columns if 'ORDER ID' in c or 'ORDER' in c), 'ORDER ID')
-    col_curr_po = next((c for c in df.columns if 'CURRENT POST OFFICE' in c), 'CURRENT POST OFFICE')
-    col_deliv_po = next((c for c in df.columns if 'DELIVERY POST OFFICE' in c), 'DELIVERY POST OFFICE')
+    col_dest_prov = next((c for c in df.columns if 'DELIVERY PROVINCE' in c or 'DESTINATION_BRANCH' in c), 'DELIVERY PROVINCE')
+    col_dest_po = next((c for c in df.columns if 'DELIVERY POST' in c or 'DESTINATION_POST' in c), 'DELIVERY POST OFFICE')
+    col_orig_br = next((c for c in df.columns if 'ACTION POST OFFICE' in c or 'ORIGIN_BRANCH' in c), 'ACTION POST OFFICE')
+    col_orig_po = next((c for c in df.columns if 'CURRENT POST OFFICE' in c or 'ORIGIN_POST' in c), 'CURRENT POST OFFICE')
     col_status = next((c for c in df.columns if 'CURRENT STATUS' in c or 'STATUS' in c), 'CURRENT STATUS')
     col_created = next((c for c in df.columns if 'CREATED DATE' in c), 'CREATED DATE')
+    col_receiver = next((c for c in df.columns if 'RECEIVER' in c), 'RECEIVER')
+    col_fee = next((c for c in df.columns if 'TOTAL FEE' in c or 'TOTAL_AMOUNT' in c), 'TOTAL FEE')
+    col_cod = next((c for c in df.columns if 'COD' in c), 'COD')
     col_action_time = next((c for c in df.columns if 'ACTION TIME' in c or 'CURRENT TIME' in c), 'CURRENT TIME')
 
     today = datetime.now().date()
-    tgt = target_label.upper().replace(" ", "")
+    tgt = "".join(c for c in str(target_label).upper() if c.isalnum() or c in ("-", "_")).strip()
+    if not tgt:
+        tgt = "ALL"
 
     df['sc'] = df[col_status].astype(str).str.extract(r'^(\d{3})')[0]
-    df['curr_po_clean'] = df[col_curr_po].astype(str).str.strip().str.upper()
-    df['deliv_po_clean'] = df[col_deliv_po].astype(str).str.strip().str.upper()
+    df['curr_po_clean'] = df[col_orig_po].astype(str).str.strip().str.upper()
+    df['deliv_po_clean'] = df[col_dest_po].astype(str).str.strip().str.upper()
 
-    # Determine assigned branch for each row (delivery uses delivery post office, handover uses current post office)
     df['branch'] = df.apply(
         lambda r: r['deliv_po_clean'] if str(r['sc']).startswith('4') and r['deliv_po_clean'] != 'NAN' and r['deliv_po_clean'] else r['curr_po_clean'],
         axis=1
     )
 
-    # Exclude completed (410), returned (520), cancelled (201, 99, 100, -99)
+    # Exclude completed 410, 520, cancelled 201, 99, 100, -99
     active_df = df[~df['sc'].isin(['410', '520', '201', '99', '100', '-99'])].copy()
+
+    # Zone mapping
+    zone_by_prefix = {
+        "KAN": "Zone 1", "PNP": "Zone 1", "PRE": "Zone 1", "SVA": "Zone 1",
+        "KAM": "Zone 2", "KOH": "Zone 2", "SIH": "Zone 2", "SPE": "Zone 2", "TAK": "Zone 2", "KEP": "Zone 2",
+        "BAN": "Zone 3", "BAT": "Zone 3", "CHH": "Zone 3", "PUR": "Zone 3", "PAI": "Zone 3",
+        "ODD": "Zone 4", "PRH": "Zone 4", "SIE": "Zone 4", "THO": "Zone 4",
+        "CHA": "Zone 5", "KRA": "Zone 5", "TBK": "Zone 5", "ROT": "Zone 5", "MON": "Zone 5", "STU": "Zone 5"
+    }
 
     # Filter target branch / zone / all
     if tgt not in ("ALL", "TOTAL"):
         if tgt.startswith("ZONE"):
-            zone_by_prefix = {
-                "KAN": "ZONE1", "PNP": "ZONE1", "PRE": "ZONE1", "SVA": "ZONE1",
-                "KAM": "ZONE2", "KOH": "ZONE2", "SIH": "ZONE2", "SPE": "ZONE2", "TAK": "ZONE2", "KEP": "ZONE2",
-                "BAN": "ZONE3", "BAT": "ZONE3", "CHH": "ZONE3", "PUR": "ZONE3", "PAI": "ZONE3",
-                "ODD": "ZONE4", "PRH": "ZONE4", "SIE": "ZONE4", "THO": "ZONE4",
-                "CHA": "ZONE5", "KRA": "ZONE5", "TBK": "ZONE5", "ROT": "ZONE5", "MON": "ZONE5", "STU": "ZONE5"
-            }
-            active_df['zone'] = active_df['branch'].str[:3].map(zone_by_prefix).fillna("ZONE1")
-            active_df = active_df[active_df['zone'] == tgt].copy()
+            target_zone_name = tgt.replace("ZONE", "Zone ")
+            active_df['zone'] = active_df['branch'].str[:3].map(zone_by_prefix).fillna("Zone 1")
+            active_df = active_df[active_df['zone'].str.upper().str.replace(" ", "") == tgt].copy()
         elif len(tgt) == 3:
             active_df = active_df[active_df['branch'].str.startswith(tgt)].copy()
         else:
-            active_df = active_df[active_df['branch'] == tgt].copy()
+            active_df = active_df[
+                (active_df['branch'] == tgt) |
+                (active_df['curr_po_clean'] == tgt) |
+                (active_df['deliv_po_clean'] == tgt)
+            ].copy()
 
     excused_statuses = {"420", "472"}
-
-    # Aggregate stats per branch
-    branch_stats = {}
-    detail_rows = []
+    summary_data = {}
+    base_rows = []
+    r_idx = 1
 
     for _, row in active_df.iterrows():
-        po = str(row.get('branch', 'OTHER')).strip()
+        po = str(row.get('branch', 'OTHER')).strip().upper()
         if not po or po == 'NAN':
             continue
 
-        if po not in branch_stats:
-            branch_stats[po] = {
-                "po": po,
+        prov = po[:3] if len(po) >= 3 else 'OTH'
+        zone_str = zone_by_prefix.get(prov, "Zone 1")
+
+        key = (zone_str, prov, po)
+        if key not in summary_data:
+            summary_data[key] = {
                 "total_handover": 0,
                 "total_delivery": 0,
-                "penalty_handover_count": 0,
-                "penalty_delivery_count": 0,
-                "excused_delivery_count": 0,
-                "total_penalty_usd": 0.0
+                "penalty_handover": 0,
+                "penalty_delivery": 0,
+                "excused_count": 0,
+                "total_fine": 0.0
             }
 
         order_id = str(row.get(col_order, '')).strip()
@@ -105,240 +118,376 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
         is_handover = sc in {"306", "309", "310", "302", "311", "210"}
         is_delivery = sc.startswith("4")
 
+        fine = 0.0
+        risk_level = "Normal"
+        is_excused = False
+
         if is_handover:
-            branch_stats[po]["total_handover"] += 1
-            fine = 0.0
-            risk = "Safe (< 1 day)"
+            summary_data[key]["total_handover"] += 1
             if age_days >= 3:
                 fine = 0.40
-                risk = "Urgent (> 3 days)"
-                branch_stats[po]["penalty_handover_count"] += 1
+                risk_level = "Urgent (> 3 days)"
+                summary_data[key]["penalty_handover"] += 1
             elif age_days >= 1:
                 fine = 0.10
-                risk = "Backlog (1-2 days)"
-                branch_stats[po]["penalty_handover_count"] += 1
-
-            branch_stats[po]["total_penalty_usd"] += fine
-            detail_rows.append({
-                "order_id": order_id,
-                "po": po,
-                "type": "Handover / Transit",
-                "status": status_raw,
-                "status_code": sc,
-                "act_date": str(act_date or ""),
-                "age_days": age_days,
-                "is_excused": False,
-                "risk": risk,
-                "fine_usd": fine
-            })
+                risk_level = "Backlog (1-2 days)"
+                summary_data[key]["penalty_handover"] += 1
+            else:
+                risk_level = "Safe (< 1 day)"
 
         elif is_delivery:
-            branch_stats[po]["total_delivery"] += 1
-            fine = 0.0
-            is_excused = sc in excused_statuses
-            risk = "Normal"
-
-            if is_excused:
-                branch_stats[po]["excused_delivery_count"] += 1
-                risk = f"Excused ({sc})"
+            summary_data[key]["total_delivery"] += 1
+            if sc in excused_statuses:
+                is_excused = True
+                risk_level = f"Excused ({sc})"
+                summary_data[key]["excused_count"] += 1
                 fine = 0.0
             else:
                 if age_days >= 3:
                     fine = 0.40
-                    risk = "Critical (> 3 days)"
-                    branch_stats[po]["penalty_delivery_count"] += 1
+                    risk_level = "Critical (> 3 days)"
+                    summary_data[key]["penalty_delivery"] += 1
                 elif age_days >= 1:
                     fine = 0.10
-                    risk = "Stagnant (1-2 days)"
-                    branch_stats[po]["penalty_delivery_count"] += 1
+                    risk_level = "Stagnant (1-2 days)"
+                    summary_data[key]["penalty_delivery"] += 1
                 else:
-                    risk = "Safe (< 1 day)"
+                    risk_level = "Safe (< 1 day)"
 
-            branch_stats[po]["total_penalty_usd"] += fine
-            detail_rows.append({
-                "order_id": order_id,
-                "po": po,
-                "type": "Delivery",
-                "status": status_raw,
-                "status_code": sc,
-                "act_date": str(act_date or ""),
-                "age_days": age_days,
-                "is_excused": is_excused,
-                "risk": risk,
-                "fine_usd": fine
-            })
+        summary_data[key]["total_fine"] += fine
 
-    # Sort branches alphabetically
-    sorted_branches = sorted(branch_stats.values(), key=lambda x: x["po"])
+        base_rows.append({
+            "no": r_idx,
+            "order_number": order_id,
+            "customer": str(row.get(col_receiver, ''))[:30],
+            "origin_branch": str(row.get(col_orig_br, '')),
+            "origin_post": str(row.get(col_orig_po, '')),
+            "destination_branch": str(row.get(col_dest_prov, '')),
+            "destination_post": str(row.get(col_dest_po, '')),
+            "assigned_branch": po,
+            "created_at": str(row.get(col_created, '')),
+            "status": status_raw,
+            "status_code": sc,
+            "type": "Handover" if is_handover else "Delivery",
+            "age_days": age_days,
+            "excused": "YES (Green $0)" if is_excused else "NO",
+            "risk_level": risk_level,
+            "penalty_fine": fine,
+            "zone": zone_str
+        })
+        r_idx += 1
 
-    # Build Excel
+    # Build Excel Workbook (/tomorrow style)
     wb = openpyxl.Workbook()
-    fn = "Segoe UI"
-    banner_font = Font(name=fn, size=11, bold=True, color="FFFFFF")
-    hdr_font = Font(name=fn, size=10, bold=True, color="FFFFFF")
-    data_font = Font(name=fn, size=10, color="0F172A")
-    bold_data_font = Font(name=fn, size=10, bold=True, color="0F172A")
-    tot_font = Font(name=fn, size=10, bold=True, color="B91C1C")
 
-    hdr_fill = PatternFill("solid", fgColor="0B132B")      # Dark Navy
-    sub_hdr_fill = PatternFill("solid", fgColor="1E3A8A")  # Royal Blue
-    tot_fill = PatternFill("solid", fgColor="FEE2E2")      # Light Red
-    green_fill = PatternFill("solid", fgColor="DCFCE7")    # Light Green
-    amber_fill = PatternFill("solid", fgColor="FEF3C7")    # Light Amber
-    red_fill = PatternFill("solid", fgColor="FEE2E2")      # Light Red
-    zebra_fill = PatternFill("solid", fgColor="F8FAFC")
+    # Sheet 1: INVENTORY PENALTY REPORT
+    ws1 = wb.active
+    ws1.title = "INVENTORY PENALTY REPORT"
+    ws1.views.sheetView[0].showGridLines = True
 
-    border_thin = Border(
+    # Color Palette matching /tomorrow executive styling
+    fill_title_left  = PatternFill("solid", fgColor="0F172A") # Deep Slate Navy
+    fill_hdr_left    = PatternFill("solid", fgColor="1E293B") # Executive Navy Slate
+    fill_title_right = PatternFill("solid", fgColor="0F766E") # Deep Teal Slate
+    fill_hdr_right   = PatternFill("solid", fgColor="0F766E") # Deep Teal Slate
+    fill_row_alt     = PatternFill("solid", fgColor="F8FAFC") # Subtle Zebra Tint
+    fill_left_tot    = PatternFill("solid", fgColor="FEE2E2") # Light Red Total
+    fill_sum_tot     = PatternFill("solid", fgColor="FEE2E2") # Light Red Total
+    sub_fill         = PatternFill("solid", fgColor="E0F2FE") # Light Blue Subtotal
+    green_fill       = PatternFill("solid", fgColor="DCFCE7") # Light Green
+
+    border_clean = Border(
+        left=Side(style="thin", color="E2E8F0"), right=Side(style="thin", color="E2E8F0"),
+        top=Side(style="thin", color="E2E8F0"), bottom=Side(style="thin", color="E2E8F0")
+    )
+    tot_border_accounting = Border(
         left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
-        top=Side(style="thin", color="CBD5E1"), bottom=Side(style="thin", color="CBD5E1")
+        top=Side(style="thin", color="64748B"), bottom=Side(style="double", color="0F172A")
     )
 
-    # 1. SUMMARY SHEET
-    ws_sum = wb.active
-    ws_sum.title = "SUMMARY"
-    ws_sum.views.sheetView[0].showGridLines = True
+    font_banner = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
+    font_hdr = Font(name="Segoe UI", size=9, bold=True, color="FFFFFF")
+    font_data = Font(name="Segoe UI", size=9, color="0F172A")
+    font_bold_data = Font(name="Segoe UI", size=9, bold=True, color="0F172A")
+    font_tot = Font(name="Segoe UI", size=10, bold=True, color="0F172A")
+    font_tot_red = Font(name="Segoe UI", size=10, bold=True, color="991B1B")
 
-    ws_sum.merge_cells("A1:G1")
-    ws_sum["A1"].value = f"METFONE EXPRESS — INVENTORY PENALTY & STAGNANT GOODS REPORT ({target_label.upper()})"
-    ws_sum["A1"].font = banner_font
-    ws_sum["A1"].fill = hdr_fill
-    ws_sum["A1"].alignment = Alignment(horizontal="center", vertical="center")
-    ws_sum.row_dimensions[1].height = 28
+    # Left Banner
+    ws1.merge_cells("A1:G1")
+    ws1["A1"].value = f"METFONE EXPRESS — INVENTORY PENALTY & STAGNANT GOODS REPORT ({tgt})"
+    ws1["A1"].font = font_banner
+    ws1["A1"].fill = fill_title_left
+    ws1["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws1.row_dimensions[1].height = 28
 
-    ws_sum.merge_cells("A2:G2")
-    ws_sum["A2"].value = f"Generated at: {datetime.now().strftime('%d/%m/%Y %H:%M')}  |  Excused Green: 420, 472 ($0 Fine)  |  SLA Penalty: 1-2d (-$0.10), >3d (-$0.40)"
-    ws_sum["A2"].font = Font(name=fn, size=9, italic=True, color="FFFFFF")
-    ws_sum["A2"].fill = sub_hdr_fill
-    ws_sum["A2"].alignment = Alignment(horizontal="center", vertical="center")
-    ws_sum.row_dimensions[2].height = 20
+    ws1.merge_cells("A2:G2")
+    ws1["A2"].value = f"Generated: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Excused Green: 420, 472 ($0 fine) | Penalty: 1-2d (-$0.10), >3d (-$0.40)"
+    ws1["A2"].font = Font(name="Segoe UI", size=8, italic=True, color="FFFFFF")
+    ws1["A2"].fill = PatternFill("solid", fgColor="334155")
+    ws1["A2"].alignment = Alignment(horizontal="center", vertical="center")
+    ws1.row_dimensions[2].height = 20
 
-    sum_headers = [
-        "Post Office",
-        "Total Handover",
-        "Total Delivery",
-        "Penalty Handover (Count)",
-        "Penalty Delivery (Count)",
-        "Excused Green (Count)",
-        "Total Penalty ($)"
+    left_headers = [
+        "No", "Post Office", "Total Handover", "Total Delivery",
+        "Penalty Handover", "Penalty Delivery", "Total Penalty ($)"
     ]
 
-    ws_sum.row_dimensions[4].height = 26
-    for col_idx, h in enumerate(sum_headers, 1):
-        c = ws_sum.cell(row=4, column=col_idx, value=h)
-        c.font = hdr_font
-        c.fill = sub_hdr_fill
+    ws1.row_dimensions[3].height = 24
+    for col_idx, h in enumerate(left_headers, 1):
+        c = ws1.cell(row=3, column=col_idx, value=h)
+        c.font = font_hdr
+        c.fill = fill_hdr_left
         c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        c.border = border_thin
+        c.border = border_clean
 
+    r_curr = 4
+    n_idx = 1
     tot_ho = 0
     tot_del = 0
     tot_pen_ho = 0
     tot_pen_del = 0
     tot_exc = 0
-    tot_usd = 0.0
+    tot_fine = 0.0
 
-    r_cur = 5
-    for b in sorted_branches:
-        ws_sum.row_dimensions[r_cur].height = 22
-        vals = [
-            b["po"],
-            b["total_handover"],
-            b["total_delivery"],
-            b["penalty_handover_count"],
-            b["penalty_delivery_count"],
-            b["excused_delivery_count"],
-            f"-${b['total_penalty_usd']:.2f}" if b["total_penalty_usd"] > 0 else "$0.00"
+    sorted_keys = sorted(summary_data.keys())
+    for key in sorted_keys:
+        stats = summary_data[key]
+        ws1.row_dimensions[r_curr].height = 20
+        row_vals = [
+            n_idx,
+            key[2], # PO Code
+            stats["total_handover"],
+            stats["total_delivery"],
+            stats["penalty_handover"],
+            stats["penalty_delivery"],
+            f"-${stats['total_fine']:.2f}" if stats["total_fine"] > 0 else "$0.00"
         ]
-        for col_idx, val in enumerate(vals, 1):
-            c = ws_sum.cell(row=r_cur, column=col_idx, value=val)
-            c.font = bold_data_font if col_idx in (1, 7) else data_font
+        for col_idx, val in enumerate(row_vals, 1):
+            c = ws1.cell(row=r_curr, column=col_idx, value=val)
+            c.font = font_bold_data if col_idx in (2, 7) else font_data
             c.alignment = Alignment(horizontal="center", vertical="center")
-            c.border = border_thin
-            if r_cur % 2 == 0:
-                c.fill = zebra_fill
-            if col_idx == 7 and b["total_penalty_usd"] > 0:
-                c.font = tot_font
-                c.fill = red_fill
+            c.border = border_clean
+            if r_curr % 2 == 0:
+                c.fill = fill_row_alt
+            if col_idx == 7 and stats["total_fine"] > 0:
+                c.font = font_tot_red
+                c.fill = PatternFill("solid", fgColor="FEE2E2")
 
-        tot_ho += b["total_handover"]
-        tot_del += b["total_delivery"]
-        tot_pen_ho += b["penalty_handover_count"]
-        tot_pen_del += b["penalty_delivery_count"]
-        tot_exc += b["excused_delivery_count"]
-        tot_usd += b["total_penalty_usd"]
-        r_cur += 1
+        tot_ho += stats["total_handover"]
+        tot_del += stats["total_delivery"]
+        tot_pen_ho += stats["penalty_handover"]
+        tot_pen_del += stats["penalty_delivery"]
+        tot_exc += stats["excused_count"]
+        tot_fine += stats["total_fine"]
+        r_curr += 1
+        n_idx += 1
 
-    # TOTAL ROW
-    ws_sum.row_dimensions[r_cur].height = 26
-    tot_vals = [
-        "TOTAL",
+    # Left Grand Total Row
+    ws1.row_dimensions[r_curr].height = 25
+    ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=2)
+    gt_left = ws1.cell(r_curr, 1, "Grand Total / សរុប")
+    gt_left.font = font_tot
+    gt_left.alignment = Alignment(horizontal="left", vertical="center")
+
+    tot_vals_left = [
+        "", "",
         tot_ho,
         tot_del,
         tot_pen_ho,
         tot_pen_del,
-        tot_exc,
-        f"-${tot_usd:.2f}" if tot_usd > 0 else "$0.00"
+        f"-${tot_fine:.2f}" if tot_fine > 0 else "$0.00"
     ]
-    for col_idx, val in enumerate(tot_vals, 1):
-        c = ws_sum.cell(row=r_cur, column=col_idx, value=val)
-        c.font = tot_font
-        c.fill = tot_fill
-        c.alignment = Alignment(horizontal="center", vertical="center")
-        c.border = border_thin
+    for c in range(1, 8):
+        cell = ws1.cell(r_curr, c)
+        if c >= 3:
+            cell.value = tot_vals_left[c-1]
+        cell.font = font_tot_red if c == 7 else font_tot
+        cell.fill = fill_left_tot
+        cell.border = tot_border_accounting
+        cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    for col in ws_sum.columns:
+    # Right Executive Summary Table (Executive KPI Block)
+    ws1.merge_cells("I1:L1")
+    ws1["I1"].value = f"EXECUTIVE SUMMARY — {tgt}"
+    ws1["I1"].font = font_banner
+    ws1["I1"].fill = fill_title_right
+    ws1["I1"].alignment = Alignment(horizontal="center", vertical="center")
+
+    ws1.merge_cells("I2:L2")
+    ws1["I2"].value = "Province KPI Subtotals"
+    ws1["I2"].font = Font(name="Segoe UI", size=8, italic=True, color="FFFFFF")
+    ws1["I2"].fill = PatternFill("solid", fgColor="115E59")
+    ws1["I2"].alignment = Alignment(horizontal="center", vertical="center")
+
+    right_headers = ["Zone", "Branch", "Penalized Bills", "Total Fine ($)"]
+    for col_idx, h in enumerate(right_headers, 9):
+        c = ws1.cell(row=3, column=col_idx, value=h)
+        c.font = font_hdr
+        c.fill = fill_hdr_right
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = border_clean
+
+    # Group by Province
+    prov_groups = {}
+    for key, stats in summary_data.items():
+        prov = key[1]
+        if prov not in prov_groups:
+            prov_groups[prov] = {"zone": key[0], "penalized": 0, "fine": 0.0}
+        prov_groups[prov]["penalized"] += (stats["penalty_handover"] + stats["penalty_delivery"])
+        prov_groups[prov]["fine"] += stats["total_fine"]
+
+    r_sum = 4
+    for prov in sorted(prov_groups.keys()):
+        pdata = prov_groups[prov]
+        ws1.row_dimensions[r_sum].height = 20
+        s_vals = [pdata["zone"], prov, pdata["penalized"], f"-${pdata['fine']:.2f}" if pdata["fine"] > 0 else "$0.00"]
+        for ci, val in enumerate(s_vals, 9):
+            cell = ws1.cell(r_sum, ci, val)
+            cell.font = font_data
+            cell.border = border_clean
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            if ci == 12 and pdata["fine"] > 0:
+                cell.font = font_tot_red
+        r_sum += 1
+
+    # Right Grand Total Row
+    ws1.row_dimensions[r_sum].height = 25
+    ws1.merge_cells(start_row=r_sum, start_column=9, end_row=r_sum, end_column=10)
+    rt_tot = ws1.cell(r_sum, 9, "Total / សរុប")
+    rt_tot.font = font_tot
+    rt_tot.alignment = Alignment(horizontal="left", vertical="center")
+
+    cell_tot_pen = ws1.cell(r_sum, 11, (tot_pen_ho + tot_pen_del))
+    cell_tot_pen.font = font_tot
+    cell_tot_pen.alignment = Alignment(horizontal="center", vertical="center")
+
+    cell_tot_fine = ws1.cell(r_sum, 12, f"-${tot_fine:.2f}" if tot_fine > 0 else "$0.00")
+    cell_tot_fine.font = font_tot_red
+    cell_tot_fine.alignment = Alignment(horizontal="center", vertical="center")
+
+    for c in range(9, 13):
+        cell = ws1.cell(r_sum, c)
+        cell.fill = fill_sum_tot
+        cell.border = tot_border_accounting
+
+    for col in ws1.columns:
         max_len = max(len(str(cell.value or "")) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        ws_sum.column_dimensions[col_letter].width = max(max_len + 4, 16)
+        ws1.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
-    # 2. DETAIL SHEET
-    ws_det = wb.create_sheet(title="DETAIL_PENALTY")
-    ws_det.views.sheetView[0].showGridLines = True
+    # ─────────────────────────────────────────────────────────────────────────────
+    # SHEET 2: base (Full Raw / Audit Dataset matching /tomorrow style)
+    # ─────────────────────────────────────────────────────────────────────────────
+    ws2 = wb.create_sheet(title="base")
+    ws2.views.sheetView[0].showGridLines = True
 
-    det_headers = [
-        "No", "Order ID", "Post Office", "Type", "Status", "Action Date",
-        "Age (Days)", "Excused?", "Risk / SLA Level", "Penalty Fine ($)"
+    base_headers = [
+        "No", "Order Number", "Customer", "Origin Branch", "Origin Post",
+        "Destination Branch", "Destination Post", "Assigned Branch", "Created At",
+        "Status", "Status Code", "Type", "Age (Days)", "Excused?",
+        "Risk / SLA Level", "Penalty Fine ($)", "Zone"
     ]
 
-    ws_det.row_dimensions[1].height = 24
-    for col_idx, h in enumerate(det_headers, 1):
-        c = ws_det.cell(row=1, column=col_idx, value=h)
-        c.font = hdr_font
-        c.fill = hdr_fill
+    ws2.row_dimensions[1].height = 24
+    for col_idx, h in enumerate(base_headers, 1):
+        c = ws2.cell(row=1, column=col_idx, value=h)
+        c.font = font_hdr
+        c.fill = fill_hdr_left
         c.alignment = Alignment(horizontal="center", vertical="center")
-        c.border = border_thin
+        c.border = border_clean
 
-    detail_rows.sort(key=lambda x: (x["fine_usd"] == 0, -x["age_days"]))
+    base_rows.sort(key=lambda x: (x["penalty_fine"] == 0, -x["age_days"]))
 
-    for idx, item in enumerate(detail_rows, 1):
+    for idx, item in enumerate(base_rows, 1):
         r_num = idx + 1
-        ws_det.row_dimensions[r_num].height = 20
+        ws2.row_dimensions[r_num].height = 20
         row_data = [
             idx,
-            item["order_id"],
-            item["po"],
-            item["type"],
+            item["order_number"],
+            item["customer"],
+            item["origin_branch"],
+            item["origin_post"],
+            item["destination_branch"],
+            item["destination_post"],
+            item["assigned_branch"],
+            item["created_at"],
             item["status"],
-            item["act_date"],
+            item["status_code"],
+            item["type"],
             item["age_days"],
-            "YES (Green - $0 Fine)" if item["is_excused"] else "NO",
-            item["risk"],
-            f"-${item['fine_usd']:.2f}" if item["fine_usd"] > 0 else "$0.00"
+            item["excused"],
+            item["risk_level"],
+            f"-${item['penalty_fine']:.2f}" if item["penalty_fine"] > 0 else "$0.00",
+            item["zone"]
         ]
         for col_idx, val in enumerate(row_data, 1):
-            c = ws_det.cell(row=r_num, column=col_idx, value=val)
-            c.font = data_font
+            c = ws2.cell(row=r_num, column=col_idx, value=val)
+            c.font = font_data
             c.alignment = Alignment(horizontal="center", vertical="center")
-            c.border = border_thin
-            if item["is_excused"]:
+            c.border = border_clean
+            if item["excused"].startswith("YES"):
                 c.fill = green_fill
-            elif item["fine_usd"] > 0:
-                c.fill = red_fill if item["fine_usd"] >= 0.40 else amber_fill
+            elif item["penalty_fine"] > 0:
+                c.fill = PatternFill("solid", fgColor="FEE2E2") if item["penalty_fine"] >= 0.40 else PatternFill("solid", fgColor="FEF3C7")
 
-    for col in ws_det.columns:
+    for col in ws2.columns:
         max_len = max(len(str(cell.value or "")) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        ws_det.column_dimensions[col_letter].width = max(max_len + 4, 13)
+        ws2.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
     wb.save(out_xlsx)
-    return tot_ho, tot_del, (tot_pen_ho + tot_pen_del), tot_usd
+    return tot_ho, tot_del, (tot_pen_ho + tot_pen_del), tot_fine
+
+
+def render_penalty_summary_image(xlsx_path):
+    """Renders high quality summary image preview of Sheet 1 for Telegram."""
+    from PIL import Image, ImageDraw, ImageFont
+    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
+    ws = wb["INVENTORY PENALTY REPORT"]
+
+    # Simple clean PIL table renderer
+    cell_w, cell_h = 130, 32
+    cols_to_render = 7
+    rows = list(ws.iter_rows(values_only=True))
+    total_r = min(len(rows), 45)
+
+    img_w = cols_to_render * cell_w + 40
+    img_h = total_r * cell_h + 80
+
+    im = Image.new("RGB", (img_w, img_h), color="#FFFFFF")
+    draw = ImageDraw.Draw(im)
+
+    try:
+        font_main = ImageFont.truetype("seguiemj.ttf", 14)
+        font_bold = ImageFont.truetype("seguisb.ttf", 15)
+        font_title = ImageFont.truetype("seguisb.ttf", 18)
+    except:
+        font_main = ImageFont.load_default()
+        font_bold = font_main
+        font_title = font_main
+
+    # Draw header banner
+    draw.rectangle([0, 0, img_w, 50], fill="#0F172A")
+    title_text = str(ws["A1"].value or "INVENTORY PENALTY REPORT")
+    draw.text((20, 15), title_text, fill="#FFFFFF", font=font_title)
+
+    y_pos = 60
+    for r_idx in range(2, total_r):
+        row = rows[r_idx][:cols_to_render]
+        bg_color = "#1E293B" if r_idx == 2 else ("#FEE2E2" if r_idx == total_r - 1 else ("#F8FAFC" if r_idx % 2 == 0 else "#FFFFFF"))
+        draw.rectangle([20, y_pos, img_w - 20, y_pos + cell_h], fill=bg_color)
+
+        x_pos = 20
+        for val in row:
+            text = str(val or "")
+            t_color = "#FFFFFF" if r_idx == 2 else ("#B91C1C" if "$" in text and "-" in text else "#0F172A")
+            use_font = font_bold if (r_idx == 2 or r_idx == total_r - 1) else font_main
+            draw.text((x_pos + 8, y_pos + 6), text[:18], fill=t_color, font=use_font)
+            x_pos += cell_w
+
+        y_pos += cell_h
+
+    buf = io.BytesIO()
+    im.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
