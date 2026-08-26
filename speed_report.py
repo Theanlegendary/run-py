@@ -6,6 +6,19 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import pandas as pd
 
+def parse_date(val):
+    if not val or pd.isna(val):
+        return None
+    if isinstance(val, (datetime, date)):
+        return val.date() if isinstance(val, datetime) else val
+    s = str(val).strip().split(" ")[0]
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
+
 def parse_time(val):
     if not val or pd.isna(val):
         return None
@@ -19,9 +32,10 @@ def parse_time(val):
             continue
     return None
 
-def build_speed_report(src_xlsx, out_xlsx, target_label="ALL"):
+def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None):
     """
-    Builds the Fast Delivery Speed Bonus Report (Delivered bills Status 410).
+    Builds the Daily (Everyday) Fast Delivery Speed Bonus Report (Status 410).
+    Filters only bills delivered TODAY (report_date).
     Tiers:
       - < 2h: +50% ($0.30/bill)
       - 2-4h: +25% ($0.25/bill)
@@ -39,6 +53,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL"):
     col_action_time = next((c for c in df.columns if 'ACTION TIME' in c or 'CURRENT TIME' in c), 'CURRENT TIME')
     col_400_time = next((c for c in df.columns if '400' in c or 'OUT' in c or 'ASSIGN' in c), None)
 
+    today = report_date or datetime.now().date()
     tgt = target_label.upper().replace(" ", "")
 
     df['sc'] = df[col_status].astype(str).str.extract(r'^(\d{3})')[0]
@@ -52,6 +67,24 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL"):
 
     # Filter Delivered bills (410)
     delivered_df = df[df['sc'] == '410'].copy()
+
+    # EVERYDAY FILTER: Only bills delivered TODAY (action date == today)
+    def get_deliv_date(row):
+        t410 = parse_time(row.get(col_action_time)) or parse_time(row.get(col_created))
+        return t410.date() if t410 else None
+
+    delivered_df['deliv_date'] = delivered_df.apply(get_deliv_date, axis=1)
+    
+    # Filter for today
+    today_delivered_df = delivered_df[delivered_df['deliv_date'] == today].copy()
+    if len(today_delivered_df) > 0:
+        delivered_df = today_delivered_df
+    else:
+        # If no bills delivered today yet (e.g. early morning), take the latest available date
+        latest_date = delivered_df['deliv_date'].max()
+        if latest_date:
+            delivered_df = delivered_df[delivered_df['deliv_date'] == latest_date].copy()
+            today = latest_date
 
     # Filter target branch / zone / all
     if tgt not in ("ALL", "TOTAL"):
@@ -161,18 +194,19 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL"):
 
     # 1. SUMMARY SHEET
     ws_sum = wb.active
-    ws_sum.title = "SUMMARY_SPEED"
+    ws_sum.title = "SUMMARY_DAILY_SPEED"
     ws_sum.views.sheetView[0].showGridLines = True
 
+    date_str = today.strftime('%d/%m/%Y')
     ws_sum.merge_cells("A1:H1")
-    ws_sum["A1"].value = f"METFONE EXPRESS — FAST DELIVERY SPEED BONUS & COMMISSION REPORT ({target_label.upper()})"
+    ws_sum["A1"].value = f"METFONE EXPRESS — DAILY DELIVERY SPEED BONUS REPORT ({target_label.upper()}) — {date_str}"
     ws_sum["A1"].font = banner_font
     ws_sum["A1"].fill = hdr_fill
     ws_sum["A1"].alignment = Alignment(horizontal="center", vertical="center")
     ws_sum.row_dimensions[1].height = 28
 
     ws_sum.merge_cells("A2:H2")
-    ws_sum["A2"].value = f"Generated at: {datetime.now().strftime('%d/%m/%Y %H:%M')}  |  <2h (+50% / $0.30)  |  2-4h (+25% / $0.25)  |  4-8h ($0.20)  |  >8h (-25% / $0.15 Fine)"
+    ws_sum["A2"].value = f"Date: {date_str}  |  <2h (+50% / $0.30)  |  2-4h (+25% / $0.25)  |  4-8h ($0.20)  |  >8h (-25% / $0.15 Fine)"
     ws_sum["A2"].font = Font(name=fn, size=9, italic=True, color="FFFFFF")
     ws_sum["A2"].fill = sub_hdr_fill
     ws_sum["A2"].alignment = Alignment(horizontal="center", vertical="center")
@@ -180,13 +214,13 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL"):
 
     sum_headers = [
         "Post Office",
-        "Total Delivered (410)",
+        "Delivered Today (410)",
         "< 2 Hours (+50%)",
         "2 - 4 Hours (+25%)",
         "4 - 8 Hours (Normal)",
         "> 8 Hours (-25% Fine)",
         "Fast Rate (<4h %)",
-        "Total Speed Payout ($)"
+        "Daily Commission ($)"
     ]
 
     ws_sum.row_dimensions[4].height = 26
