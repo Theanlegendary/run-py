@@ -36,9 +36,10 @@ def parse_time(val):
 
 def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None):
     """
-    Builds the Compact Executive Daily Fast Delivery Speed Bonus Report (/tomorrow style):
-      - Sheet 1: DELIVERY SPEED REPORT (Compact Summary Breakdown)
-      - Sheet 2: base (Full Raw / Audit Dataset)
+    Builds the Clean Executive Fast Delivery Speed Bonus Report:
+      - If branch code (e.g. SVAP001) is given: Strictly reports ONLY that branch.
+      - Sheet 1: DELIVERY SPEED REPORT (Compact Summary Table)
+      - Sheet 2: base (Exact Bill List for that Branch)
     """
     os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
     df = pd.read_excel(src_xlsx)
@@ -64,37 +65,30 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     df['curr_po_clean'] = df[col_orig_po].astype(str).str.strip().str.upper()
     df['deliv_po_clean'] = df[col_dest_po].astype(str).str.strip().str.upper()
 
-    df['branch'] = df.apply(
-        lambda r: r['deliv_po_clean'] if r['deliv_po_clean'] != 'NAN' and r['deliv_po_clean'] else r['curr_po_clean'],
-        axis=1
-    )
-
     delivered_df = df[df['sc'] == '410'].copy()
 
-    zone_by_prefix = {
-        "KAN": "Zone 1", "PNP": "Zone 1", "PRE": "Zone 1", "SVA": "Zone 1",
-        "KAM": "Zone 2", "KOH": "Zone 2", "SIH": "Zone 2", "SPE": "Zone 2", "TAK": "Zone 2", "KEP": "Zone 2",
-        "BAN": "Zone 3", "BAT": "Zone 3", "CHH": "Zone 3", "PUR": "Zone 3", "PAI": "Zone 3",
-        "ODD": "Zone 4", "PRH": "Zone 4", "SIE": "Zone 4", "THO": "Zone 4",
-        "CHA": "Zone 5", "KRA": "Zone 5", "TBK": "Zone 5", "ROT": "Zone 5", "MON": "Zone 5", "STU": "Zone 5"
-    }
-
-    # Strict branch filtering: If target is SVAP001 or SVA, ONLY include SVA post offices!
+    # Strict branch filtering
     if tgt not in ("ALL", "TOTAL"):
         if tgt.startswith("ZONE"):
-            delivered_df['zone'] = delivered_df['branch'].str[:3].map(zone_by_prefix).fillna("Zone 1")
-            delivered_df = delivered_df[delivered_df['zone'].str.upper().str.replace(" ", "") == tgt].copy()
-        elif len(tgt) == 3:
-            delivered_df = delivered_df[delivered_df['branch'].str.startswith(tgt)].copy()
-        elif len(tgt) >= 7:
-            br_prefix = tgt[:3]
+            zone_by_prefix = {
+                "KAN": "ZONE1", "PNP": "ZONE1", "PRE": "ZONE1", "SVA": "ZONE1",
+                "KAM": "ZONE2", "KOH": "ZONE2", "SIH": "ZONE2", "SPE": "ZONE2", "TAK": "ZONE2", "KEP": "ZONE2",
+                "BAN": "ZONE3", "BAT": "ZONE3", "CHH": "ZONE3", "PUR": "ZONE3", "PAI": "ZONE3",
+                "ODD": "ZONE4", "PRH": "ZONE4", "SIE": "ZONE4", "THO": "ZONE4",
+                "CHA": "ZONE5", "KRA": "ZONE5", "TBK": "ZONE5", "ROT": "ZONE5", "MON": "ZONE5", "STU": "ZONE5"
+            }
+            delivered_df['zone'] = delivered_df['deliv_po_clean'].str[:3].map(zone_by_prefix).fillna("ZONE1")
+            delivered_df = delivered_df[delivered_df['zone'] == tgt].copy()
+        elif len(tgt) == 3: # SVA, BAT
             delivered_df = delivered_df[
-                (delivered_df['branch'].str.startswith(br_prefix)) |
-                (delivered_df['curr_po_clean'] == tgt) |
-                (delivered_df['deliv_po_clean'] == tgt)
+                (delivered_df['deliv_po_clean'].str.startswith(tgt)) |
+                (delivered_df['curr_po_clean'].str.startswith(tgt))
             ].copy()
-        else:
-            delivered_df = delivered_df[delivered_df['branch'].str.startswith(tgt[:3])].copy()
+        else: # Exact Branch e.g. SVAP001
+            delivered_df = delivered_df[
+                (delivered_df['deliv_po_clean'] == tgt) |
+                (delivered_df['curr_po_clean'] == tgt)
+            ].copy()
 
     # EVERYDAY FILTER
     def get_deliv_date(row):
@@ -117,16 +111,23 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     r_idx = 1
 
     for idx, row in delivered_df.iterrows():
-        po = str(row.get('branch', 'OTHER')).strip().upper()
+        deliv_po = str(row.get('deliv_po_clean', '')).strip()
+        curr_po = str(row.get('curr_po_clean', '')).strip()
+
+        if tgt not in ("ALL", "TOTAL") and len(tgt) >= 7:
+            po = tgt
+        else:
+            po = deliv_po if deliv_po and deliv_po != 'NAN' else curr_po
+
         if not po or po == 'NAN':
             continue
 
-        prov = po[:3] if len(po) >= 3 else 'OTH'
-        zone_str = zone_by_prefix.get(prov, "Zone 1")
+        if tgt not in ("ALL", "TOTAL") and len(tgt) >= 7 and po != tgt:
+            continue
 
-        key = (zone_str, prov, po)
-        if key not in summary_data:
-            summary_data[key] = {
+        if po not in summary_data:
+            summary_data[po] = {
+                "po": po,
                 "total_delivered": 0,
                 "under_2h": 0,
                 "between_2_4h": 0,
@@ -143,30 +144,30 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
         duration_hours = (t410 - t400).total_seconds() / 3600.0 if (t410 and t400 and t410 >= t400) else 1.5
 
-        summary_data[key]["total_delivered"] += 1
+        summary_data[po]["total_delivered"] += 1
 
         if duration_hours < 2.0:
             tier = "< 2 Hours (+50%)"
             rate_usd = 0.30
-            summary_data[key]["under_2h"] += 1
+            summary_data[po]["under_2h"] += 1
             tag_color = "GREEN"
         elif duration_hours <= 4.0:
             tier = "2 - 4 Hours (+25%)"
             rate_usd = 0.25
-            summary_data[key]["between_2_4h"] += 1
+            summary_data[po]["between_2_4h"] += 1
             tag_color = "BLUE"
         elif duration_hours <= 8.0:
             tier = "4 - 8 Hours (Normal)"
             rate_usd = 0.20
-            summary_data[key]["between_4_8h"] += 1
+            summary_data[po]["between_4_8h"] += 1
             tag_color = "NORMAL"
         else:
             tier = "> 8 Hours (-25% Fine)"
             rate_usd = 0.15
-            summary_data[key]["over_8h"] += 1
+            summary_data[po]["over_8h"] += 1
             tag_color = "RED"
 
-        summary_data[key]["total_commission"] += rate_usd
+        summary_data[po]["total_commission"] += rate_usd
         dur_str = f"{int(duration_hours)}h {int((duration_hours%1)*60)}m" if duration_hours else "N/A"
 
         base_rows.append({
@@ -174,9 +175,9 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             "order_number": order_id,
             "customer": str(row.get(col_receiver, ''))[:30],
             "origin_branch": str(row.get(col_orig_br, '')),
-            "origin_post": str(row.get(col_orig_po, '')),
+            "origin_post": curr_po,
             "destination_branch": str(row.get(col_dest_prov, '')),
-            "destination_post": str(row.get(col_dest_po, '')),
+            "destination_post": deliv_po,
             "assigned_branch": po,
             "created_at": str(row.get(col_created, '')),
             "t400": str(t400 or ""),
@@ -185,12 +186,22 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             "duration_hours": round(duration_hours, 2),
             "tier": tier,
             "rate_usd": rate_usd,
-            "tag_color": tag_color,
-            "zone": zone_str
+            "tag_color": tag_color
         })
         r_idx += 1
 
-    # Build Excel Workbook (/tomorrow style)
+    if tgt not in ("ALL", "TOTAL") and tgt not in summary_data:
+        summary_data[tgt] = {
+            "po": tgt,
+            "total_delivered": 0,
+            "under_2h": 0,
+            "between_2_4h": 0,
+            "between_4_8h": 0,
+            "over_8h": 0,
+            "total_commission": 0.0
+        }
+
+    # Build Excel Workbook
     wb = openpyxl.Workbook()
 
     # Sheet 1: DELIVERY SPEED REPORT
@@ -261,13 +272,12 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     tot_o8 = 0
     tot_pay = 0.0
 
-    sorted_keys = sorted(summary_data.keys())
-    for key in sorted_keys:
-        stats = summary_data[key]
+    sorted_branches = sorted(summary_data.values(), key=lambda x: x["po"])
+    for stats in sorted_branches:
         ws1.row_dimensions[r_curr].height = 18
         row_vals = [
             n_idx,
-            key[2],
+            stats["po"],
             stats["total_delivered"],
             stats["under_2h"],
             stats["between_2_4h"],
@@ -294,7 +304,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         r_curr += 1
         n_idx += 1
 
-    # Left Grand Total Row
+    # Grand Total Row
     ws1.row_dimensions[r_curr].height = 22
     ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=2)
     gt_left = ws1.cell(r_curr, 1, "Grand Total")
@@ -325,7 +335,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         "No", "Order Number", "Customer", "Origin Branch", "Origin Post",
         "Destination Branch", "Destination Post", "Assigned Branch", "Created At",
         "Out for Delivery (400)", "Delivered (410)", "Duration", "Hours (Dec)",
-        "Speed Category", "Rate ($/Bill)", "Zone"
+        "Speed Category", "Rate ($/Bill)"
     ]
 
     ws2.row_dimensions[1].height = 22
@@ -354,8 +364,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             item["duration"],
             item["duration_hours"],
             item["tier"],
-            f"${item['rate_usd']:.2f}",
-            item["zone"]
+            f"${item['rate_usd']:.2f}"
         ]
         for col_idx, val in enumerate(row_data, 1):
             c = ws2.cell(row=r_num, column=col_idx, value=val)
@@ -379,7 +388,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
 
 def render_speed_summary_image(out_xlsx):
-    """Renders compact, high-contrast, crisp image preview matching /tomorrow style."""
+    """Renders compact HD image preview matching /tomorrow style."""
     import tempfile, copy
     wb = openpyxl.load_workbook(out_xlsx)
     ws = wb['DELIVERY SPEED REPORT']
@@ -417,7 +426,6 @@ def render_speed_summary_image(out_xlsx):
     try:
         buf = excel_to_image.excel_to_image(tmp_path)
         return buf
-        
     finally:
         try:
             os.remove(tmp_path)

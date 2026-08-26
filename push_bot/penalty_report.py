@@ -23,9 +23,10 @@ def parse_date(val):
 
 def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
     """
-    Builds the Executive Stagnant Inventory & Handover Penalty Report (/tomorrow style):
-      - Sheet 1: INVENTORY PENALTY REPORT (Compact Summary Table + Executive Subtotals)
-      - Sheet 2: base (Full Raw / Audit Dataset)
+    Builds the Clean Executive Stagnant Inventory & Handover Penalty Report:
+      - If branch code (e.g. SVAP001) is given: Strictly reports ONLY that branch.
+      - Sheet 1: INVENTORY PENALTY REPORT (Compact Summary Table)
+      - Sheet 2: base (Exact Bill List for that Branch)
     """
     os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
     df = pd.read_excel(src_xlsx)
@@ -50,57 +51,66 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
     df['curr_po_clean'] = df[col_orig_po].astype(str).str.strip().str.upper()
     df['deliv_po_clean'] = df[col_dest_po].astype(str).str.strip().str.upper()
 
-    df['branch'] = df.apply(
-        lambda r: r['deliv_po_clean'] if str(r['sc']).startswith('4') and r['deliv_po_clean'] != 'NAN' and r['deliv_po_clean'] else r['curr_po_clean'],
-        axis=1
-    )
-
     # Exclude completed 410, 520, cancelled 201, 99, 100, -99
     active_df = df[~df['sc'].isin(['410', '520', '201', '99', '100', '-99'])].copy()
-
-    zone_by_prefix = {
-        "KAN": "Zone 1", "PNP": "Zone 1", "PRE": "Zone 1", "SVA": "Zone 1",
-        "KAM": "Zone 2", "KOH": "Zone 2", "SIH": "Zone 2", "SPE": "Zone 2", "TAK": "Zone 2", "KEP": "Zone 2",
-        "BAN": "Zone 3", "BAT": "Zone 3", "CHH": "Zone 3", "PUR": "Zone 3", "PAI": "Zone 3",
-        "ODD": "Zone 4", "PRH": "Zone 4", "SIE": "Zone 4", "THO": "Zone 4",
-        "CHA": "Zone 5", "KRA": "Zone 5", "TBK": "Zone 5", "ROT": "Zone 5", "MON": "Zone 5", "STU": "Zone 5"
-    }
-
-    # Strict branch filtering: If target is SVAP001 or SVA, ONLY include SVA post offices!
-    if tgt not in ("ALL", "TOTAL"):
-        if tgt.startswith("ZONE"):
-            target_zone_name = tgt.replace("ZONE", "Zone ")
-            active_df['zone'] = active_df['branch'].str[:3].map(zone_by_prefix).fillna("Zone 1")
-            active_df = active_df[active_df['zone'].str.upper().str.replace(" ", "") == tgt].copy()
-        elif len(tgt) == 3:
-            active_df = active_df[active_df['branch'].str.startswith(tgt)].copy()
-        elif len(tgt) >= 7:
-            br_prefix = tgt[:3]
-            # Match branch prefix or exact PO code
-            active_df = active_df[
-                (active_df['branch'].str.startswith(br_prefix)) |
-                (active_df['curr_po_clean'] == tgt) |
-                (active_df['deliv_po_clean'] == tgt)
-            ].copy()
-        else:
-            active_df = active_df[active_df['branch'].str.startswith(tgt[:3])].copy()
 
     excused_statuses = {"420", "472"}
     summary_data = {}
     base_rows = []
     r_idx = 1
 
+    # Handover condition
+    is_ho_mask = active_df['sc'].isin(['306', '309', '310', '302', '311', '210'])
+    # Delivery condition
+    is_del_mask = active_df['sc'].str.startswith('4')
+
+    # Strict branch filtering
+    if tgt not in ("ALL", "TOTAL"):
+        if tgt.startswith("ZONE"):
+            zone_by_prefix = {
+                "KAN": "ZONE1", "PNP": "ZONE1", "PRE": "ZONE1", "SVA": "ZONE1",
+                "KAM": "ZONE2", "KOH": "ZONE2", "SIH": "ZONE2", "SPE": "ZONE2", "TAK": "ZONE2", "KEP": "ZONE2",
+                "BAN": "ZONE3", "BAT": "ZONE3", "CHH": "ZONE3", "PUR": "ZONE3", "PAI": "ZONE3",
+                "ODD": "ZONE4", "PRH": "ZONE4", "SIE": "ZONE4", "THO": "ZONE4",
+                "CHA": "ZONE5", "KRA": "ZONE5", "TBK": "ZONE5", "ROT": "ZONE5", "MON": "ZONE5", "STU": "ZONE5"
+            }
+            active_df['zone'] = active_df['curr_po_clean'].str[:3].map(zone_by_prefix).fillna("ZONE1")
+            active_df = active_df[active_df['zone'] == tgt].copy()
+        elif len(tgt) == 3: # Province prefix e.g. SVA, BAT
+            active_df = active_df[
+                (active_df['curr_po_clean'].str.startswith(tgt)) |
+                (active_df['deliv_po_clean'].str.startswith(tgt))
+            ].copy()
+        else: # Exact Branch e.g. SVAP001
+            # For exact branch: Handover at this branch OR Delivery at this branch
+            active_df = active_df[
+                ((active_df['curr_po_clean'] == tgt) & is_ho_mask) |
+                ((active_df['deliv_po_clean'] == tgt) & is_del_mask)
+            ].copy()
+
     for _, row in active_df.iterrows():
-        po = str(row.get('branch', 'OTHER')).strip().upper()
+        sc = str(row.get('sc', '')).strip()
+        curr_po = str(row.get('curr_po_clean', '')).strip()
+        deliv_po = str(row.get('deliv_po_clean', '')).strip()
+
+        is_handover = sc in {"306", "309", "310", "302", "311", "210"}
+        is_delivery = sc.startswith("4")
+
+        # Assign exact branch
+        if tgt not in ("ALL", "TOTAL") and len(tgt) >= 7:
+            po = tgt
+        else:
+            po = deliv_po if is_delivery and deliv_po and deliv_po != 'NAN' else curr_po
+
         if not po or po == 'NAN':
             continue
 
-        prov = po[:3] if len(po) >= 3 else 'OTH'
-        zone_str = zone_by_prefix.get(prov, "Zone 1")
+        if tgt not in ("ALL", "TOTAL") and len(tgt) >= 7 and po != tgt:
+            continue
 
-        key = (zone_str, prov, po)
-        if key not in summary_data:
-            summary_data[key] = {
+        if po not in summary_data:
+            summary_data[po] = {
+                "po": po,
                 "total_handover": 0,
                 "total_delivery": 0,
                 "penalty_handover": 0,
@@ -110,62 +120,58 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
             }
 
         order_id = str(row.get(col_order, '')).strip()
-        sc = str(row.get('sc', '')).strip()
         status_raw = str(row.get(col_status, '')).strip()
 
         act_val = row.get(col_action_time) if pd.notna(row.get(col_action_time)) else row.get(col_created)
         act_date = parse_date(act_val) or parse_date(row.get(col_created))
         age_days = (today - act_date).days if act_date else 0
 
-        is_handover = sc in {"306", "309", "310", "302", "311", "210"}
-        is_delivery = sc.startswith("4")
-
         fine = 0.0
         risk_level = "Normal"
         is_excused = False
 
         if is_handover:
-            summary_data[key]["total_handover"] += 1
+            summary_data[po]["total_handover"] += 1
             if age_days >= 3:
                 fine = 0.40
                 risk_level = "Urgent (> 3 days)"
-                summary_data[key]["penalty_handover"] += 1
+                summary_data[po]["penalty_handover"] += 1
             elif age_days >= 1:
                 fine = 0.10
                 risk_level = "Backlog (1-2 days)"
-                summary_data[key]["penalty_handover"] += 1
+                summary_data[po]["penalty_handover"] += 1
             else:
                 risk_level = "Safe (< 1 day)"
 
         elif is_delivery:
-            summary_data[key]["total_delivery"] += 1
+            summary_data[po]["total_delivery"] += 1
             if sc in excused_statuses:
                 is_excused = True
                 risk_level = f"Excused ({sc})"
-                summary_data[key]["excused_count"] += 1
+                summary_data[po]["excused_count"] += 1
                 fine = 0.0
             else:
                 if age_days >= 3:
                     fine = 0.40
                     risk_level = "Critical (> 3 days)"
-                    summary_data[key]["penalty_delivery"] += 1
+                    summary_data[po]["penalty_delivery"] += 1
                 elif age_days >= 1:
                     fine = 0.10
                     risk_level = "Stagnant (1-2 days)"
-                    summary_data[key]["penalty_delivery"] += 1
+                    summary_data[po]["penalty_delivery"] += 1
                 else:
                     risk_level = "Safe (< 1 day)"
 
-        summary_data[key]["total_fine"] += fine
+        summary_data[po]["total_fine"] += fine
 
         base_rows.append({
             "no": r_idx,
             "order_number": order_id,
             "customer": str(row.get(col_receiver, ''))[:30],
             "origin_branch": str(row.get(col_orig_br, '')),
-            "origin_post": str(row.get(col_orig_po, '')),
+            "origin_post": curr_po,
             "destination_branch": str(row.get(col_dest_prov, '')),
-            "destination_post": str(row.get(col_dest_po, '')),
+            "destination_post": deliv_po,
             "assigned_branch": po,
             "created_at": str(row.get(col_created, '')),
             "status": status_raw,
@@ -174,12 +180,23 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
             "age_days": age_days,
             "excused": "YES (Green $0)" if is_excused else "NO",
             "risk_level": risk_level,
-            "penalty_fine": fine,
-            "zone": zone_str
+            "penalty_fine": fine
         })
         r_idx += 1
 
-    # Build Excel Workbook (/tomorrow style)
+    # Ensure target branch exists in summary even if 0
+    if tgt not in ("ALL", "TOTAL") and tgt not in summary_data:
+        summary_data[tgt] = {
+            "po": tgt,
+            "total_handover": 0,
+            "total_delivery": 0,
+            "penalty_handover": 0,
+            "penalty_delivery": 0,
+            "excused_count": 0,
+            "total_fine": 0.0
+        }
+
+    # Build Excel Workbook
     wb = openpyxl.Workbook()
 
     # Sheet 1: INVENTORY PENALTY REPORT
@@ -189,11 +206,8 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
 
     fill_title_left  = PatternFill("solid", fgColor="0F172A") # Deep Slate Navy
     fill_hdr_left    = PatternFill("solid", fgColor="1E293B") # Executive Navy Slate
-    fill_title_right = PatternFill("solid", fgColor="0F766E") # Deep Teal Slate
-    fill_hdr_right   = PatternFill("solid", fgColor="0F766E") # Deep Teal Slate
     fill_row_alt     = PatternFill("solid", fgColor="F8FAFC") # Subtle Zebra Tint
     fill_left_tot    = PatternFill("solid", fgColor="FEE2E2") # Light Red Total
-    fill_sum_tot     = PatternFill("solid", fgColor="FEE2E2") # Light Red Total
     green_fill       = PatternFill("solid", fgColor="DCFCE7") # Light Green
 
     border_clean = Border(
@@ -249,13 +263,12 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
     tot_exc = 0
     tot_fine = 0.0
 
-    sorted_keys = sorted(summary_data.keys())
-    for key in sorted_keys:
-        stats = summary_data[key]
+    sorted_branches = sorted(summary_data.values(), key=lambda x: x["po"])
+    for stats in sorted_branches:
         ws1.row_dimensions[r_curr].height = 18
         row_vals = [
             n_idx,
-            key[2],
+            stats["po"],
             stats["total_handover"],
             stats["total_delivery"],
             stats["penalty_handover"],
@@ -282,7 +295,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
         r_curr += 1
         n_idx += 1
 
-    # Left Grand Total Row
+    # Grand Total Row
     ws1.row_dimensions[r_curr].height = 22
     ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=2)
     gt_left = ws1.cell(r_curr, 1, "Grand Total")
@@ -299,7 +312,6 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
         cell.border = tot_border_accounting
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Set compact column widths
     col_widths_left = {1: 5, 2: 12, 3: 13, 4: 13, 5: 14, 6: 14, 7: 15}
     for c, w in col_widths_left.items():
         ws1.column_dimensions[get_column_letter(c)].width = w
@@ -314,7 +326,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
         "No", "Order Number", "Customer", "Origin Branch", "Origin Post",
         "Destination Branch", "Destination Post", "Assigned Branch", "Created At",
         "Status", "Status Code", "Type", "Age (Days)", "Excused?",
-        "Risk / SLA Level", "Penalty Fine ($)", "Zone"
+        "Risk / SLA Level", "Penalty Fine ($)"
     ]
 
     ws2.row_dimensions[1].height = 22
@@ -346,8 +358,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
             item["age_days"],
             item["excused"],
             item["risk_level"],
-            f"-${item['penalty_fine']:.2f}" if item["penalty_fine"] > 0 else "$0.00",
-            item["zone"]
+            f"-${item['penalty_fine']:.2f}" if item["penalty_fine"] > 0 else "$0.00"
         ]
         for col_idx, val in enumerate(row_data, 1):
             c = ws2.cell(row=r_num, column=col_idx, value=val)
@@ -369,12 +380,11 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
 
 
 def render_penalty_summary_image(out_xlsx):
-    """Renders compact, high-contrast, crisp image preview matching /tomorrow style."""
+    """Renders compact HD image preview matching /tomorrow style."""
     import tempfile, copy
     wb = openpyxl.load_workbook(out_xlsx)
     ws = wb['INVENTORY PENALTY REPORT']
 
-    # Create compact 1-table workbook
     wb_sum = openpyxl.Workbook()
     ws_sum = wb_sum.active
     ws_sum.title = 'Penalty Summary'
@@ -393,12 +403,10 @@ def render_penalty_summary_image(out_xlsx):
                 cell_tgt.border = copy.copy(cell_orig.border)
                 cell_tgt.alignment = copy.copy(cell_orig.alignment)
 
-    # Column widths
     for c in range(1, 8):
         col_l = get_column_letter(c)
         ws_sum.column_dimensions[col_l].width = ws.column_dimensions[col_l].width or 12
 
-    # Merged ranges
     ws_sum.merge_cells("A1:G1")
     ws_sum.merge_cells("A2:G2")
     ws_sum.merge_cells(start_row=max_r, start_column=1, end_row=max_r, end_column=2)
@@ -410,7 +418,6 @@ def render_penalty_summary_image(out_xlsx):
     try:
         buf = excel_to_image.excel_to_image(tmp_path)
         return buf
-        
     finally:
         try:
             os.remove(tmp_path)
