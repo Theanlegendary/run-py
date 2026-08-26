@@ -20,6 +20,7 @@ def parse_date(val):
     return None
 
 def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
+    os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
     """
     Builds the Stagnant Inventory & Handover Penalty Report.
     Rules:

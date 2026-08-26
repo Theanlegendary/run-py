@@ -1630,7 +1630,8 @@ async def cmd_penalty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         downloader.download_detail(cfg["api"], src, force_refresh=True)
         import penalty_report
-        out_xlsx = os.path.join(tmpdir, f"INVENTORY_PENALTY_REPORT_{stamp}_{target_label.replace(' ', '_')}.xlsx")
+        safe_label = "".join(c for c in target_label if c.isalnum() or c in ("-", "_")).strip() or "ALL"
+        out_xlsx = os.path.join(tmpdir, f"INVENTORY_PENALTY_REPORT_{stamp}_{safe_label}.xlsx")
         tot_ho, tot_del, tot_pen_cnt, tot_fine = penalty_report.build_penalty_report(src, out_xlsx, target_label=target_label)
 
         caption = (
@@ -1667,7 +1668,8 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         downloader.download_detail(cfg["api"], src, force_refresh=True)
         import speed_report
-        out_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{target_label.replace(' ', '_')}.xlsx")
+        safe_label = "".join(c for c in target_label if c.isalnum() or c in ("-", "_")).strip() or "ALL"
+        out_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{safe_label}.xlsx")
         tot_del, tot_u2, tot_24, tot_o8, tot_pay = speed_report.build_speed_report(src, out_xlsx, target_label=target_label)
 
         fast_pct = ((tot_u2 + tot_24) / tot_del * 100) if tot_del > 0 else 0

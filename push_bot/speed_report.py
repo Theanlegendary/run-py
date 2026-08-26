@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 from datetime import datetime, date
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -33,15 +34,7 @@ def parse_time(val):
     return None
 
 def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None):
-    """
-    Builds the Daily (Everyday) Fast Delivery Speed Bonus Report (Status 410).
-    Filters only bills delivered TODAY (report_date).
-    Tiers:
-      - < 2h: +50% ($0.30/bill)
-      - 2-4h: +25% ($0.25/bill)
-      - 4-8h: Normal ($0.20/bill)
-      - > 8h: -25% Fine ($0.15/bill)
-    """
+    os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
     df = pd.read_excel(src_xlsx)
     df.columns = [str(c).strip().upper() for c in df.columns]
 
@@ -54,7 +47,9 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     col_400_time = next((c for c in df.columns if '400' in c or 'OUT' in c or 'ASSIGN' in c), None)
 
     today = report_date or datetime.now().date()
-    tgt = target_label.upper().replace(" ", "")
+    tgt = "".join(c for c in str(target_label).upper() if c.isalnum() or c in ("-", "_")).strip()
+    if not tgt:
+        tgt = "ALL"
 
     df['sc'] = df[col_status].astype(str).str.extract(r'^(\d{3})')[0]
     df['curr_po_clean'] = df[col_curr_po].astype(str).str.strip().str.upper()
@@ -68,25 +63,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     # Filter Delivered bills (410)
     delivered_df = df[df['sc'] == '410'].copy()
 
-    # EVERYDAY FILTER: Only bills delivered TODAY (action date == today)
-    def get_deliv_date(row):
-        t410 = parse_time(row.get(col_action_time)) or parse_time(row.get(col_created))
-        return t410.date() if t410 else None
-
-    delivered_df['deliv_date'] = delivered_df.apply(get_deliv_date, axis=1)
-    
-    # Filter for today
-    today_delivered_df = delivered_df[delivered_df['deliv_date'] == today].copy()
-    if len(today_delivered_df) > 0:
-        delivered_df = today_delivered_df
-    else:
-        # If no bills delivered today yet (e.g. early morning), take the latest available date
-        latest_date = delivered_df['deliv_date'].max()
-        if latest_date:
-            delivered_df = delivered_df[delivered_df['deliv_date'] == latest_date].copy()
-            today = latest_date
-
-    # Filter target branch / zone / all
+    # Filter target branch / zone / all first
     if tgt not in ("ALL", "TOTAL"):
         if tgt.startswith("ZONE"):
             zone_by_prefix = {
@@ -101,7 +78,29 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         elif len(tgt) == 3:
             delivered_df = delivered_df[delivered_df['branch'].str.startswith(tgt)].copy()
         else:
-            delivered_df = delivered_df[delivered_df['branch'] == tgt].copy()
+            delivered_df = delivered_df[
+                (delivered_df['branch'] == tgt) |
+                (delivered_df['curr_po_clean'] == tgt) |
+                (delivered_df['deliv_po_clean'] == tgt)
+            ].copy()
+
+    # EVERYDAY FILTER: Filter by delivery date
+    def get_deliv_date(row):
+        t410 = parse_time(row.get(col_action_time)) or parse_time(row.get(col_created))
+        return t410.date() if t410 else None
+
+    delivered_df['deliv_date'] = delivered_df.apply(get_deliv_date, axis=1)
+    
+    # Check if there are bills for today
+    today_df = delivered_df[delivered_df['deliv_date'] == today].copy()
+    if len(today_df) > 0:
+        delivered_df = today_df
+    elif len(delivered_df) > 0:
+        # Take the most recent date available in the dataset
+        latest_date = delivered_df['deliv_date'].dropna().max()
+        if latest_date:
+            today = latest_date
+            delivered_df = delivered_df[delivered_df['deliv_date'] == latest_date].copy()
 
     branch_stats = {}
     detail_rows = []
@@ -199,7 +198,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
     date_str = today.strftime('%d/%m/%Y')
     ws_sum.merge_cells("A1:H1")
-    ws_sum["A1"].value = f"METFONE EXPRESS — DAILY DELIVERY SPEED BONUS REPORT ({target_label.upper()}) — {date_str}"
+    ws_sum["A1"].value = f"METFONE EXPRESS — DAILY DELIVERY SPEED BONUS REPORT ({tgt}) — {date_str}"
     ws_sum["A1"].font = banner_font
     ws_sum["A1"].fill = hdr_fill
     ws_sum["A1"].alignment = Alignment(horizontal="center", vertical="center")
@@ -268,6 +267,17 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         tot_48 += b["4_to_8h_count"]
         tot_o8 += b["over_8h_count"]
         tot_pay += b["total_commission_usd"]
+        r_cur += 1
+
+    # If no data found for specific branch, still write a blank row
+    if not sorted_branches and tgt not in ("ALL", "TOTAL"):
+        ws_sum.row_dimensions[r_cur].height = 22
+        vals = [tgt, 0, 0, 0, 0, 0, "0.0%", "$0.00"]
+        for col_idx, val in enumerate(vals, 1):
+            c = ws_sum.cell(row=r_cur, column=col_idx, value=val)
+            c.font = data_font
+            c.alignment = Alignment(horizontal="center", vertical="center")
+            c.border = border_thin
         r_cur += 1
 
     # TOTAL ROW
