@@ -1,11 +1,12 @@
 import os
 import sys
-import io
+import copy
 from datetime import datetime, date
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import pandas as pd
+import excel_to_image
 
 def parse_date(val):
     if not val or pd.isna(val):
@@ -23,7 +24,7 @@ def parse_date(val):
 def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
     """
     Builds the Executive Stagnant Inventory & Handover Penalty Report (/tomorrow style):
-      - Sheet 1: INVENTORY PENALTY REPORT (Summary Table + Executive Subtotals)
+      - Sheet 1: INVENTORY PENALTY REPORT (Compact Summary Table + Executive Subtotals)
       - Sheet 2: base (Full Raw / Audit Dataset)
     """
     os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
@@ -38,8 +39,6 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
     col_status = next((c for c in df.columns if 'CURRENT STATUS' in c or 'STATUS' in c), 'CURRENT STATUS')
     col_created = next((c for c in df.columns if 'CREATED DATE' in c), 'CREATED DATE')
     col_receiver = next((c for c in df.columns if 'RECEIVER' in c), 'RECEIVER')
-    col_fee = next((c for c in df.columns if 'TOTAL FEE' in c or 'TOTAL_AMOUNT' in c), 'TOTAL FEE')
-    col_cod = next((c for c in df.columns if 'COD' in c), 'COD')
     col_action_time = next((c for c in df.columns if 'ACTION TIME' in c or 'CURRENT TIME' in c), 'CURRENT TIME')
 
     today = datetime.now().date()
@@ -59,7 +58,6 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
     # Exclude completed 410, 520, cancelled 201, 99, 100, -99
     active_df = df[~df['sc'].isin(['410', '520', '201', '99', '100', '-99'])].copy()
 
-    # Zone mapping
     zone_by_prefix = {
         "KAN": "Zone 1", "PNP": "Zone 1", "PRE": "Zone 1", "SVA": "Zone 1",
         "KAM": "Zone 2", "KOH": "Zone 2", "SIH": "Zone 2", "SPE": "Zone 2", "TAK": "Zone 2", "KEP": "Zone 2",
@@ -68,7 +66,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
         "CHA": "Zone 5", "KRA": "Zone 5", "TBK": "Zone 5", "ROT": "Zone 5", "MON": "Zone 5", "STU": "Zone 5"
     }
 
-    # Filter target branch / zone / all
+    # Strict branch filtering: If target is SVAP001 or SVA, ONLY include SVA post offices!
     if tgt not in ("ALL", "TOTAL"):
         if tgt.startswith("ZONE"):
             target_zone_name = tgt.replace("ZONE", "Zone ")
@@ -76,12 +74,16 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
             active_df = active_df[active_df['zone'].str.upper().str.replace(" ", "") == tgt].copy()
         elif len(tgt) == 3:
             active_df = active_df[active_df['branch'].str.startswith(tgt)].copy()
-        else:
+        elif len(tgt) >= 7:
+            br_prefix = tgt[:3]
+            # Match branch prefix or exact PO code
             active_df = active_df[
-                (active_df['branch'] == tgt) |
+                (active_df['branch'].str.startswith(br_prefix)) |
                 (active_df['curr_po_clean'] == tgt) |
                 (active_df['deliv_po_clean'] == tgt)
             ].copy()
+        else:
+            active_df = active_df[active_df['branch'].str.startswith(tgt[:3])].copy()
 
     excused_statuses = {"420", "472"}
     summary_data = {}
@@ -185,7 +187,6 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
     ws1.title = "INVENTORY PENALTY REPORT"
     ws1.views.sheetView[0].showGridLines = True
 
-    # Color Palette matching /tomorrow executive styling
     fill_title_left  = PatternFill("solid", fgColor="0F172A") # Deep Slate Navy
     fill_hdr_left    = PatternFill("solid", fgColor="1E293B") # Executive Navy Slate
     fill_title_right = PatternFill("solid", fgColor="0F766E") # Deep Teal Slate
@@ -193,7 +194,6 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
     fill_row_alt     = PatternFill("solid", fgColor="F8FAFC") # Subtle Zebra Tint
     fill_left_tot    = PatternFill("solid", fgColor="FEE2E2") # Light Red Total
     fill_sum_tot     = PatternFill("solid", fgColor="FEE2E2") # Light Red Total
-    sub_fill         = PatternFill("solid", fgColor="E0F2FE") # Light Blue Subtotal
     green_fill       = PatternFill("solid", fgColor="DCFCE7") # Light Green
 
     border_clean = Border(
@@ -205,34 +205,34 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
         top=Side(style="thin", color="64748B"), bottom=Side(style="double", color="0F172A")
     )
 
-    font_banner = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
-    font_hdr = Font(name="Segoe UI", size=9, bold=True, color="FFFFFF")
-    font_data = Font(name="Segoe UI", size=9, color="0F172A")
-    font_bold_data = Font(name="Segoe UI", size=9, bold=True, color="0F172A")
-    font_tot = Font(name="Segoe UI", size=10, bold=True, color="0F172A")
-    font_tot_red = Font(name="Segoe UI", size=10, bold=True, color="991B1B")
+    font_banner = Font(name="Segoe UI", size=10, bold=True, color="FFFFFF")
+    font_hdr = Font(name="Segoe UI", size=8.5, bold=True, color="FFFFFF")
+    font_data = Font(name="Segoe UI", size=8.5, color="0F172A")
+    font_bold_data = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")
+    font_tot = Font(name="Segoe UI", size=9, bold=True, color="0F172A")
+    font_tot_red = Font(name="Segoe UI", size=9, bold=True, color="991B1B")
 
     # Left Banner
     ws1.merge_cells("A1:G1")
-    ws1["A1"].value = f"METFONE EXPRESS — INVENTORY PENALTY & STAGNANT GOODS REPORT ({tgt})"
+    ws1["A1"].value = f"METFONE EXPRESS — INVENTORY PENALTY & STAGNANT GOODS ({tgt})"
     ws1["A1"].font = font_banner
     ws1["A1"].fill = fill_title_left
     ws1["A1"].alignment = Alignment(horizontal="center", vertical="center")
-    ws1.row_dimensions[1].height = 28
+    ws1.row_dimensions[1].height = 24
 
     ws1.merge_cells("A2:G2")
     ws1["A2"].value = f"Generated: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Excused Green: 420, 472 ($0 fine) | Penalty: 1-2d (-$0.10), >3d (-$0.40)"
-    ws1["A2"].font = Font(name="Segoe UI", size=8, italic=True, color="FFFFFF")
+    ws1["A2"].font = Font(name="Segoe UI", size=7.5, italic=True, color="FFFFFF")
     ws1["A2"].fill = PatternFill("solid", fgColor="334155")
     ws1["A2"].alignment = Alignment(horizontal="center", vertical="center")
-    ws1.row_dimensions[2].height = 20
+    ws1.row_dimensions[2].height = 18
 
     left_headers = [
         "No", "Post Office", "Total Handover", "Total Delivery",
         "Penalty Handover", "Penalty Delivery", "Total Penalty ($)"
     ]
 
-    ws1.row_dimensions[3].height = 24
+    ws1.row_dimensions[3].height = 22
     for col_idx, h in enumerate(left_headers, 1):
         c = ws1.cell(row=3, column=col_idx, value=h)
         c.font = font_hdr
@@ -252,10 +252,10 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
     sorted_keys = sorted(summary_data.keys())
     for key in sorted_keys:
         stats = summary_data[key]
-        ws1.row_dimensions[r_curr].height = 20
+        ws1.row_dimensions[r_curr].height = 18
         row_vals = [
             n_idx,
-            key[2], # PO Code
+            key[2],
             stats["total_handover"],
             stats["total_delivery"],
             stats["penalty_handover"],
@@ -283,20 +283,13 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
         n_idx += 1
 
     # Left Grand Total Row
-    ws1.row_dimensions[r_curr].height = 25
+    ws1.row_dimensions[r_curr].height = 22
     ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=2)
-    gt_left = ws1.cell(r_curr, 1, "Grand Total / សរុប")
+    gt_left = ws1.cell(r_curr, 1, "Grand Total")
     gt_left.font = font_tot
     gt_left.alignment = Alignment(horizontal="left", vertical="center")
 
-    tot_vals_left = [
-        "", "",
-        tot_ho,
-        tot_del,
-        tot_pen_ho,
-        tot_pen_del,
-        f"-${tot_fine:.2f}" if tot_fine > 0 else "$0.00"
-    ]
+    tot_vals_left = ["", "", tot_ho, tot_del, tot_pen_ho, tot_pen_del, f"-${tot_fine:.2f}" if tot_fine > 0 else "$0.00"]
     for c in range(1, 8):
         cell = ws1.cell(r_curr, c)
         if c >= 3:
@@ -306,77 +299,13 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
         cell.border = tot_border_accounting
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Right Executive Summary Table (Executive KPI Block)
-    ws1.merge_cells("I1:L1")
-    ws1["I1"].value = f"EXECUTIVE SUMMARY — {tgt}"
-    ws1["I1"].font = font_banner
-    ws1["I1"].fill = fill_title_right
-    ws1["I1"].alignment = Alignment(horizontal="center", vertical="center")
-
-    ws1.merge_cells("I2:L2")
-    ws1["I2"].value = "Province KPI Subtotals"
-    ws1["I2"].font = Font(name="Segoe UI", size=8, italic=True, color="FFFFFF")
-    ws1["I2"].fill = PatternFill("solid", fgColor="115E59")
-    ws1["I2"].alignment = Alignment(horizontal="center", vertical="center")
-
-    right_headers = ["Zone", "Branch", "Penalized Bills", "Total Fine ($)"]
-    for col_idx, h in enumerate(right_headers, 9):
-        c = ws1.cell(row=3, column=col_idx, value=h)
-        c.font = font_hdr
-        c.fill = fill_hdr_right
-        c.alignment = Alignment(horizontal="center", vertical="center")
-        c.border = border_clean
-
-    # Group by Province
-    prov_groups = {}
-    for key, stats in summary_data.items():
-        prov = key[1]
-        if prov not in prov_groups:
-            prov_groups[prov] = {"zone": key[0], "penalized": 0, "fine": 0.0}
-        prov_groups[prov]["penalized"] += (stats["penalty_handover"] + stats["penalty_delivery"])
-        prov_groups[prov]["fine"] += stats["total_fine"]
-
-    r_sum = 4
-    for prov in sorted(prov_groups.keys()):
-        pdata = prov_groups[prov]
-        ws1.row_dimensions[r_sum].height = 20
-        s_vals = [pdata["zone"], prov, pdata["penalized"], f"-${pdata['fine']:.2f}" if pdata["fine"] > 0 else "$0.00"]
-        for ci, val in enumerate(s_vals, 9):
-            cell = ws1.cell(r_sum, ci, val)
-            cell.font = font_data
-            cell.border = border_clean
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            if ci == 12 and pdata["fine"] > 0:
-                cell.font = font_tot_red
-        r_sum += 1
-
-    # Right Grand Total Row
-    ws1.row_dimensions[r_sum].height = 25
-    ws1.merge_cells(start_row=r_sum, start_column=9, end_row=r_sum, end_column=10)
-    rt_tot = ws1.cell(r_sum, 9, "Total / សរុប")
-    rt_tot.font = font_tot
-    rt_tot.alignment = Alignment(horizontal="left", vertical="center")
-
-    cell_tot_pen = ws1.cell(r_sum, 11, (tot_pen_ho + tot_pen_del))
-    cell_tot_pen.font = font_tot
-    cell_tot_pen.alignment = Alignment(horizontal="center", vertical="center")
-
-    cell_tot_fine = ws1.cell(r_sum, 12, f"-${tot_fine:.2f}" if tot_fine > 0 else "$0.00")
-    cell_tot_fine.font = font_tot_red
-    cell_tot_fine.alignment = Alignment(horizontal="center", vertical="center")
-
-    for c in range(9, 13):
-        cell = ws1.cell(r_sum, c)
-        cell.fill = fill_sum_tot
-        cell.border = tot_border_accounting
-
-    for col in ws1.columns:
-        max_len = max(len(str(cell.value or "")) for cell in col)
-        col_letter = get_column_letter(col[0].column)
-        ws1.column_dimensions[col_letter].width = max(max_len + 3, 12)
+    # Set compact column widths
+    col_widths_left = {1: 5, 2: 12, 3: 13, 4: 13, 5: 14, 6: 14, 7: 15}
+    for c, w in col_widths_left.items():
+        ws1.column_dimensions[get_column_letter(c)].width = w
 
     # ─────────────────────────────────────────────────────────────────────────────
-    # SHEET 2: base (Full Raw / Audit Dataset matching /tomorrow style)
+    # SHEET 2: base
     # ─────────────────────────────────────────────────────────────────────────────
     ws2 = wb.create_sheet(title="base")
     ws2.views.sheetView[0].showGridLines = True
@@ -388,7 +317,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
         "Risk / SLA Level", "Penalty Fine ($)", "Zone"
     ]
 
-    ws2.row_dimensions[1].height = 24
+    ws2.row_dimensions[1].height = 22
     for col_idx, h in enumerate(base_headers, 1):
         c = ws2.cell(row=1, column=col_idx, value=h)
         c.font = font_hdr
@@ -400,7 +329,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
 
     for idx, item in enumerate(base_rows, 1):
         r_num = idx + 1
-        ws2.row_dimensions[r_num].height = 20
+        ws2.row_dimensions[r_num].height = 18
         row_data = [
             idx,
             item["order_number"],
@@ -433,61 +362,57 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL"):
     for col in ws2.columns:
         max_len = max(len(str(cell.value or "")) for cell in col)
         col_letter = get_column_letter(col[0].column)
-        ws2.column_dimensions[col_letter].width = max(max_len + 3, 12)
+        ws2.column_dimensions[col_letter].width = max(max_len + 3, 11)
 
     wb.save(out_xlsx)
     return tot_ho, tot_del, (tot_pen_ho + tot_pen_del), tot_fine
 
 
-def render_penalty_summary_image(xlsx_path):
-    """Renders high quality summary image preview of Sheet 1 for Telegram."""
-    from PIL import Image, ImageDraw, ImageFont
-    wb = openpyxl.load_workbook(xlsx_path, data_only=True)
-    ws = wb["INVENTORY PENALTY REPORT"]
+def render_penalty_summary_image(out_xlsx):
+    """Renders compact, high-contrast, crisp image preview matching /tomorrow style."""
+    import tempfile, copy
+    wb = openpyxl.load_workbook(out_xlsx)
+    ws = wb['INVENTORY PENALTY REPORT']
 
-    # Simple clean PIL table renderer
-    cell_w, cell_h = 130, 32
-    cols_to_render = 7
-    rows = list(ws.iter_rows(values_only=True))
-    total_r = min(len(rows), 45)
+    # Create compact 1-table workbook
+    wb_sum = openpyxl.Workbook()
+    ws_sum = wb_sum.active
+    ws_sum.title = 'Penalty Summary'
+    ws_sum.views.sheetView[0].showGridLines = True
 
-    img_w = cols_to_render * cell_w + 40
-    img_h = total_r * cell_h + 80
+    max_r = ws.max_row
+    for r in range(1, max_r + 1):
+        if ws.row_dimensions[r].height:
+            ws_sum.row_dimensions[r].height = ws.row_dimensions[r].height
+        for c in range(1, 8):
+            cell_orig = ws.cell(r, c)
+            cell_tgt = ws_sum.cell(r, c, cell_orig.value)
+            if cell_orig.has_style:
+                cell_tgt.font = copy.copy(cell_orig.font)
+                cell_tgt.fill = copy.copy(cell_orig.fill)
+                cell_tgt.border = copy.copy(cell_orig.border)
+                cell_tgt.alignment = copy.copy(cell_orig.alignment)
 
-    im = Image.new("RGB", (img_w, img_h), color="#FFFFFF")
-    draw = ImageDraw.Draw(im)
+    # Column widths
+    for c in range(1, 8):
+        col_l = get_column_letter(c)
+        ws_sum.column_dimensions[col_l].width = ws.column_dimensions[col_l].width or 12
+
+    # Merged ranges
+    ws_sum.merge_cells("A1:G1")
+    ws_sum.merge_cells("A2:G2")
+    ws_sum.merge_cells(start_row=max_r, start_column=1, end_row=max_r, end_column=2)
+
+    with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_f:
+        tmp_path = tmp_f.name
+    wb_sum.save(tmp_path)
 
     try:
-        font_main = ImageFont.truetype("seguiemj.ttf", 14)
-        font_bold = ImageFont.truetype("seguisb.ttf", 15)
-        font_title = ImageFont.truetype("seguisb.ttf", 18)
-    except:
-        font_main = ImageFont.load_default()
-        font_bold = font_main
-        font_title = font_main
-
-    # Draw header banner
-    draw.rectangle([0, 0, img_w, 50], fill="#0F172A")
-    title_text = str(ws["A1"].value or "INVENTORY PENALTY REPORT")
-    draw.text((20, 15), title_text, fill="#FFFFFF", font=font_title)
-
-    y_pos = 60
-    for r_idx in range(2, total_r):
-        row = rows[r_idx][:cols_to_render]
-        bg_color = "#1E293B" if r_idx == 2 else ("#FEE2E2" if r_idx == total_r - 1 else ("#F8FAFC" if r_idx % 2 == 0 else "#FFFFFF"))
-        draw.rectangle([20, y_pos, img_w - 20, y_pos + cell_h], fill=bg_color)
-
-        x_pos = 20
-        for val in row:
-            text = str(val or "")
-            t_color = "#FFFFFF" if r_idx == 2 else ("#B91C1C" if "$" in text and "-" in text else "#0F172A")
-            use_font = font_bold if (r_idx == 2 or r_idx == total_r - 1) else font_main
-            draw.text((x_pos + 8, y_pos + 6), text[:18], fill=t_color, font=use_font)
-            x_pos += cell_w
-
-        y_pos += cell_h
-
-    buf = io.BytesIO()
-    im.save(buf, format="PNG")
-    buf.seek(0)
-    return buf
+        buf = excel_to_image.excel_to_image(tmp_path)
+        return buf
+        
+    finally:
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
