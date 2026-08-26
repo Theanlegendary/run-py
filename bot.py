@@ -1611,6 +1611,81 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await edit_or_send_requester_text(msg, update, context, f"❌ Error generating tomorrow report: {e}")
 
 
+
+@pm_required_handler
+async def cmd_penalty(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Generates Stagnant Inventory & Handover Penalty Report."""
+    await delete_group_command(update, context)
+    cfg = load_config()
+
+    args = [a.strip() for a in (context.args or []) if a.strip()]
+    target_label = " ".join(args) if args else "ALL"
+
+    msg = await send_requester_text(update, context, f"⏳ Generating INVENTORY PENALTY REPORT ({target_label})...")
+    tmpdir = tempfile.mkdtemp(prefix="penalty_")
+    track_report_dir(tmpdir)
+    stamp = datetime.now().strftime("%d.%m_%HH%M")
+    src = os.path.join(tmpdir, f"export_{stamp}.xlsx")
+
+    try:
+        downloader.download_detail(cfg["api"], src, force_refresh=True)
+        import penalty_report
+        out_xlsx = os.path.join(tmpdir, f"INVENTORY_PENALTY_REPORT_{stamp}_{target_label.replace(' ', '_')}.xlsx")
+        tot_ho, tot_del, tot_pen_cnt, tot_fine = penalty_report.build_penalty_report(src, out_xlsx, target_label=target_label)
+
+        caption = (
+            f"📊 *INVENTORY PENALTY REPORT ({target_label.upper()})*\n"
+            f"📦 Handover Bills: `{tot_ho}`\n"
+            f"🚚 Delivery Bills: `{tot_del}`\n"
+            f"⚠️ Penalized Bills: `{tot_pen_cnt}`\n"
+            f"💰 Total Fine: `-${tot_fine:.2f}`\n\n"
+            f"_• Excused Green: 420, 472 ($0 fine)_\n"
+            f"_• SLA Penalty: 1-2d (-$0.10), >3d (-$0.40)_"
+        )
+        await send_requester_document(update, context, out_xlsx, filename=os.path.basename(out_xlsx), caption=caption)
+        await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent INVENTORY PENALTY REPORT ({target_label}).")
+    except Exception as e:
+        log.exception("Error in /penalty command: %s", e)
+        await edit_or_send_requester_text(msg, update, context, f"❌ Error generating penalty report: {e}")
+
+
+@pm_required_handler
+async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Generates Fast Delivery Speed Bonus Report (Status 410)."""
+    await delete_group_command(update, context)
+    cfg = load_config()
+
+    args = [a.strip() for a in (context.args or []) if a.strip()]
+    target_label = " ".join(args) if args else "ALL"
+
+    msg = await send_requester_text(update, context, f"⏳ Generating FAST DELIVERY SPEED REPORT ({target_label})...")
+    tmpdir = tempfile.mkdtemp(prefix="speed_")
+    track_report_dir(tmpdir)
+    stamp = datetime.now().strftime("%d.%m_%HH%M")
+    src = os.path.join(tmpdir, f"export_{stamp}.xlsx")
+
+    try:
+        downloader.download_detail(cfg["api"], src, force_refresh=True)
+        import speed_report
+        out_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{target_label.replace(' ', '_')}.xlsx")
+        tot_del, tot_u2, tot_24, tot_o8, tot_pay = speed_report.build_speed_report(src, out_xlsx, target_label=target_label)
+
+        fast_pct = ((tot_u2 + tot_24) / tot_del * 100) if tot_del > 0 else 0
+        caption = (
+            f"⏱️ *FAST DELIVERY SPEED REPORT ({target_label.upper()})*\n"
+            f"📦 Total Delivered: `{tot_del}`\n"
+            f"🟢 < 2 Hours (+50%): `{tot_u2}`\n"
+            f"🔵 2 - 4 Hours (+25%): `{tot_24}`\n"
+            f"🔴 > 8 Hours (-25%): `{tot_o8}`\n"
+            f"⚡ Fast Rate (<4h): `{fast_pct:.1f}%`\n"
+            f"💵 Total Commission: `${tot_pay:.2f}`"
+        )
+        await send_requester_document(update, context, out_xlsx, filename=os.path.basename(out_xlsx), caption=caption)
+        await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent FAST DELIVERY SPEED REPORT ({target_label}).")
+    except Exception as e:
+        log.exception("Error in /speed command: %s", e)
+        await edit_or_send_requester_text(msg, update, context, f"❌ Error generating speed report: {e}")
+
 @pm_required_handler
 async def cmd_delayed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler for /delayed or /ge3 or /backlog command to export NOT ASSIGN & DELIVERY >= 3 DAYS."""
@@ -7745,6 +7820,8 @@ def main():
     app.add_handler(CommandHandler("under10h",   cmd_kpi10h))
     app.add_handler(CommandHandler("kpi10",      cmd_kpi10h))
     app.add_handler(CommandHandler("tomorrow",   cmd_tomorrow))
+    app.add_handler(CommandHandler("penalty",     cmd_penalty))
+    app.add_handler(CommandHandler("speed",       cmd_speed))
     app.add_handler(CommandHandler("today",       cmd_today))
     app.add_handler(CommandHandler("daily",       cmd_today))
     app.add_handler(CommandHandler("delayed",     cmd_delayed))
