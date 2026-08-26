@@ -1,6 +1,7 @@
 import os
 import sys
 import copy
+import tempfile
 from datetime import datetime, date
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -36,10 +37,9 @@ def parse_time(val):
 
 def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None):
     """
-    Builds the Clean Executive Fast Delivery Speed Bonus Report:
-      - If branch code (e.g. SVAP001) is given: Strictly reports ONLY that branch.
-      - Sheet 1: DELIVERY SPEED REPORT (Compact Summary Table)
-      - Sheet 2: base (Exact Bill List for that Branch)
+    Builds the Fast Delivery Speed Bonus Report (/tomorrow layout):
+      - Sheet 1: Left Table = Detailed Delivery Bills, Right Table = Executive Summary Table
+      - Sheet 2: base = Complete raw audit dataset
     """
     os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
     df = pd.read_excel(src_xlsx)
@@ -67,7 +67,6 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
     delivered_df = df[df['sc'] == '410'].copy()
 
-    # Strict branch filtering
     if tgt not in ("ALL", "TOTAL"):
         if tgt.startswith("ZONE"):
             zone_by_prefix = {
@@ -79,12 +78,12 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             }
             delivered_df['zone'] = delivered_df['deliv_po_clean'].str[:3].map(zone_by_prefix).fillna("ZONE1")
             delivered_df = delivered_df[delivered_df['zone'] == tgt].copy()
-        elif len(tgt) == 3: # SVA, BAT
+        elif len(tgt) == 3:
             delivered_df = delivered_df[
                 (delivered_df['deliv_po_clean'].str.startswith(tgt)) |
                 (delivered_df['curr_po_clean'].str.startswith(tgt))
             ].copy()
-        else: # Exact Branch e.g. SVAP001
+        else:
             delivered_df = delivered_df[
                 (delivered_df['deliv_po_clean'] == tgt) |
                 (delivered_df['curr_po_clean'] == tgt)
@@ -114,10 +113,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         deliv_po = str(row.get('deliv_po_clean', '')).strip()
         curr_po = str(row.get('curr_po_clean', '')).strip()
 
-        if tgt not in ("ALL", "TOTAL") and len(tgt) >= 7:
-            po = tgt
-        else:
-            po = deliv_po if deliv_po and deliv_po != 'NAN' else curr_po
+        po = tgt if (tgt not in ("ALL", "TOTAL") and len(tgt) >= 7) else (deliv_po if deliv_po and deliv_po != 'NAN' else curr_po)
 
         if not po or po == 'NAN':
             continue
@@ -173,7 +169,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         base_rows.append({
             "no": r_idx,
             "order_number": order_id,
-            "customer": str(row.get(col_receiver, ''))[:30],
+            "customer": str(row.get(col_receiver, ''))[:28],
             "origin_branch": str(row.get(col_orig_br, '')),
             "origin_post": curr_po,
             "destination_branch": str(row.get(col_dest_prov, '')),
@@ -211,8 +207,11 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
     fill_title_left  = PatternFill("solid", fgColor="0F172A") # Deep Slate Navy
     fill_hdr_left    = PatternFill("solid", fgColor="1E293B") # Executive Navy Slate
+    fill_title_right = PatternFill("solid", fgColor="0F766E") # Deep Teal Slate
+    fill_hdr_right   = PatternFill("solid", fgColor="0F766E") # Deep Teal Slate
     fill_row_alt     = PatternFill("solid", fgColor="F8FAFC") # Subtle Zebra Tint
-    fill_left_tot    = PatternFill("solid", fgColor="DCFCE7") # Light Green Total
+    fill_left_tot    = PatternFill("solid", fgColor="CBD5E1") # Refined Slate Grey Total
+    fill_sum_tot     = PatternFill("solid", fgColor="DCFCE7") # Light Green Total
     green_fill       = PatternFill("solid", fgColor="DCFCE7") # Light Green
     blue_fill        = PatternFill("solid", fgColor="EFF6FF") # Light Blue
     red_fill         = PatternFill("solid", fgColor="FEE2E2") # Light Red
@@ -235,35 +234,98 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
     date_str = today.strftime('%d/%m/%Y')
 
-    # Left Banner
+    # 1. Left Title Banner
     ws1.merge_cells("A1:H1")
-    ws1["A1"].value = f"METFONE EXPRESS — DAILY DELIVERY SPEED REPORT ({tgt}) — {date_str}"
-    ws1["A1"].font = font_banner
-    ws1["A1"].fill = fill_title_left
-    ws1["A1"].alignment = Alignment(horizontal="center", vertical="center")
-    ws1.row_dimensions[1].height = 24
+    ws1.cell(1, 1, f"DAILY DELIVERY SPEED ORDER DETAIL ({tgt}) — {date_str}").font = font_banner
+    ws1.cell(1, 1).alignment = Alignment(horizontal="left", vertical="center")
+    for c in range(1, 9):
+        ws1.cell(1, c).fill = fill_title_left
 
-    ws1.merge_cells("A2:H2")
-    ws1["A2"].value = f"Date: {date_str} | <2h (+50% / $0.30) | 2-4h (+25% / $0.25) | 4-8h ($0.20) | >8h (-25% / $0.15)"
-    ws1["A2"].font = Font(name="Segoe UI", size=7.5, italic=True, color="FFFFFF")
-    ws1["A2"].fill = PatternFill("solid", fgColor="334155")
-    ws1["A2"].alignment = Alignment(horizontal="center", vertical="center")
-    ws1.row_dimensions[2].height = 18
+    # 2. Right Title Banner
+    ws1.merge_cells("J1:Q1")
+    ws1.cell(1, 10, f"EXECUTIVE SUMMARY ({tgt})").font = font_banner
+    ws1.cell(1, 10).alignment = Alignment(horizontal="center", vertical="center")
+    for c in range(10, 18):
+        ws1.cell(1, c).fill = fill_title_right
 
-    left_headers = [
+    ws1.row_dimensions[1].height = 28.0
+
+    # Row 2: Headers
+    headers_left = [
+        "No", "Order Number", "Customer", "Post Office",
+        "Duration", "Hours (Dec)", "Speed Category", "Rate ($/Bill)"
+    ]
+    headers_right = [
         "No", "Post Office", "Delivered (410)", "< 2 Hours (+50%)",
         "2 - 4 Hours (+25%)", "4 - 8 Hours (Normal)", "> 8 Hours (-25%)", "Commission ($)"
     ]
 
-    ws1.row_dimensions[3].height = 22
-    for col_idx, h in enumerate(left_headers, 1):
-        c = ws1.cell(row=3, column=col_idx, value=h)
-        c.font = font_hdr
-        c.fill = fill_hdr_left
-        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        c.border = border_clean
+    ws1.row_dimensions[2].height = 24.0
+    for ci, h in enumerate(headers_left, 1):
+        cell = ws1.cell(2, ci, h)
+        cell.font = font_hdr
+        cell.fill = fill_hdr_left
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border_clean
 
-    r_curr = 4
+    for ci, h in enumerate(headers_right, 10):
+        cell = ws1.cell(2, ci, h)
+        cell.font = font_hdr
+        cell.fill = fill_hdr_right
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border_clean
+
+    # Populate Left Detail Order Rows
+    r_curr = 3
+    tot_pay_left = 0.0
+
+    for idx, item in enumerate(base_rows, 1):
+        ws1.row_dimensions[r_curr].height = 18.0
+        row_vals = [
+            idx,
+            item["order_number"],
+            item["customer"],
+            item["assigned_branch"],
+            item["duration"],
+            item["duration_hours"],
+            item["tier"],
+            f"${item['rate_usd']:.2f}"
+        ]
+        for col_idx, val in enumerate(row_vals, 1):
+            c = ws1.cell(row=r_curr, column=col_idx, value=val)
+            c.font = font_data
+            c.alignment = Alignment(horizontal="center", vertical="center")
+            c.border = border_clean
+            if r_curr % 2 == 0:
+                c.fill = fill_row_alt
+            if item["tag_color"] == "GREEN":
+                c.fill = green_fill
+            elif item["tag_color"] == "BLUE":
+                c.fill = blue_fill
+            elif item["tag_color"] == "RED":
+                c.fill = red_fill
+
+        tot_pay_left += item["rate_usd"]
+        r_curr += 1
+
+    # Left Grand Total
+    ws1.row_dimensions[r_curr].height = 22.0
+    ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=2)
+    gt_left = ws1.cell(r_curr, 1, f"Total Delivered: {len(base_rows)}")
+    gt_left.font = font_tot
+    gt_left.alignment = Alignment(horizontal="left", vertical="center")
+
+    for c in range(1, 9):
+        cell = ws1.cell(r_curr, c)
+        cell.fill = fill_left_tot
+        cell.border = tot_border_accounting
+        if c == 8:
+            cell.value = f"${tot_pay_left:.2f}"
+            cell.font = font_tot_green
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Populate Right Executive Summary Table
+    r_sum = 3
     n_idx = 1
     tot_del = 0
     tot_u2 = 0
@@ -274,8 +336,8 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
     sorted_branches = sorted(summary_data.values(), key=lambda x: x["po"])
     for stats in sorted_branches:
-        ws1.row_dimensions[r_curr].height = 18
-        row_vals = [
+        ws1.row_dimensions[r_sum].height = 18.0
+        s_vals = [
             n_idx,
             stats["po"],
             stats["total_delivered"],
@@ -285,15 +347,13 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             stats["over_8h"],
             f"${stats['total_commission']:.2f}"
         ]
-        for col_idx, val in enumerate(row_vals, 1):
-            c = ws1.cell(row=r_curr, column=col_idx, value=val)
-            c.font = font_bold_data if col_idx in (2, 8) else font_data
-            c.alignment = Alignment(horizontal="center", vertical="center")
-            c.border = border_clean
-            if r_curr % 2 == 0:
-                c.fill = fill_row_alt
-            if col_idx == 8:
-                c.font = font_tot_green
+        for ci, val in enumerate(s_vals, 10):
+            cell = ws1.cell(r_sum, ci, val)
+            cell.font = font_bold_data if ci in (11, 17) else font_data
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = border_clean
+            if ci == 17:
+                cell.font = font_tot_green
 
         tot_del += stats["total_delivered"]
         tot_u2 += stats["under_2h"]
@@ -301,28 +361,32 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         tot_48 += stats["between_4_8h"]
         tot_o8 += stats["over_8h"]
         tot_pay += stats["total_commission"]
-        r_curr += 1
+        r_sum += 1
         n_idx += 1
 
-    # Grand Total Row
-    ws1.row_dimensions[r_curr].height = 22
-    ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=2)
-    gt_left = ws1.cell(r_curr, 1, "Grand Total")
-    gt_left.font = font_tot
-    gt_left.alignment = Alignment(horizontal="left", vertical="center")
+    # Right Grand Total Row
+    ws1.row_dimensions[r_sum].height = 22.0
+    ws1.merge_cells(start_row=r_sum, start_column=10, end_row=r_sum, end_column=11)
+    rt_tot = ws1.cell(r_sum, 10, "Grand Total")
+    rt_tot.font = font_tot
+    rt_tot.alignment = Alignment(horizontal="left", vertical="center")
 
-    tot_vals_left = ["", "", tot_del, tot_u2, tot_24, tot_48, tot_o8, f"${tot_pay:.2f}"]
-    for c in range(1, 9):
-        cell = ws1.cell(r_curr, c)
-        if c >= 3:
-            cell.value = tot_vals_left[c-1]
-        cell.font = font_tot_green if c == 8 else font_tot
-        cell.fill = fill_left_tot
+    tot_vals_right = ["", "", tot_del, tot_u2, tot_24, tot_48, tot_o8, f"${tot_pay:.2f}"]
+    for c in range(10, 18):
+        cell = ws1.cell(r_sum, c)
+        if c >= 12:
+            cell.value = tot_vals_right[c-10]
+        cell.font = font_tot_green if c == 17 else font_tot
+        cell.fill = fill_sum_tot
         cell.border = tot_border_accounting
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    col_widths_left = {1: 5, 2: 12, 3: 13, 4: 14, 5: 14, 6: 14, 7: 14, 8: 15}
-    for c, w in col_widths_left.items():
+    col_widths = {
+        1: 5, 2: 15, 3: 20, 4: 12, 5: 12, 6: 12, 7: 18, 8: 14,
+        9: 4, # Gap
+        10: 5, 11: 12, 12: 13, 13: 14, 14: 14, 15: 14, 16: 14, 17: 15
+    }
+    for c, w in col_widths.items():
         ws1.column_dimensions[get_column_letter(c)].width = w
 
     # ─────────────────────────────────────────────────────────────────────────────
@@ -388,35 +452,39 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
 
 def render_speed_summary_image(out_xlsx):
-    """Renders compact HD image preview matching /tomorrow style."""
-    import tempfile, copy
+    """Renders ONLY the right Executive Summary Table as a crisp PNG image (matching /tomorrow)."""
     wb = openpyxl.load_workbook(out_xlsx)
     ws = wb['DELIVERY SPEED REPORT']
 
     wb_sum = openpyxl.Workbook()
     ws_sum = wb_sum.active
-    ws_sum.title = 'Speed Summary'
+    ws_sum.title = 'Executive Summary'
     ws_sum.views.sheetView[0].showGridLines = True
 
-    max_r = ws.max_row
+    max_r = 1
+    for r in range(1, ws.max_row + 1):
+        if ws.cell(r, 10).value is not None or ws.cell(r, 17).value is not None:
+            max_r = r
+
     for r in range(1, max_r + 1):
         if ws.row_dimensions[r].height:
             ws_sum.row_dimensions[r].height = ws.row_dimensions[r].height
-        for c in range(1, 9):
-            cell_orig = ws.cell(r, c)
-            cell_tgt = ws_sum.cell(r, c, cell_orig.value)
+        for c_idx in range(8):
+            orig_c = 10 + c_idx
+            tgt_c = 1 + c_idx
+            cell_orig = ws.cell(r, orig_c)
+            cell_tgt = ws_sum.cell(r, tgt_c, cell_orig.value)
             if cell_orig.has_style:
                 cell_tgt.font = copy.copy(cell_orig.font)
                 cell_tgt.fill = copy.copy(cell_orig.fill)
                 cell_tgt.border = copy.copy(cell_orig.border)
                 cell_tgt.alignment = copy.copy(cell_orig.alignment)
 
-    for c in range(1, 9):
-        col_l = get_column_letter(c)
-        ws_sum.column_dimensions[col_l].width = ws.column_dimensions[col_l].width or 12
+    col_widths = {1: 5, 2: 12, 3: 13, 4: 14, 5: 14, 6: 14, 7: 14, 8: 15}
+    for c, w in col_widths.items():
+        ws_sum.column_dimensions[get_column_letter(c)].width = w
 
     ws_sum.merge_cells("A1:H1")
-    ws_sum.merge_cells("A2:H2")
     ws_sum.merge_cells(start_row=max_r, start_column=1, end_row=max_r, end_column=2)
 
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_f:
