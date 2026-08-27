@@ -732,27 +732,31 @@ import re
 def get_forward_mapping(cfg):
     # Groups configured manually in config.json
     mapping = dict(cfg["telegram"].get("forward_mapping", {}))
+    pure_zone_cids = set(str(k) for k in cfg.get("zone_forward_mapping", {}).keys())
     
     # Auto-detect from registered group titles!
     for g in load_registered_groups():
         chat_id_str = str(g["chat_id"])
-        title = g.get("title", "")
-        # Look for handles like PNPP014, SVAP001, KANP001 in the title
-        found_handles = re.findall(r'\b[A-Z]{3}P\d{3}\b', title.upper())
+        title = g.get("title", "").strip()
+        title_u = title.upper()
         
-        # If no full handles found, try matching 3-letter branch codes (like SIH, KOH)
+        # Exclude only pure zone groups (e.g. 'Zone 1- Pickup & Delivery')
+        if chat_id_str in pure_zone_cids or re.match(r'^ZONE\s*\d+\s*[-–]', title_u):
+            continue
+            
+        found_handles = re.findall(r'\b[A-Z]{3}P\d{3}\b', title_u)
         if not found_handles:
-            words = re.findall(r'\b[A-Z]{3}\b', title.upper())
-            for w in words:
-                known_prefixes = []
-                for zb in cfg.get("zone_branches", {}).values():
-                    known_prefixes.extend([p.strip().upper() for p in zb.split(",") if p.strip()])
-                
-                if w in known_prefixes:
-                    found_handles.append(f"{w}P001")
+            # Match 3-letter prefix anywhere separated by non-alphanumeric (including _)
+            tokens = re.split(r'[^A-Z0-9]', title_u)
+            known_prefixes = []
+            for zb in cfg.get("zone_branches", {}).values():
+                known_prefixes.extend([p.strip().upper() for p in zb.split(",") if p.strip()])
+            for t in tokens:
+                if t in known_prefixes:
+                    found_handles.append(f"{t}P001")
+                    break
         
         if found_handles:
-            # If the group is already in mapping, don't overwrite manual settings
             if chat_id_str not in mapping:
                 mapping[chat_id_str] = found_handles
                 
@@ -768,7 +772,7 @@ def get_all_forward_groups(cfg):
     
     # Exclude zone groups from regular forwarding (they receive zone reports instead)
     zone_groups = set(str(k) for k in cfg.get("zone_forward_mapping", {}).keys())
-    return [g for g in all_groups if g not in zone_groups]
+    return [g for g in all_groups if g not in zone_groups and not re.match(r'^ZONE\s*\d+\s*[-–]', next((item.get('title', '').upper() for item in load_registered_groups() if str(item['chat_id']) == g), ''))]
 
 
 def is_paused(cfg):
