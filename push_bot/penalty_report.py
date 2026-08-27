@@ -270,21 +270,21 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         top=Side(style="thin", color="64748B"), bottom=Side(style="double", color="0B132B")
     )
 
-    font_banner = Font(name="Segoe UI", size=10.5, bold=True, color="FFFFFF")
-    font_sub = Font(name="Segoe UI", size=8.0, italic=True, color="93C5FD")
-    font_hdr = Font(name="Segoe UI", size=8.5, bold=True, color="FFFFFF")
-    font_data = Font(name="Segoe UI", size=8.5, color="0F172A")
-    font_bold_data = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")
-    font_tot = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
+    font_banner = Font(name="Segoe UI", size=12.0, bold=True, color="FFFFFF")
+    font_sub = Font(name="Segoe UI", size=9.0, italic=True, color="93C5FD")
+    font_hdr = Font(name="Segoe UI", size=9.5, bold=True, color="FFFFFF")
+    font_data = Font(name="Segoe UI", size=9.5, color="0F172A")
+    font_bold_data = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
+    font_tot = Font(name="Segoe UI", size=10.5, bold=True, color="0F172A")
 
-    # Font colors for % on-time metrics
-    font_pct_green = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A") # >= 90%
-    font_pct_amber = Font(name="Segoe UI", size=8.5, bold=True, color="D97706") # 75% - 89.9%
-    font_pct_red   = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # < 75%
+    # High-contrast bold font colors for % on-time metrics
+    font_pct_green = Font(name="Segoe UI", size=9.5, bold=True, color="16A34A") # >= 90% (Bold Green)
+    font_pct_amber = Font(name="Segoe UI", size=9.5, bold=True, color="D97706") # 75% - 89.9% (Bold Amber)
+    font_pct_red   = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626") # < 75% (Bold Crimson Red)
 
-    font_tot_pct_green = Font(name="Segoe UI", size=9.5, bold=True, color="16A34A")
-    font_tot_pct_amber = Font(name="Segoe UI", size=9.5, bold=True, color="D97706")
-    font_tot_pct_red   = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626")
+    font_tot_pct_green = Font(name="Segoe UI", size=10.5, bold=True, color="16A34A")
+    font_tot_pct_amber = Font(name="Segoe UI", size=10.5, bold=True, color="D97706")
+    font_tot_pct_red   = Font(name="Segoe UI", size=10.5, bold=True, color="DC2626")
 
     def get_pct_font(pct_val, is_tot=False):
         if pct_val >= 90.0:
@@ -302,7 +302,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     ws1.cell(1, 1).alignment = Alignment(horizontal="left", vertical="center")
     for c in range(1, 9):
         ws1.cell(1, c).fill = fill_title_left
-    ws1.row_dimensions[1].height = 26.0
+    ws1.row_dimensions[1].height = 30.0
 
     # 2. Right Title Banner (Cols J to R)
     ws1.merge_cells("J1:R1")
@@ -316,7 +316,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     ws1.cell(2, 10).alignment = Alignment(horizontal="center", vertical="center")
     for c in range(10, 19):
         ws1.cell(2, c).fill = fill_sub_right
-    ws1.row_dimensions[2].height = 18.0
+    ws1.row_dimensions[2].height = 20.0
 
     # Row 3: Headers
     headers_left = [
@@ -328,7 +328,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         "Total\nHandover", "Total\nDelivery", "% RIGHT\nHandover", "% RIGHT\nDelivery", "Total\nPenalty ($)"
     ]
 
-    ws1.row_dimensions[3].height = 28.0
+    ws1.row_dimensions[3].height = 34.0
     for ci, h in enumerate(headers_left, 1):
         cell = ws1.cell(3, ci, h)
         cell.font = font_hdr
@@ -388,13 +388,13 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # Populate Right Executive Summary Table
-    # SORT: % RIGHT Delivery ascending (worst delivery → top), then fine descending
+    # SORT: % RIGHT Handover ascending (worst handover → top), then % RIGHT Delivery, then fine
     def calc_sort_key(stats):
+        r_ho = max(0, stats["total_handover"] - stats["penalty_handover"])
+        pct_ho = (r_ho / stats["total_handover"] * 100.0) if stats["total_handover"] > 0 else 100.0
         r_del = max(0, stats["total_delivery"] - stats["penalty_delivery"])
-        # If branch has no delivery records at all, treat as 100% (put at bottom)
-        # If branch has delivery records but all penalized, treat as 0% (put at top)
         pct_del = (r_del / stats["total_delivery"] * 100.0) if stats["total_delivery"] > 0 else 100.0
-        return (pct_del, -stats["total_fine"])
+        return (pct_ho, pct_del, -stats["total_fine"])
 
     if tgt in ("ALL", "TOTAL"):
         all_branches = [summary_data[b] for b in MAIN_36_BRANCHES if b in summary_data]
@@ -412,10 +412,10 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     tot_fine = 0.0
 
     fill_pen_pink = PatternFill("solid", fgColor="FEE2E2") # Soft Light Pink for penalty cells
-    font_pen_red  = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # Bold Red
+    font_pen_red  = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626") # Bold Red
 
     for stats in sorted_branches:
-        ws1.row_dimensions[r_sum].height = 18.0
+        ws1.row_dimensions[r_sum].height = 22.0
         
         # Calculate RIGHT (On-Time)
         r_ho = max(0, stats["total_handover"] - stats["penalty_handover"])
