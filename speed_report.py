@@ -540,7 +540,7 @@ def render_speed_summary_image(out_xlsx):
                 cell_tgt.border = copy.copy(cell_orig.border)
                 cell_tgt.alignment = copy.copy(cell_orig.alignment)
 
-    col_widths = {1: 5, 2: 12, 3: 13, 4: 14, 5: 14, 6: 14, 7: 14, 8: 15}
+    col_widths = {1: 6, 2: 14, 3: 15, 4: 16, 5: 16, 6: 16, 7: 16, 8: 18}
     for c, w in col_widths.items():
         ws_sum.column_dimensions[get_column_letter(c)].width = w
 
