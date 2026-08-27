@@ -2201,6 +2201,12 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
     zone_label = "ALL"
     if args:
         zone_key = args[0]
+        if zone_key in ("speed", "delivery", "fast"):
+            context.args = ["ALL"]
+            return await cmd_speed(update, context)
+        if zone_key in ("penalty", "inventory", "stagnant"):
+            context.args = ["ALL"]
+            return await cmd_penalty(update, context)
         if zone_key == "mega":
             msg = await send_requester_text(update, context, "Fetching data for TỒN MEGA CHECK...")
             tmpdir = tempfile.mkdtemp(prefix="mega_")
