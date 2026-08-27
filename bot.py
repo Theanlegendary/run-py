@@ -1271,19 +1271,10 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     log.warning("Failed to render penalty summary image: %s", e)
 
-                caption = (
-                    f"📊 *EXECUTIVE PENALTY DASHBOARD ({target_label.upper()})*\n"
-                    f"📦 Total Handover: `{tot_ho}` | 🚚 Total Delivery: `{tot_del}`\n"
-                    f"⚠️ Penalized Bills: `{tot_pen_cnt}`\n"
-                    f"💰 Total Penalty: `-${tot_fine:.2f}`\n\n"
-                    f"_• SLA Penalty: 1-2 Days (-$0.10) | ≥ 3 Days (-$0.40)_\n"
-                    f"_• Excused (Status 420/472): $0.00 fine_"
-                )
                 with open(out_xlsx, "rb") as f:
                     await send_requester_document(
                         update, context, f,
-                        os.path.basename(out_xlsx),
-                        caption=caption
+                        os.path.basename(out_xlsx)
                     )
                 await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent INVENTORY PENALTY REPORT ({target_label.upper()}).")
             except Exception as e:
@@ -1312,21 +1303,10 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     log.warning("Failed to render speed summary image: %s", e)
 
-                fast_pct = ((tot_u2 + tot_24) / tot_del * 100) if tot_del > 0 else 0
-                caption = (
-                    f"⏱️ *EXECUTIVE DELIVERY SPEED DASHBOARD ({target_label.upper()})*\n"
-                    f"📦 Total Delivered (410): `{tot_del}`\n"
-                    f"🟢 < 2 Hours (+50%): `{tot_u2}`\n"
-                    f"🔵 2 - 4 Hours (+25%): `{tot_24}`\n"
-                    f"🔴 > 8 Hours (-25%): `{tot_o8}`\n"
-                    f"⚡ Fast Delivery Rate (<4h): `{fast_pct:.1f}%`\n"
-                    f"💵 Total Commission: `${tot_pay:.2f}`"
-                )
                 with open(out_xlsx, "rb") as f:
                     await send_requester_document(
                         update, context, f,
-                        os.path.basename(out_xlsx),
-                        caption=caption
+                        os.path.basename(out_xlsx)
                     )
                 await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent EXECUTIVE DELIVERY SPEED DASHBOARD ({target_label.upper()}).")
             except Exception as e:
