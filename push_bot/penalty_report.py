@@ -251,40 +251,40 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     ws1.views.sheetView[0].showGridLines = True
 
     # ── CEO MIDNIGHT & ROYAL SAPPHIRE BLUE PALETTE ──
-    fill_title_left   = PatternFill("solid", fgColor="0B132B") # Deepest Midnight Navy
-    fill_hdr_left     = PatternFill("solid", fgColor="1C2541") # Midnight Slate
+    fill_title_left   = PatternFill("solid", fgColor="0F172A") # Midnight Navy
+    fill_hdr_left     = PatternFill("solid", fgColor="1E293B") # Midnight Slate
     fill_title_right  = PatternFill("solid", fgColor="0B132B") # Deepest Midnight Navy
     fill_sub_right    = PatternFill("solid", fgColor="1C2541") # Subtitle Midnight Slate
     fill_hdr_right    = PatternFill("solid", fgColor="1C3D82") # Royal Sapphire Blue Header
     fill_row_alt      = PatternFill("solid", fgColor="F8FAFC") # Clean Soft Zebra
     fill_left_tot     = PatternFill("solid", fgColor="E2E8F0") # Soft Slate Total
     fill_sum_tot      = PatternFill("solid", fgColor="E2E8F0") # Executive Accounting Total
-    fill_penalty_pink = PatternFill("solid", fgColor="FEE2E2") # Light Pink for penalty cells
+    fill_penalty_pink = PatternFill("solid", fgColor="FFEAEA") # Light Pink / Soft Red for penalty cells
 
     border_clean = Border(
-        left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
-        top=Side(style="thin", color="CBD5E1"), bottom=Side(style="thin", color="CBD5E1")
+        left=Side(style="thin", color="E2E8F0"), right=Side(style="thin", color="E2E8F0"),
+        top=Side(style="thin", color="E2E8F0"), bottom=Side(style="thin", color="E2E8F0")
     )
     tot_border_accounting = Border(
         left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
-        top=Side(style="thin", color="64748B"), bottom=Side(style="double", color="0B132B")
+        top=Side(style="thin", color="94A3B8"), bottom=Side(style="double", color="0B132B")
     )
 
-    font_banner = Font(name="Segoe UI", size=12.0, bold=True, color="FFFFFF")
-    font_sub = Font(name="Segoe UI", size=9.0, italic=True, color="93C5FD")
-    font_hdr = Font(name="Segoe UI", size=9.5, bold=True, color="FFFFFF")
-    font_data = Font(name="Segoe UI", size=9.5, color="0F172A")
-    font_bold_data = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
-    font_tot = Font(name="Segoe UI", size=10.5, bold=True, color="0F172A")
+    font_banner = Font(name="Segoe UI", size=10.5, bold=True, color="FFFFFF")
+    font_sub = Font(name="Segoe UI", size=8.0, italic=True, color="93C5FD")
+    font_hdr = Font(name="Segoe UI", size=8.5, bold=True, color="FFFFFF")
+    font_data = Font(name="Segoe UI", size=8.5, color="0F172A")
+    font_bold_data = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")
+    font_tot = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
 
     # High-contrast bold font colors for % on-time metrics
-    font_pct_green = Font(name="Segoe UI", size=9.5, bold=True, color="16A34A") # >= 90% (Bold Green)
-    font_pct_amber = Font(name="Segoe UI", size=9.5, bold=True, color="D97706") # 75% - 89.9% (Bold Amber)
-    font_pct_red   = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626") # < 75% (Bold Crimson Red)
+    font_pct_green = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A") # >= 90%
+    font_pct_amber = Font(name="Segoe UI", size=8.5, bold=True, color="D97706") # 75% - 89.9%
+    font_pct_red   = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # < 75%
 
-    font_tot_pct_green = Font(name="Segoe UI", size=10.5, bold=True, color="16A34A")
-    font_tot_pct_amber = Font(name="Segoe UI", size=10.5, bold=True, color="D97706")
-    font_tot_pct_red   = Font(name="Segoe UI", size=10.5, bold=True, color="DC2626")
+    font_tot_pct_green = Font(name="Segoe UI", size=9.5, bold=True, color="16A34A")
+    font_tot_pct_amber = Font(name="Segoe UI", size=9.5, bold=True, color="D97706")
+    font_tot_pct_red   = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626")
 
     def get_pct_font(pct_val, is_tot=False):
         if pct_val >= 90.0:
@@ -302,7 +302,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     ws1.cell(1, 1).alignment = Alignment(horizontal="left", vertical="center")
     for c in range(1, 9):
         ws1.cell(1, c).fill = fill_title_left
-    ws1.row_dimensions[1].height = 30.0
+    ws1.row_dimensions[1].height = 26.0
 
     # 2. Right Title Banner (Cols J to R)
     ws1.merge_cells("J1:R1")
@@ -316,7 +316,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     ws1.cell(2, 10).alignment = Alignment(horizontal="center", vertical="center")
     for c in range(10, 19):
         ws1.cell(2, c).fill = fill_sub_right
-    ws1.row_dimensions[2].height = 20.0
+    ws1.row_dimensions[2].height = 18.0
 
     # Row 3: Headers
     headers_left = [
@@ -324,11 +324,11 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         "Status", "Type", "Age (Days)", "Penalty Fine ($)"
     ]
     headers_right = [
-        "No", "Post Office", "RIGHT\nHandover", "RIGHT\nDelivery",
-        "Total\nHandover", "Total\nDelivery", "% RIGHT\nHandover", "% RIGHT\nDelivery", "Total\nPenalty ($)"
+        "No", "Post Office", "RIGHT Handover", "RIGHT Delivery",
+        "Total Handover", "Total Delivery", "% RIGHT Handover", "% RIGHT Delivery", "Total Penalty ($)"
     ]
 
-    ws1.row_dimensions[3].height = 34.0
+    ws1.row_dimensions[3].height = 26.0
     for ci, h in enumerate(headers_left, 1):
         cell = ws1.cell(3, ci, h)
         cell.font = font_hdr
@@ -411,11 +411,11 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     tot_pen_del = 0
     tot_fine = 0.0
 
-    fill_pen_pink = PatternFill("solid", fgColor="FEE2E2") # Soft Light Pink for penalty cells
-    font_pen_red  = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626") # Bold Red
+    fill_pen_pink = PatternFill("solid", fgColor="FFEAEA") # Soft Light Pink for penalty cells
+    font_pen_red  = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # Bold Red
 
     for stats in sorted_branches:
-        ws1.row_dimensions[r_sum].height = 22.0
+        ws1.row_dimensions[r_sum].height = 18.0
         
         # Calculate RIGHT (On-Time)
         r_ho = max(0, stats["total_handover"] - stats["penalty_handover"])
@@ -532,7 +532,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     col_widths = {
         1: 5, 2: 15, 3: 20, 4: 12, 5: 18, 6: 10, 7: 12, 8: 15,
         9: 4,
-        10: 6, 11: 14, 12: 16, 13: 16, 14: 16, 15: 16, 16: 18, 17: 18, 18: 18
+        10: 5, 11: 14, 12: 15, 13: 15, 14: 15, 15: 15, 16: 16, 17: 16, 18: 16
     }
     for c, w in col_widths.items():
         ws1.column_dimensions[get_column_letter(c)].width = w
@@ -623,7 +623,7 @@ def render_penalty_summary_image(out_xlsx):
                 cell_tgt.alignment = copy.copy(cell_orig.alignment)
 
     # Wide column dimensions for crisp unclipped header text
-    col_widths = {1: 6, 2: 14, 3: 16, 4: 16, 5: 16, 6: 16, 7: 18, 8: 18, 9: 18}
+    col_widths = {1: 5, 2: 14, 3: 15, 4: 15, 5: 15, 6: 15, 7: 16, 8: 16, 9: 16}
     for c, w in col_widths.items():
         ws_sum.column_dimensions[get_column_letter(c)].width = w
 
