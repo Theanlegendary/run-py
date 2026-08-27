@@ -45,9 +45,11 @@ def parse_time(val):
 
 def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None):
     """
-    CEO-Grade Clean Executive Navy & Slate Penalty Report (NO RED):
-      - Deep Royal Navy (#0F172A) & Executive Slate (#1E293B)
-      - No red fonts or red fills. Clean, ultra-crisp executive presentation.
+    CEO Executive Penalty Dashboard:
+      - Headers: No | Post Office | RIGHT Handover | RIGHT Delivery | Total Handover | Total Delivery | % RIGHT Handover | % RIGHT Delivery | Total Penalty ($)
+      - Distinct Theme: Deep Midnight Navy (#0B132B) & Royal Sapphire Blue (#1C3D82 / #1E3A8A)
+      - Sheet 1: Left Table = Detailed Active Orders, Right Table = 36-Branch Executive Summary
+      - Sheet 2: base = Raw Audit Dataset
     """
     os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
     df = pd.read_excel(src_xlsx)
@@ -246,27 +248,27 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     ws1.title = "INVENTORY PENALTY REPORT"
     ws1.views.sheetView[0].showGridLines = True
 
-    # ── CEO NO-RED THEME: Deep Midnight Navy (#0F172A) & Slate Sapphire (#1E3A8A / #334155) ──
-    fill_title_left   = PatternFill("solid", fgColor="0F172A") # Midnight Navy
-    fill_hdr_left     = PatternFill("solid", fgColor="1E293B") # Executive Slate
-    fill_title_right  = PatternFill("solid", fgColor="0F172A") # Midnight Navy
-    fill_sub_right    = PatternFill("solid", fgColor="1E293B") # Dark Slate Subtitle
-    fill_hdr_right    = PatternFill("solid", fgColor="1E3A8A") # Sapphire Navy Header
-    fill_row_alt      = PatternFill("solid", fgColor="F8FAFC") # Crisp Clean Zebra
+    # ── CEO MIDNIGHT & ROYAL SAPPHIRE BLUE PALETTE ──
+    fill_title_left   = PatternFill("solid", fgColor="0B132B") # Deepest Midnight Navy
+    fill_hdr_left     = PatternFill("solid", fgColor="1C2541") # Midnight Slate
+    fill_title_right  = PatternFill("solid", fgColor="0B132B") # Deepest Midnight Navy
+    fill_sub_right    = PatternFill("solid", fgColor="1C2541") # Subtitle Midnight Slate
+    fill_hdr_right    = PatternFill("solid", fgColor="1C3D82") # Royal Sapphire Blue Header
+    fill_row_alt      = PatternFill("solid", fgColor="F8FAFC") # Clean Soft Zebra
     fill_left_tot     = PatternFill("solid", fgColor="E2E8F0") # Soft Slate Total
-    fill_sum_tot      = PatternFill("solid", fgColor="E2E8F0") # Executive Slate Accounting Total
+    fill_sum_tot      = PatternFill("solid", fgColor="E2E8F0") # Executive Accounting Total
 
     border_clean = Border(
-        left=Side(style="thin", color="E2E8F0"), right=Side(style="thin", color="E2E8F0"),
-        top=Side(style="thin", color="E2E8F0"), bottom=Side(style="thin", color="E2E8F0")
+        left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"), bottom=Side(style="thin", color="CBD5E1")
     )
     tot_border_accounting = Border(
         left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
-        top=Side(style="thin", color="64748B"), bottom=Side(style="double", color="0F172A")
+        top=Side(style="thin", color="64748B"), bottom=Side(style="double", color="0B132B")
     )
 
     font_banner = Font(name="Segoe UI", size=10.5, bold=True, color="FFFFFF")
-    font_sub = Font(name="Segoe UI", size=8.0, italic=True, color="CBD5E1")
+    font_sub = Font(name="Segoe UI", size=8.0, italic=True, color="93C5FD")
     font_hdr = Font(name="Segoe UI", size=8.5, bold=True, color="FFFFFF")
     font_data = Font(name="Segoe UI", size=8.5, color="0F172A")
     font_bold_data = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")
@@ -282,28 +284,28 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         ws1.cell(1, c).fill = fill_title_left
     ws1.row_dimensions[1].height = 26.0
 
-    # 2. Right Title Banner (2-Tier Executive Header)
-    ws1.merge_cells("J1:P1")
+    # 2. Right Title Banner (Exact user format: Cols J to R)
+    ws1.merge_cells("J1:R1")
     ws1.cell(1, 10, f"EXECUTIVE PENALTY DASHBOARD ({tgt})").font = font_banner
     ws1.cell(1, 10).alignment = Alignment(horizontal="center", vertical="center")
-    for c in range(10, 17):
+    for c in range(10, 19):
         ws1.cell(1, c).fill = fill_title_right
 
-    ws1.merge_cells("J2:P2")
+    ws1.merge_cells("J2:R2")
     ws1.cell(2, 10, "SLA Penalty: 1-2 Days (-$0.10) | ≥ 3 Days (-$0.40) • Excused 420/472 ($0.00)").font = font_sub
     ws1.cell(2, 10).alignment = Alignment(horizontal="center", vertical="center")
-    for c in range(10, 17):
+    for c in range(10, 19):
         ws1.cell(2, c).fill = fill_sub_right
     ws1.row_dimensions[2].height = 18.0
 
-    # Row 3: Headers
+    # Row 3: Headers (Exact User Header Layout)
     headers_left = [
         "No", "Order Number", "Customer", "Post Office",
         "Status", "Type", "Age (Days)", "Penalty Fine ($)"
     ]
     headers_right = [
-        "No", "Post Office", "Total Handover", "Total Delivery",
-        "Penalty Handover", "Penalty Delivery", "Total Penalty ($)"
+        "No", "Post Office", "RIGHT Handover", "RIGHT Delivery",
+        "Total Handover", "Total Delivery", "% RIGHT Handover", "% RIGHT Delivery", "Total Penalty ($)"
     ]
 
     ws1.row_dimensions[3].height = 25.0
@@ -381,19 +383,29 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
 
     for stats in sorted_branches:
         ws1.row_dimensions[r_sum].height = 18.0
+        
+        # Calculate RIGHT (On-Time / Excused)
+        r_ho = max(0, stats["total_handover"] - stats["penalty_handover"])
+        r_del = max(0, stats["total_delivery"] - stats["penalty_delivery"])
+        
+        pct_r_ho = (r_ho / stats["total_handover"] * 100) if stats["total_handover"] > 0 else 100.0
+        pct_r_del = (r_del / stats["total_delivery"] * 100) if stats["total_delivery"] > 0 else 100.0
         fine_str = f"-${stats['total_fine']:.2f}" if stats['total_fine'] > 0 else "$0.00"
+
         s_vals = [
             n_idx,
             stats["po"],
+            r_ho,
+            r_del,
             stats["total_handover"],
             stats["total_delivery"],
-            stats["penalty_handover"],
-            stats["penalty_delivery"],
+            f"{pct_r_ho:.1f}%",
+            f"{pct_r_del:.1f}%",
             fine_str
         ]
         for ci, val in enumerate(s_vals, 10):
             cell = ws1.cell(r_sum, ci, val)
-            cell.font = font_bold_data if ci in (11, 16) else font_data
+            cell.font = font_bold_data if ci in (11, 18) else font_data
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = border_clean
             if r_sum % 2 == 0:
@@ -414,9 +426,23 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     rt_tot.font = font_tot
     rt_tot.alignment = Alignment(horizontal="left", vertical="center")
 
+    tot_r_ho = max(0, tot_ho - tot_pen_ho)
+    tot_r_del = max(0, tot_del - tot_pen_del)
+    tot_pct_r_ho = (tot_r_ho / tot_ho * 100) if tot_ho > 0 else 100.0
+    tot_pct_r_del = (tot_r_del / tot_del * 100) if tot_del > 0 else 100.0
     tot_fine_str = f"-${tot_fine:.2f}" if tot_fine > 0 else "$0.00"
-    tot_vals_right = ["", "", tot_ho, tot_del, tot_pen_ho, tot_pen_del, tot_fine_str]
-    for c in range(10, 17):
+
+    tot_vals_right = [
+        "", "",
+        tot_r_ho,
+        tot_r_del,
+        tot_ho,
+        tot_del,
+        f"{tot_pct_r_ho:.1f}%",
+        f"{tot_pct_r_del:.1f}%",
+        tot_fine_str
+    ]
+    for c in range(10, 19):
         cell = ws1.cell(r_sum, c)
         if c >= 12:
             cell.value = tot_vals_right[c-10]
@@ -425,11 +451,11 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         cell.border = tot_border_accounting
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Generous Column Widths to prevent header overlap
+    # Generous Column Widths
     col_widths = {
         1: 5, 2: 15, 3: 20, 4: 12, 5: 18, 6: 10, 7: 12, 8: 15,
         9: 4,
-        10: 6, 11: 14, 12: 16, 13: 15, 14: 18, 15: 18, 16: 18
+        10: 6, 11: 14, 12: 16, 13: 16, 14: 16, 15: 16, 16: 18, 17: 18, 18: 18
     }
     for c, w in col_widths.items():
         ws1.column_dimensions[get_column_letter(c)].width = w
@@ -502,13 +528,13 @@ def render_penalty_summary_image(out_xlsx):
 
     max_r = 1
     for r in range(1, ws.max_row + 1):
-        if ws.cell(r, 10).value is not None or ws.cell(r, 16).value is not None:
+        if ws.cell(r, 10).value is not None or ws.cell(r, 18).value is not None:
             max_r = r
 
     for r in range(1, max_r + 1):
         if ws.row_dimensions[r].height:
             ws_sum.row_dimensions[r].height = ws.row_dimensions[r].height
-        for c_idx in range(7):
+        for c_idx in range(9):
             orig_c = 10 + c_idx
             tgt_c = 1 + c_idx
             cell_orig = ws.cell(r, orig_c)
@@ -520,12 +546,12 @@ def render_penalty_summary_image(out_xlsx):
                 cell_tgt.alignment = copy.copy(cell_orig.alignment)
 
     # Wide column dimensions for crisp unclipped header text
-    col_widths = {1: 6, 2: 14, 3: 16, 4: 15, 5: 18, 6: 18, 7: 18}
+    col_widths = {1: 6, 2: 14, 3: 16, 4: 16, 5: 16, 6: 16, 7: 18, 8: 18, 9: 18}
     for c, w in col_widths.items():
         ws_sum.column_dimensions[get_column_letter(c)].width = w
 
-    ws_sum.merge_cells("A1:G1")
-    ws_sum.merge_cells("A2:G2")
+    ws_sum.merge_cells("A1:I1")
+    ws_sum.merge_cells("A2:I2")
     ws_sum.merge_cells(start_row=max_r, start_column=1, end_row=max_r, end_column=2)
 
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_f:
