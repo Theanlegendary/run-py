@@ -46,10 +46,12 @@ def parse_time(val):
 def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None):
     """
     CEO Executive Penalty Dashboard:
-      - Headers: No | Post Office | RIGHT Handover | RIGHT Delivery | Total Handover | Total Delivery | % RIGHT Handover | % RIGHT Delivery | Total Penalty ($)
-      - Distinct Theme: Deep Midnight Navy (#0B132B) & Royal Sapphire Blue (#1C3D82 / #1E3A8A)
-      - Sheet 1: Left Table = Detailed Active Orders, Right Table = 36-Branch Executive Summary
-      - Sheet 2: base = Raw Audit Dataset
+      - Sorted: From WORST performing branch (% On-Time) to BEST
+      - Dynamic Font Coloring on % Columns:
+          * < 75.0%: Bold Red (#DC2626)
+          * 75.0% - 89.9%: Bold Amber (#D97706)
+          * >= 90.0%: Bold Green (#16A34A)
+      - Exact 9 Columns: No | Post Office | RIGHT Handover | RIGHT Delivery | Total Handover | Total Delivery | % RIGHT Handover | % RIGHT Delivery | Total Penalty ($)
     """
     os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
     df = pd.read_excel(src_xlsx)
@@ -274,6 +276,23 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     font_bold_data = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")
     font_tot = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
 
+    # Font colors for % on-time metrics
+    font_pct_green = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A") # >= 90%
+    font_pct_amber = Font(name="Segoe UI", size=8.5, bold=True, color="D97706") # 75% - 89.9%
+    font_pct_red   = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # < 75%
+
+    font_tot_pct_green = Font(name="Segoe UI", size=9.5, bold=True, color="16A34A")
+    font_tot_pct_amber = Font(name="Segoe UI", size=9.5, bold=True, color="D97706")
+    font_tot_pct_red   = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626")
+
+    def get_pct_font(pct_val, is_tot=False):
+        if pct_val >= 90.0:
+            return font_tot_pct_green if is_tot else font_pct_green
+        elif pct_val >= 75.0:
+            return font_tot_pct_amber if is_tot else font_pct_amber
+        else:
+            return font_tot_pct_red if is_tot else font_pct_red
+
     date_str = today.strftime('%d/%m/%Y')
 
     # 1. Left Title Banner
@@ -284,7 +303,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         ws1.cell(1, c).fill = fill_title_left
     ws1.row_dimensions[1].height = 26.0
 
-    # 2. Right Title Banner (Exact user format: Cols J to R)
+    # 2. Right Title Banner (Cols J to R)
     ws1.merge_cells("J1:R1")
     ws1.cell(1, 10, f"EXECUTIVE PENALTY DASHBOARD ({tgt})").font = font_banner
     ws1.cell(1, 10).alignment = Alignment(horizontal="center", vertical="center")
@@ -298,7 +317,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         ws1.cell(2, c).fill = fill_sub_right
     ws1.row_dimensions[2].height = 18.0
 
-    # Row 3: Headers (Exact User Header Layout)
+    # Row 3: Headers
     headers_left = [
         "No", "Order Number", "Customer", "Post Office",
         "Status", "Type", "Age (Days)", "Penalty Fine ($)"
@@ -368,6 +387,23 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # Populate Right Executive Summary Table
+    # SORT FROM WORSE TO BEST (% ON-TIME ASCENDING)
+    def calc_sort_key(stats):
+        tot_ops = stats["total_handover"] + stats["total_delivery"]
+        r_ho = max(0, stats["total_handover"] - stats["penalty_handover"])
+        r_del = max(0, stats["total_delivery"] - stats["penalty_delivery"])
+        tot_r = r_ho + r_del
+        overall_pct = (tot_r / tot_ops * 100.0) if tot_ops > 0 else 100.0
+        # Worse first: lowest overall_pct, then largest fine (descending), then volume
+        return (overall_pct, -stats["total_fine"], -tot_ops)
+
+    if tgt in ("ALL", "TOTAL"):
+        all_branches = [summary_data[b] for b in MAIN_36_BRANCHES if b in summary_data]
+    else:
+        all_branches = list(summary_data.values())
+
+    sorted_branches = sorted(all_branches, key=calc_sort_key)
+
     r_sum = 4
     n_idx = 1
     tot_ho = 0
@@ -375,11 +411,6 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     tot_pen_ho = 0
     tot_pen_del = 0
     tot_fine = 0.0
-
-    if tgt in ("ALL", "TOTAL"):
-        sorted_branches = [summary_data[b] for b in MAIN_36_BRANCHES if b in summary_data]
-    else:
-        sorted_branches = sorted(summary_data.values(), key=lambda x: x["po"])
 
     for stats in sorted_branches:
         ws1.row_dimensions[r_sum].height = 18.0
@@ -405,9 +436,19 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         ]
         for ci, val in enumerate(s_vals, 10):
             cell = ws1.cell(r_sum, ci, val)
-            cell.font = font_bold_data if ci in (11, 18) else font_data
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = border_clean
+            
+            # Dynamic Font Coloring on % Columns
+            if ci == 16: # % RIGHT Handover
+                cell.font = get_pct_font(pct_r_ho)
+            elif ci == 17: # % RIGHT Delivery
+                cell.font = get_pct_font(pct_r_del)
+            elif ci in (11, 18):
+                cell.font = font_bold_data
+            else:
+                cell.font = font_data
+
             if r_sum % 2 == 0:
                 cell.fill = fill_row_alt
 
@@ -446,7 +487,15 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         cell = ws1.cell(r_sum, c)
         if c >= 12:
             cell.value = tot_vals_right[c-10]
-        cell.font = font_tot
+        
+        # Color Grand Total %
+        if c == 16:
+            cell.font = get_pct_font(tot_pct_r_ho, is_tot=True)
+        elif c == 17:
+            cell.font = get_pct_font(tot_pct_r_del, is_tot=True)
+        else:
+            cell.font = font_tot
+
         cell.fill = fill_sum_tot
         cell.border = tot_border_accounting
         cell.alignment = Alignment(horizontal="center", vertical="center")
