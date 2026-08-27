@@ -1682,9 +1682,7 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
             log.warning("Could not render speed summary image: %s", e_img)
 
         # 2. Send Excel Document (Sheet 1: Summary Table, Sheet 2: base dataset)
-        fast_pct = ((tot_u2 + tot_24) / tot_del * 100) if tot_del > 0 else 0
-        caption = f"⏱️ *FAST DELIVERY SPEED REPORT ({target_label.upper()})*\n📦 Total Delivered: `{tot_del}`\n🟢 < 2 Hours (+50%): `{tot_u2}`\n🔵 2 - 4 Hours (+25%): `{tot_24}`\n🔴 > 8 Hours (-25%): `{tot_o8}`\n⚡ Fast Rate (<4h): `{fast_pct:.1f}%`\n💵 Total Commission: `${tot_pay:.2f}`"
-        await send_requester_document(update, context, out_xlsx, filename=os.path.basename(out_xlsx), caption=caption)
+        await send_requester_document(update, context, out_xlsx, filename=os.path.basename(out_xlsx))
         await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent FAST DELIVERY SPEED REPORT ({target_label}).")
     except Exception as e:
         log.exception("Error in /speed command: %s", e)
