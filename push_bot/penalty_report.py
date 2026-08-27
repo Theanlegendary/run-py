@@ -45,13 +45,11 @@ def parse_time(val):
 
 def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None):
     """
-    CEO Executive Penalty Dashboard:
-      - Sorted: From WORST performing branch (% On-Time) to BEST
-      - Dynamic Font Coloring on % Columns:
-          * < 75.0%: Bold Red (#DC2626)
-          * 75.0% - 89.9%: Bold Amber (#D97706)
-          * >= 90.0%: Bold Green (#16A34A)
-      - Exact 9 Columns: No | Post Office | RIGHT Handover | RIGHT Delivery | Total Handover | Total Delivery | % RIGHT Handover | % RIGHT Delivery | Total Penalty ($)
+    Sleek CEO Executive Penalty Dashboard:
+      - 2-line wrapped clean headers (No overlap)
+      - Soft elegant Slate/Navy theme with clean readability
+      - Sorted: Worst on-time % to Best on-time %
+      - Text color on %: Green (>=90%), Amber (75-89%), Red (<75%)
     """
     os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
     df = pd.read_excel(src_xlsx)
@@ -250,23 +248,23 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     ws1.title = "INVENTORY PENALTY REPORT"
     ws1.views.sheetView[0].showGridLines = True
 
-    # ── CEO MIDNIGHT & ROYAL SAPPHIRE BLUE PALETTE ──
-    fill_title_left   = PatternFill("solid", fgColor="0B132B") # Deepest Midnight Navy
-    fill_hdr_left     = PatternFill("solid", fgColor="1C2541") # Midnight Slate
-    fill_title_right  = PatternFill("solid", fgColor="0B132B") # Deepest Midnight Navy
-    fill_sub_right    = PatternFill("solid", fgColor="1C2541") # Subtitle Midnight Slate
-    fill_hdr_right    = PatternFill("solid", fgColor="1C3D82") # Royal Sapphire Blue Header
-    fill_row_alt      = PatternFill("solid", fgColor="F8FAFC") # Clean Soft Zebra
+    # ── SLEEK EXECUTIVE NAVY / SLATE PALETTE ──
+    fill_title_left   = PatternFill("solid", fgColor="0F172A") # Midnight Navy
+    fill_hdr_left     = PatternFill("solid", fgColor="1E293B") # Executive Slate
+    fill_title_right  = PatternFill("solid", fgColor="0F172A") # Midnight Navy
+    fill_sub_right    = PatternFill("solid", fgColor="1E293B") # Slate Subtitle
+    fill_hdr_right    = PatternFill("solid", fgColor="1E3A8A") # Royal Navy Header
+    fill_row_alt      = PatternFill("solid", fgColor="F8FAFC") # Soft Clean Zebra
     fill_left_tot     = PatternFill("solid", fgColor="E2E8F0") # Soft Slate Total
-    fill_sum_tot      = PatternFill("solid", fgColor="E2E8F0") # Executive Accounting Total
+    fill_sum_tot      = PatternFill("solid", fgColor="F1F5F9") # Executive Accounting Total
 
     border_clean = Border(
-        left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
-        top=Side(style="thin", color="CBD5E1"), bottom=Side(style="thin", color="CBD5E1")
+        left=Side(style="thin", color="E2E8F0"), right=Side(style="thin", color="E2E8F0"),
+        top=Side(style="thin", color="E2E8F0"), bottom=Side(style="thin", color="E2E8F0")
     )
     tot_border_accounting = Border(
         left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
-        top=Side(style="thin", color="64748B"), bottom=Side(style="double", color="0B132B")
+        top=Side(style="thin", color="94A3B8"), bottom=Side(style="double", color="0F172A")
     )
 
     font_banner = Font(name="Segoe UI", size=10.5, bold=True, color="FFFFFF")
@@ -317,29 +315,29 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         ws1.cell(2, c).fill = fill_sub_right
     ws1.row_dimensions[2].height = 18.0
 
-    # Row 3: Headers
+    # Row 3: Clean Wrapped Headers (2-Line format to ensure NO overlap in rendering)
     headers_left = [
         "No", "Order Number", "Customer", "Post Office",
         "Status", "Type", "Age (Days)", "Penalty Fine ($)"
     ]
     headers_right = [
-        "No", "Post Office", "RIGHT Handover", "RIGHT Delivery",
-        "Total Handover", "Total Delivery", "% RIGHT Handover", "% RIGHT Delivery", "Total Penalty ($)"
+        "No", "Post Office", "RIGHT\nHandover", "RIGHT\nDelivery",
+        "Total\nHandover", "Total\nDelivery", "% RIGHT\nHandover", "% RIGHT\nDelivery", "Total\nPenalty ($)"
     ]
 
-    ws1.row_dimensions[3].height = 25.0
+    ws1.row_dimensions[3].height = 32.0
     for ci, h in enumerate(headers_left, 1):
         cell = ws1.cell(3, ci, h)
         cell.font = font_hdr
         cell.fill = fill_hdr_left
-        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = border_clean
 
     for ci, h in enumerate(headers_right, 10):
         cell = ws1.cell(3, ci, h)
         cell.font = font_hdr
         cell.fill = fill_hdr_right
-        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = border_clean
 
     # Populate Left Detail Order Rows
@@ -394,7 +392,6 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         r_del = max(0, stats["total_delivery"] - stats["penalty_delivery"])
         tot_r = r_ho + r_del
         overall_pct = (tot_r / tot_ops * 100.0) if tot_ops > 0 else 100.0
-        # Worse first: lowest overall_pct, then largest fine (descending), then volume
         return (overall_pct, -stats["total_fine"], -tot_ops)
 
     if tgt in ("ALL", "TOTAL"):
@@ -504,7 +501,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     col_widths = {
         1: 5, 2: 15, 3: 20, 4: 12, 5: 18, 6: 10, 7: 12, 8: 15,
         9: 4,
-        10: 6, 11: 14, 12: 16, 13: 16, 14: 16, 15: 16, 16: 18, 17: 18, 18: 18
+        10: 6, 11: 14, 12: 14, 13: 14, 14: 14, 15: 14, 16: 16, 17: 16, 18: 16
     }
     for c, w in col_widths.items():
         ws1.column_dimensions[get_column_letter(c)].width = w
@@ -593,9 +590,13 @@ def render_penalty_summary_image(out_xlsx):
                 cell_tgt.fill = copy.copy(cell_orig.fill)
                 cell_tgt.border = copy.copy(cell_orig.border)
                 cell_tgt.alignment = copy.copy(cell_orig.alignment)
+            
+            # Explicitly enforce clean center wrap on headers
+            if r == 3:
+                cell_tgt.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-    # Wide column dimensions for crisp unclipped header text
-    col_widths = {1: 6, 2: 14, 3: 16, 4: 16, 5: 16, 6: 16, 7: 18, 8: 18, 9: 18}
+    # Clean spacious column widths for perfect rendering
+    col_widths = {1: 6, 2: 14, 3: 13, 4: 13, 5: 13, 6: 13, 7: 15, 8: 15, 9: 16}
     for c, w in col_widths.items():
         ws_sum.column_dimensions[get_column_letter(c)].width = w
 
