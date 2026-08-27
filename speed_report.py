@@ -9,6 +9,32 @@ from openpyxl.utils import get_column_letter
 import pandas as pd
 import excel_to_image
 
+MAIN_36_BRANCHES = [
+    'BANP001', 'BATP001', 'CHAP001', 'CHHP001', 'KAMP001', 'KANP001', 'KOHP001', 'KRAP001',
+    'MONP001', 'ODDP001', 'PNPP001', 'PNPP002', 'PNPP003', 'PNPP004', 'PNPP005', 'PNPP006',
+    'PNPP007', 'PNPP008', 'PNPP009', 'PNPP010', 'PNPP011', 'PNPP012', 'PNPP013', 'PNPP014',
+    'PREP001', 'PRHP001', 'PURP001', 'ROTP001', 'SIEP001', 'SIHP001', 'SPEP001', 'STUP001',
+    'SVAP001', 'TAKP001', 'TBKP001', 'THOP001'
+]
+
+def rollup_to_main_branch(po_code):
+    p = str(po_code).upper().strip()
+    if p in MAIN_36_BRANCHES:
+        return p
+    if p.startswith('PNPP'):
+        return p if p in MAIN_36_BRANCHES else 'PNPP014'
+    if p.startswith('PNPA') or p.startswith('PNPS'):
+        return 'PNPP001'
+    if p.startswith('PAI'):
+        return 'BATP001'
+    if p.startswith('KEP'):
+        return 'KAMP001'
+    prefix3 = p[:3]
+    cand = f'{prefix3}P001'
+    if cand in MAIN_36_BRANCHES:
+        return cand
+    return None
+
 def parse_date(val):
     if not val or pd.isna(val):
         return None
@@ -36,12 +62,6 @@ def parse_time(val):
     return None
 
 def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None):
-    """
-    Builds the Fast Delivery Speed Bonus Report (/tomorrow layout):
-      - Duration calculated from Branch Arrival / Handover (Status 306) to Delivered (Status 410)
-      - Sheet 1: Left Table = Detailed Delivery Bills, Right Table = Executive Summary Table
-      - Sheet 2: base = Complete raw audit dataset
-    """
     os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
     df = pd.read_excel(src_xlsx)
     df.columns = [str(c).strip().upper() for c in df.columns]
@@ -56,7 +76,6 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     col_receiver = next((c for c in df.columns if 'RECEIVER' in c), 'RECEIVER')
     col_action_time = next((c for c in df.columns if 'ACTION TIME' in c or 'CURRENT TIME' in c), 'CURRENT TIME')
     
-    # Accurate Branch Arrival / Handover columns
     col_306_last = next((c for c in df.columns if '306' in c and ('STORE' in c or 'AGENT' in c) and 'LAST' in c), None)
     col_306_first = next((c for c in df.columns if '306' in c and ('STORE' in c or 'AGENT' in c or 'HUB' in c)), None)
     col_400_time = next((c for c in df.columns if '400' in c or 'OUT' in c or 'ASSIGN' in c), None)
@@ -112,20 +131,39 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             delivered_df = delivered_df[delivered_df['deliv_date'] == latest_date].copy()
 
     summary_data = {}
+    if tgt in ("ALL", "TOTAL"):
+        for b in MAIN_36_BRANCHES:
+            summary_data[b] = {
+                "po": b,
+                "total_delivered": 0,
+                "under_2h": 0,
+                "between_2_4h": 0,
+                "between_4_8h": 0,
+                "over_8h": 0,
+                "total_commission": 0.0
+            }
+
     base_rows = []
     r_idx = 1
 
     for idx, row in delivered_df.iterrows():
         deliv_po = str(row.get('deliv_po_clean', '')).strip()
         curr_po = str(row.get('curr_po_clean', '')).strip()
+        raw_po = deliv_po if deliv_po and deliv_po != 'NAN' else curr_po
 
-        po = tgt if (tgt not in ("ALL", "TOTAL") and len(tgt) >= 7) else (deliv_po if deliv_po and deliv_po != 'NAN' else curr_po)
-
-        if not po or po == 'NAN':
+        if not raw_po or raw_po == 'NAN':
             continue
 
-        if tgt not in ("ALL", "TOTAL") and len(tgt) >= 7 and po != tgt:
-            continue
+        if tgt in ("ALL", "TOTAL"):
+            po = rollup_to_main_branch(raw_po)
+            if not po:
+                continue
+        elif len(tgt) >= 7:
+            po = tgt
+            if raw_po != tgt:
+                continue
+        else:
+            po = raw_po
 
         if po not in summary_data:
             summary_data[po] = {
@@ -141,7 +179,6 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         order_id = str(row.get(col_order, '')).strip()
         t410 = parse_time(row.get(col_action_time)) or parse_time(row.get(col_created))
         
-        # Determine exact Branch Handover / Arrival time
         t_start = None
         if col_306_last and pd.notna(row.get(col_306_last)):
             t_start = parse_time(row.get(col_306_last))
@@ -224,16 +261,16 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     ws1.title = "DELIVERY SPEED REPORT"
     ws1.views.sheetView[0].showGridLines = True
 
-    fill_title_left  = PatternFill("solid", fgColor="0F172A") # Deep Slate Navy
-    fill_hdr_left    = PatternFill("solid", fgColor="1E293B") # Executive Navy Slate
-    fill_title_right = PatternFill("solid", fgColor="0F766E") # Deep Teal Slate
-    fill_hdr_right   = PatternFill("solid", fgColor="0F766E") # Deep Teal Slate
-    fill_row_alt     = PatternFill("solid", fgColor="F8FAFC") # Subtle Zebra Tint
-    fill_left_tot    = PatternFill("solid", fgColor="CBD5E1") # Refined Slate Grey Total
-    fill_sum_tot     = PatternFill("solid", fgColor="DCFCE7") # Light Green Total
-    green_fill       = PatternFill("solid", fgColor="DCFCE7") # Light Green
-    blue_fill        = PatternFill("solid", fgColor="EFF6FF") # Light Blue
-    red_fill         = PatternFill("solid", fgColor="FEE2E2") # Light Red
+    fill_title_left  = PatternFill("solid", fgColor="0F172A")
+    fill_hdr_left    = PatternFill("solid", fgColor="1E293B")
+    fill_title_right = PatternFill("solid", fgColor="0F766E")
+    fill_hdr_right   = PatternFill("solid", fgColor="0F766E")
+    fill_row_alt     = PatternFill("solid", fgColor="F8FAFC")
+    fill_left_tot    = PatternFill("solid", fgColor="CBD5E1")
+    fill_sum_tot     = PatternFill("solid", fgColor="DCFCE7")
+    green_fill       = PatternFill("solid", fgColor="DCFCE7")
+    blue_fill        = PatternFill("solid", fgColor="EFF6FF")
+    red_fill         = PatternFill("solid", fgColor="FEE2E2")
 
     border_clean = Border(
         left=Side(style="thin", color="E2E8F0"), right=Side(style="thin", color="E2E8F0"),
@@ -353,7 +390,11 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     tot_o8 = 0
     tot_pay = 0.0
 
-    sorted_branches = sorted(summary_data.values(), key=lambda x: x["po"])
+    if tgt in ("ALL", "TOTAL"):
+        sorted_branches = [summary_data[b] for b in MAIN_36_BRANCHES if b in summary_data]
+    else:
+        sorted_branches = sorted(summary_data.values(), key=lambda x: x["po"])
+
     for stats in sorted_branches:
         ws1.row_dimensions[r_sum].height = 18.0
         s_vals = [
@@ -402,15 +443,13 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
     col_widths = {
         1: 5, 2: 15, 3: 20, 4: 12, 5: 12, 6: 12, 7: 18, 8: 14,
-        9: 4, # Gap
+        9: 4,
         10: 5, 11: 12, 12: 13, 13: 14, 14: 14, 15: 14, 16: 14, 17: 15
     }
     for c, w in col_widths.items():
         ws1.column_dimensions[get_column_letter(c)].width = w
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # SHEET 2: base
-    # ─────────────────────────────────────────────────────────────────────────────
+    # Sheet 2: base
     ws2 = wb.create_sheet(title="base")
     ws2.views.sheetView[0].showGridLines = True
 
@@ -471,7 +510,6 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
 
 def render_speed_summary_image(out_xlsx):
-    """Renders ONLY the right Executive Summary Table as a crisp PNG image (matching /tomorrow)."""
     wb = openpyxl.load_workbook(out_xlsx)
     ws = wb['DELIVERY SPEED REPORT']
 
