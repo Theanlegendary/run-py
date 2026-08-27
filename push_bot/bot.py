@@ -1643,8 +1643,7 @@ async def cmd_penalty(update: Update, context: ContextTypes.DEFAULT_TYPE):
             log.warning("Could not render penalty summary image: %s", e_img)
 
         # 2. Send Excel Document (Sheet 1: Summary Table, Sheet 2: base dataset)
-        caption = f"📊 *INVENTORY PENALTY REPORT ({target_label.upper()})*\n📦 Handover Bills: `{tot_ho}`\n🚚 Delivery Bills: `{tot_del}`\n⚠️ Penalized Bills: `{tot_pen_cnt}`\n💰 Total Fine: `-${tot_fine:.2f}`\n\n_• Excused Green: 420, 472 ($0 fine)_\n_• SLA Penalty: 1-2d (-$0.10), >3d (-$0.40)_"
-        await send_requester_document(update, context, out_xlsx, filename=os.path.basename(out_xlsx), caption=caption)
+        await send_requester_document(update, context, out_xlsx, filename=os.path.basename(out_xlsx))
         await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent INVENTORY PENALTY REPORT ({target_label}).")
     except Exception as e:
         log.exception("Error in /penalty command: %s", e)
