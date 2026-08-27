@@ -17,24 +17,6 @@ MAIN_36_BRANCHES = [
     'SVAP001', 'TAKP001', 'TBKP001', 'THOP001'
 ]
 
-def rollup_to_main_branch(po_code):
-    p = str(po_code).upper().strip()
-    if p in MAIN_36_BRANCHES:
-        return p
-    if p.startswith('PNPP'):
-        return p if p in MAIN_36_BRANCHES else 'PNPP014'
-    if p.startswith('PNPA') or p.startswith('PNPS'):
-        return 'PNPP001'
-    if p.startswith('PAI'):
-        return 'BATP001'
-    if p.startswith('KEP'):
-        return 'KAMP001'
-    prefix3 = p[:3]
-    cand = f'{prefix3}P001'
-    if cand in MAIN_36_BRANCHES:
-        return cand
-    return None
-
 def parse_date(val):
     if not val or pd.isna(val):
         return None
@@ -151,10 +133,11 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         if not raw_po or raw_po == 'NAN':
             continue
 
+        # STRICT FILTER: Strictly 36 Main Post Offices, Exclude Agents (*A*) and Showrooms (*S*)
         if tgt in ("ALL", "TOTAL"):
-            po = rollup_to_main_branch(raw_po)
-            if not po:
+            if raw_po not in MAIN_36_BRANCHES:
                 continue
+            po = raw_po
         elif len(tgt) >= 7:
             po = tgt
             if raw_po != tgt:
