@@ -19,10 +19,12 @@ SUMMARY_HEADER_KHMER = {
     "Pickup": "ត្រូវយក",
     "Delivery": "ត្រូវដឹក",
     "Pending": "កំពុងរង់ចាំ",
-    "Transit": "ដាក់ទៅ MEGA",
-    "Branch": "មិនទាន់ចាត់",
-    "Send Mega": "ដាក់ទៅ MEGA",
-    "Not Assign": "មិនទាន់ចាត់",
+    "Transit": "ប្រគល់ទៅ MEGA",
+    "Branch": "ចាត់តាំងដឹក",
+    "Send Mega": "ប្រគល់ទៅ MEGA",
+    "Not Assign": "ចាត់តាំងដឹក",
+    "Handover to Mega": "ប្រគល់ទៅ MEGA",
+    "Assign Deliver": "ចាត់តាំងដឹក",
     "TOTAL": "សរុប",
     "> 1 Day": "> 1 ថ្ងៃ",
     "> 3 Days": "> 3 ថ្ងៃ",
@@ -30,7 +32,7 @@ SUMMARY_HEADER_KHMER = {
     "U.Delivery": "ប្រញាប់.ដឹក",
     "U.Pending": "ប្រញាប់.រង់ចាំ",
     "U.Transit": "ប្រញាប់.MEGA",
-    "U.Branch": "ប្រញាប់.មិនចាត់",
+    "U.Branch": "ប្រញាប់.ចាត់ដឹក",
     "GRAND TOTAL": "សរុបទាំងអស់"
 }
 
@@ -223,7 +225,7 @@ def build_summary_image(
     W_HANDLE = max(W_HANDLE, 80 * sc)
     W_ZONE   = max(_tw(draw, "Zone 5", fn_b) + PAD * 2, 54 * sc) if show_zone_col else 0
 
-    W_NUM    = max(_tw(draw, h, fn_b) for h in ["Pickup", "Delivery", "Transit", "Branch", "VIP", "TOTAL"]) + PAD * 2
+    W_NUM    = max(_tw(draw, h, fn_b) for h in ["Delivery", "Assign Deliver", "Pickup", "Handover to Mega", "VIP", "TOTAL"]) + PAD * 2
     W_NUM    = max(W_NUM, 56 * sc)
 
     W_DATE   = max(_tw(draw, "00", fn_b) + PAD * 2, 32 * sc)
@@ -231,8 +233,8 @@ def build_summary_image(
     W_URGENT_3 = max(_tw(draw, "> 3 Days", fn_sm) + PAD * 2, 56 * sc)
     W_U_COL  = max(_tw(draw, "U.Delivery", fn_sm) + PAD * 2, 48 * sc)
 
-    # Column order: [ZONE] | Handle | Pickup | Delivery | Transit | Branch | [VIP] | [dates…] | TOTAL | [Fee | COD] | > 1 Day | > 3 Days
-    fixed_cols  = (["ZONE"] if show_zone_col else []) + ["HANDLE", "Pickup", "Delivery", "Transit", "Branch"]
+    # Column order: [ZONE] | Handle | Delivery | Assign Deliver | Pickup | Handover to Mega | [VIP] | [dates…] | TOTAL | [Fee | COD] | > 1 Day | > 3 Days
+    fixed_cols  = (["ZONE"] if show_zone_col else []) + ["HANDLE", "Delivery", "Assign Deliver", "Pickup", "Handover to Mega"]
     if vip_counts is not None:
         fixed_cols.append("VIP")
     date_labels = [f"{d.day:02d}" for d in all_dates]
@@ -395,10 +397,10 @@ def build_summary_image(
         z_str  = resolve_zone(handle) if show_zone_col else None
         cells  = (([z_str] if show_zone_col else []) +
                   [handle,
-                   str(pickup)   if pickup   else "",
                    str(delivery) if delivery else "",
-                   str(transit)  if transit  else "",
-                   str(branch)   if branch   else ""])
+                   str(branch)   if branch   else "",
+                   str(pickup)   if pickup   else "",
+                   str(transit)  if transit  else ""])
 
         fgs    = (([C_HANDLE_FG] if show_zone_col else []) +
                   [C_HANDLE_FG,
@@ -502,10 +504,10 @@ def build_summary_image(
 
     gt_cells  = ([""] if show_zone_col else []) + [
                  "GRAND TOTAL",
-                 str(g_pickup)   if g_pickup   else "",
                  str(g_delivery) if g_delivery else "",
-                 str(g_transit)  if g_transit  else "",
-                 str(g_branch)   if g_branch   else ""]
+                 str(g_branch)   if g_branch   else "",
+                 str(g_pickup)   if g_pickup   else "",
+                 str(g_transit)  if g_transit  else ""]
 
     if vip_counts is not None:
         g_vip = sum((vip_counts or {}).values())
@@ -657,11 +659,13 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
     from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
     from openpyxl.utils import get_column_letter
 
-    REPORT_ORDER = ['Delivery', 'Not Assign', 'Pickup', 'Send Mega']
+    REPORT_ORDER = ['Delivery', 'Assign Deliver', 'Pickup', 'Handover to Mega']
     REPORT_COLS = {
         'Pickup':   ['ZONE', 'POST OFFICE HANDLE', 'CURRENT POST OFFICE', 'ORDER ID', 'Cus name', 'Phone'],
         'Delivery': ['ZONE', 'POST OFFICE HANDLE', 'CURRENT POST OFFICE', 'ORDER ID', 'RECEIVER', 'VIP', 'STATUS_CODE', 'NEXT_STEP', 'TOTAL FEE (USD)', 'COD (USD)', 'Age', '10H KPI'],
+        'Handover to Mega': ['ZONE', 'POST OFFICE HANDLE', 'CURRENT POST OFFICE', 'ORDER ID', 'STATUS_CODE', 'NEXT_STEP'],
         'Send Mega':  ['ZONE', 'POST OFFICE HANDLE', 'CURRENT POST OFFICE', 'ORDER ID', 'STATUS_CODE', 'NEXT_STEP'],
+        'Assign Deliver': ['ZONE', 'POST OFFICE HANDLE', 'CURRENT POST OFFICE', 'ORDER ID', 'RECEIVER', 'VIP', 'STATUS_CODE', 'NEXT_STEP', 'TOTAL FEE (USD)', 'COD (USD)', 'Age', '10H KPI'],
         'Not Assign': ['ZONE', 'POST OFFICE HANDLE', 'CURRENT POST OFFICE', 'ORDER ID', 'RECEIVER', 'VIP', 'STATUS_CODE', 'NEXT_STEP', 'TOTAL FEE (USD)', 'COD (USD)', 'Age', '10H KPI'],
     }
 
@@ -722,7 +726,9 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
         current_row = 1
 
         internal_key_map = {
+            'Assign Deliver': 'Branch',
             'Not Assign': 'Branch',
+            'Handover to Mega': 'Transit',
             'Send Mega': 'Transit',
             'Delivery': 'Delivery',
             'Pickup': 'Pickup',
@@ -744,12 +750,13 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
             if col not in df.columns:
                 df[col] = ''
 
-        if date_col in df.columns:
+        # Map dates to day columns
+        if '_scan_date' in df.columns and df['_scan_date'].notna().any():
+            df['_date'] = df['_scan_date']
+        elif date_col in df.columns:
             parsed = pd.to_datetime(df[date_col], dayfirst=True, format='mixed', errors='coerce')
-            df = df.copy()
             df['_date'] = parsed.dt.date
         else:
-            df = df.copy()
             df['_date'] = None
 
         dates_present = set(df['_date'].dropna().unique())
@@ -757,7 +764,7 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
         dates_present.add(datetime.now().date())
         active_days = [d for d in day_cols if d in dates_present]
 
-        if rn in ('Delivery', 'Not Assign'):
+        if rn in ('Delivery', 'Assign Deliver', 'Not Assign'):
             kpi_res = df.apply(lambda row: compute_kpi_info(row, age_adjust_hours), axis=1)
             df['Age'] = [r[0] for r in kpi_res]
             df['10H KPI'] = [r[1] for r in kpi_res]

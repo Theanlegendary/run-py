@@ -242,8 +242,8 @@ def extract_total_report_counts(df_detail):
                 "urgent": urgent_cnt,
                 "pickup": hr.get("handle_counts", {}).get("Pickup", 0),
                 "delivery": hr.get("handle_counts", {}).get("Delivery", 0),
-                "transit": hr.get("handle_counts", {}).get("Send Mega", 0),
-                "branch": hr.get("handle_counts", {}).get("Not Assign", 0)
+                "transit": hr.get("handle_counts", {}).get("Handover to Mega", hr.get("handle_counts", {}).get("Send Mega", hr.get("handle_counts", {}).get("Transit", 0))),
+                "branch": hr.get("handle_counts", {}).get("Assign Deliver", hr.get("handle_counts", {}).get("Not Assign", hr.get("handle_counts", {}).get("Branch", 0)))
             }
     except Exception as e:
         pass

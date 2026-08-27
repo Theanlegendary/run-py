@@ -30,10 +30,12 @@ HEADER_KHMER_MAP = {
     'Pending': 'អីវ៉ាន់កំពុងរង់ចាំ (Pending)',
     'Pickup': 'អីវ៉ាន់ត្រូវយក (Pickup)',
     'Delivery': 'អីវ៉ាន់ត្រូវដឹក (Delivery)',
-    'Transit': 'ដាក់ទៅ MEGA (Send Mega)',
-    'Branch': 'មិនទាន់ចាត់តាំង (Not Assign)',
-    'Send Mega': 'ដាក់ទៅ MEGA (Send Mega)',
-    'Not Assign': 'មិនទាន់ចាត់តាំង (Not Assign)',
+    'Transit': 'ប្រគល់ទៅ MEGA (Handover to Mega)',
+    'Branch': 'ចាត់តាំងដឹក (Assign Deliver)',
+    'Send Mega': 'ប្រគល់ទៅ MEGA (Handover to Mega)',
+    'Not Assign': 'ចាត់តាំងដឹក (Assign Deliver)',
+    'Handover to Mega': 'ប្រគល់ទៅ MEGA (Handover to Mega)',
+    'Assign Deliver': 'ចាត់តាំងដឹក (Assign Deliver)',
     'TOTAL FEE (USD)': 'ថ្លៃដឹក (USD)',
     'COD (USD)': 'COD (USD)',
     'STATUS_CODE': 'Status',
@@ -97,7 +99,7 @@ def compute_kpi_info(row):
     return age_with_dot, kpi_target
 
 # ── Status codes ───────────────────────────────────────────────────────────────
-CLASSIFY_LABEL = {'Pickup': 'Pickup', 'Delivery': 'Delivery', 'Pending': 'Pending', 'Transit': 'Transit', 'Branch': 'Branch'}
+CLASSIFY_LABEL = {'Pickup': 'Pickup', 'Delivery': 'Delivery', 'Pending': 'Pending', 'Transit': 'Handover to Mega', 'Branch': 'Assign Deliver'}
 
 # All active report tabs (internal keys)
 ALL_TABS = ['Pickup', 'Delivery', 'Transit', 'Branch']
@@ -108,16 +110,16 @@ CEO_SHEET_ORDER = ['Delivery', 'Branch', 'Pickup', 'Transit']
 # CEO Display Titles for Excel Tabs & Headers
 CEO_DISPLAY_TITLES = {
     'Delivery': 'Delivery',
-    'Branch':   'Not Assign',
+    'Branch':   'Assign Deliver',
     'Pickup':   'Pickup',
-    'Transit':  'Send Mega',
+    'Transit':  'Handover to Mega',
 }
 
 CEO_HEADER_KHMER = {
     'Delivery': 'អីវ៉ាន់ត្រូវដឹក (Delivery)',
-    'Branch':   'មិនទាន់ចាត់តាំង (Not Assign)',
+    'Branch':   'ចាត់តាំងដឹក (Assign Deliver)',
     'Pickup':   'អីវ៉ាន់ត្រូវយក (Pickup)',
-    'Transit':  'ដាក់ទៅ MEGA (Send Mega)',
+    'Transit':  'ប្រគល់ទៅ MEGA (Handover to Mega)',
 }
 
 # Max index cols across all report types (for stacked/long alignment)
@@ -176,18 +178,18 @@ DELIVERY_ACTION_MAP = {
     '500': ('ត្រឡប់', 'ផ្ញើត្រឡប់ទៅហាងផ្ញើ'),
 }
 
-# Transit (Send Mega) — next step is always "Send to Mega" regardless of status
+# Handover to Mega — next step is always "ប្រគល់ទៅ MEGA" regardless of status
 TRANSIT_ACTION_MAP = {
-    '210': ('ដាក់ទៅ', 'ដាក់ទៅ MEGA'),
-    '230': ('ដាក់ទៅ', 'ដាក់ទៅ MEGA'),
-    '300': ('ដាក់ទៅ', 'ដាក់ទៅ MEGA'),
-    '302': ('ដាក់ទៅ', 'ដាក់ទៅ MEGA'),
-    '306': ('ដាក់ទៅ', 'ដាក់ទៅ MEGA'),
-    '310': ('ដាក់ទៅ', 'ដាក់ទៅ MEGA'),
-    '311': ('ដាក់ទៅ', 'ដាក់ទៅ MEGA'),
+    '210': ('ប្រគល់ទៅ', 'ប្រគល់ទៅ MEGA'),
+    '230': ('ប្រគល់ទៅ', 'ប្រគល់ទៅ MEGA'),
+    '300': ('ប្រគល់ទៅ', 'ប្រគល់ទៅ MEGA'),
+    '302': ('ប្រគល់ទៅ', 'ប្រគល់ទៅ MEGA'),
+    '306': ('ប្រគល់ទៅ', 'ប្រគល់ទៅ MEGA'),
+    '310': ('ប្រគល់ទៅ', 'ប្រគល់ទៅ MEGA'),
+    '311': ('ប្រគល់ទៅ', 'ប្រគល់ទៅ MEGA'),
 }
 
-# Branch (Not Assign) — parcels received at branch but not yet assigned to rider
+# Assign Deliver — parcels received at branch but not yet assigned to rider
 NOT_ASSIGN_ACTION_MAP = {
     '306': ('ដឹកជញ្ជូន', 'ចាត់អ្នកដឹក'),
     '309': ('ដឹកជញ្ជូន', 'ចាត់អ្នកដឹក'),
@@ -1045,10 +1047,47 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
     else:
         df['STATUS_CODE'] = ''
 
-    # ========== LIVE API STATUS SYNC (OPTIONAL / LOCAL LOGS ONLY) ==========
+    # ========== STRICT EXCLUDED STATUS SCRAPING / PRE-FILTERING ==========
+    # Scrape all excluded/completed status bills UPFRONT before report generation & comparison
+    excluded_codes = {'99', '100', '201', '410', '520'}
+    excluded_keywords = ['410', '520', 'GIAO THÀNH CÔNG', 'DELIVERED', 'COMPLETED', 'ĐÃ GIAO', 'DA GIAO', 'RETURN COMPLETED']
+    
+    if 'STATUS_CODE' in df.columns:
+        sc_mask = df['STATUS_CODE'].astype(str).str.strip().isin(excluded_codes)
+        df = df[~sc_mask].copy()
+
+    if 'CURRENT STATUS' in df.columns:
+        st_text = df['CURRENT STATUS'].astype(str).str.upper()
+        for kw in excluded_keywords:
+            df = df[~st_text.str.contains(kw.upper(), na=False)].copy()
+
+    # ========== REAL-TIME TRACKING API CROSS-CHECK ==========
+    # The slow export API (tms-report) lags behind the real-time tracking DB.
+    # A bill can be physically delivered (S410/Giao thành công) or returned (S520) on the web/mobile app,
+    # but the export still shows an older pending status.
+    # We query the real-time tracking API for ALL pending bills to exclude all completed/success bills.
     completed_from_sync = set()
     try:
-        # Check local tracking log Excel files if present
+        from downloader import batch_verify_delivered
+        if 'ORDER ID' in df.columns:
+            pending_ids = [
+                normalize_id(v)
+                for v in df['ORDER ID'].dropna().unique()
+                if str(v).strip() and str(v).strip() != 'nan'
+            ]
+            if pending_ids:
+                print(f"[REALTIME CHECK] Cross-checking {len(pending_ids)} pending bills against live tracking API...")
+                import time as _time
+                _t0 = _time.time()
+                confirmed_done = batch_verify_delivered(cfg['api'], pending_ids, max_workers=50, timeout=10)
+                _elapsed = _time.time() - _t0
+                print(f"[REALTIME CHECK] Found {len(confirmed_done)} already-delivered/success bills in {_elapsed:.1f}s — removing from report.")
+                completed_from_sync.update(confirmed_done)
+    except Exception as e_sync:
+        print(f"[REALTIME CHECK] Warning: live cross-check skipped ({e_sync})")
+
+    # Also check local tracking log Excel files as a fallback bonus source
+    try:
         for f_log in glob.glob('*Tracking*Status*Logs*.xlsx') + glob.glob('Bill_Tracking*.xlsx'):
             try:
                 xl_log = pd.ExcelFile(f_log)
@@ -1064,30 +1103,15 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
                                     completed_from_sync.add(normalize_id(oid_str))
             except Exception:
                 pass
-    except Exception as e_sync:
+    except Exception:
         pass
-    # ========== END LIVE API STATUS SYNC ==========
-
-    # ========== STRICT EXCLUDED STATUS SCRAPING / PRE-FILTERING ==========
-    # Scrape all excluded/completed status bills UPFRONT before report generation & comparison
-    excluded_codes = {'99', '100', '201', '410', '520'}
-    excluded_keywords = ['410', '520', 'GIAO THÀNH CÔNG', 'DELIVERED', 'COMPLETED', 'ĐÃ GIAO', 'DA GIAO', 'RETURN COMPLETED']
-    
-    if 'STATUS_CODE' in df.columns:
-        sc_mask = df['STATUS_CODE'].astype(str).str.strip().isin(excluded_codes)
-        df = df[~sc_mask].copy()
-
-    if 'CURRENT STATUS' in df.columns:
-        st_text = df['CURRENT STATUS'].astype(str).str.upper()
-        for kw in excluded_keywords:
-            df = df[~st_text.str.contains(kw.upper(), na=False)].copy()
 
     if completed_from_sync and 'ORDER ID' in df.columns:
         df['_oid_norm'] = df['ORDER ID'].apply(normalize_id)
         df = df[~df['_oid_norm'].isin(completed_from_sync)].copy()
         if '_oid_norm' in df.columns:
             df.drop(columns=['_oid_norm'], inplace=True, errors='ignore')
-    # ========== END STRICT EXCLUDED STATUS SCRAPING ==========
+    # ========== END REAL-TIME TRACKING API CROSS-CHECK ==========
 
     if 'CURRENT POST OFFICE' in df.columns:
         df['_po_key'] = df['CURRENT POST OFFICE'].apply(normalize_code)
@@ -1350,8 +1374,8 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
             df_t['Age'] = [r[0] for r in kpi_res]
             df_t['10H KPI'] = [r[1] for r in kpi_res]
         if rn == 'Transit':
-            # Transit tab next step is always 'ដាក់ទៅ MEGA'
-            df_t['NEXT_STEP'] = 'ដាក់ទៅ MEGA'
+            # Handover to Mega tab next step is always 'ប្រគល់ទៅ MEGA'
+            df_t['NEXT_STEP'] = 'ប្រគល់ទៅ MEGA'
         if rn == 'Branch' and 'STATUS_CODE' in df_t.columns:
             def _branch_next_step(row):
                 sc = str(row.get('STATUS_CODE', '')).strip()
@@ -1545,9 +1569,16 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
         combined_xlsx = os.path.join(output_dir, f"Report_{handle}_{today.strftime('%d_%m_%Y')}.xlsx")
         build_final_excel([(handle, sections)], day_cols, excel_design, combined_xlsx, mode=mode, order_created_map=order_created_map, order_status_map=order_status_map, handle_title=handle)
 
+        display_name_map = {
+            'Delivery': 'Delivery',
+            'Branch': 'Assign Deliver',
+            'Pickup': 'Pickup',
+            'Transit': 'Handover to Mega',
+        }
+        ordered_tabs = ['Delivery', 'Branch', 'Pickup', 'Transit']
         remark = (
             f"{handle}  |  "
-            + "  |  ".join(f"{t}: {counts.get(t,0)}" for t in ALL_TABS)
+            + "  |  ".join(f"{display_name_map.get(t, t)}: {counts.get(t,0)}" for t in ordered_tabs)
             + f"  |  Total: {total_handle}"
         )
 
@@ -1580,7 +1611,7 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
     grand_total = sum(overall.values())
     summary = "\n".join([
         f"📋 Daily Report  {datetime.now().strftime('%d/%m/%Y %H:%M')}",
-        f"Delivery: {overall.get('Delivery',0)}  |  Not Assign: {overall.get('Not Assign',0)}  |  Pickup: {overall.get('Pickup',0)}  |  Send Mega: {overall.get('Send Mega',0)}",
+        f"Delivery: {overall.get('Delivery',0)}  |  Assign Deliver: {overall.get('Branch',0)}  |  Pickup: {overall.get('Pickup',0)}  |  Handover to Mega: {overall.get('Transit',0)}",
         f"Grand Total: {grand_total}",
     ])
 

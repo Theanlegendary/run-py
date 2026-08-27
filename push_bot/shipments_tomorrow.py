@@ -46,6 +46,13 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
         "CHA": "ZONE5", "KRA": "ZONE5", "TBK": "ZONE5", "ROT": "ZONE5", "MON": "ZONE5", "STU": "ZONE5"
     }
 
+    PROVINCIAL_BRANCH_CODES = {
+        'BANP001', 'BATP001', 'CHHP001', 'PURP001', 'SIEP001', 'PRHP001',
+        'ODDP001', 'THOP001', 'SIHP001', 'KOHP001', 'KAMP001', 'SPEP001',
+        'TAKP001', 'TBKP001', 'CHAP001', 'KRAP001', 'STUP001', 'ROTP001',
+        'MONP001', 'PREP001', 'SVAP001', 'PAIP001', 'KEPP001'
+    }
+
     df_active['dest_prov_clean'] = df_active[col_dest_prov].astype(str).str.strip().str.upper()
     df_active['dest_po_clean'] = df_active[col_dest_po].astype(str).str.strip().str.upper()
 
@@ -53,10 +60,15 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
         target_zone_name = tgt if len(tgt) > 4 else "ZONE1"
         df_active['zone'] = df_active['dest_prov_clean'].map(zone_by_prefix).fillna("ZONE1")
         df_matched = df_active[df_active['zone'] == target_zone_name].copy()
+    elif tgt in ("ALL", "TOTAL", "MEGA", "BRANCH", "BRANCHES"):
+        df_matched = df_active.copy()
+    elif tgt in PROVINCIAL_BRANCH_CODES or (len(tgt) == 3 and tgt in zone_by_prefix and tgt not in ("PNP", "KAN")):
+        df_matched = df_active[
+            (df_active['dest_prov_clean'] == tgt[:3]) |
+            (df_active['dest_po_clean'].str.startswith(tgt[:3]))
+        ].copy()
     elif len(tgt) >= 7 or (len(tgt) > 3 and tgt[3:4] in ("P", "A", "S")):
         df_matched = df_active[df_active['dest_po_clean'] == tgt].copy()
-    elif tgt in ("ALL", "TOTAL", "MEGA"):
-        df_matched = df_active.copy()
     else:
         df_matched = df_active[df_active['dest_prov_clean'].str.startswith(tgt[:3])].copy()
 
@@ -118,72 +130,461 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
         vas_code_str = ", ".join(vas_codes)
         vas_khmer_str = ", ".join(vas_khmer_list)
 
-        district_map = {
-            # Phnom Penh (PNP)
-            'PNPA002': 'Boeng Keng Kang', 'PNPP001': 'Boeng Keng Kang', 'PNPP007': 'Boeng Keng Kang', 'PNPS007': 'Boeng Keng Kang',
-            'PNPP005': 'Chbar Ampov', 'PNPP010': 'Chraoy Chongvar', 'PNPP011': 'Dangkao', 'PNPP014': 'Doun Penh',
-            'PNPA016': 'Kamboul', 'PNPP012': 'Kamboul', 'PNPA029': 'Mean Chey', 'PNPA055': 'Mean Chey', 'PNPP002': 'Mean Chey', 'PNPP003': 'Mean Chey',
-            'PNPA028': 'Pou Saen Chey', 'PNPP008': 'Pou Saen Chey', 'PNPP009': 'Pou Saen Chey', 'PNPP004': 'Preaek Pnov',
-            'PNPA040': 'Saen Sokh', 'PNPP013': 'Saen Sokh', 'PNPA036': 'Tuol Kouk', 'PNPP006': 'Tuol Kouk',
+        # Full district lookup — 3-level: exact PO code → 5-char prefix → province fallback
+        DISTRICT_BY_PO = {
+            # ── Phnom Penh (PNP) ──
+            'PNPP001': 'Chamkar Mon',     'PNPP007': 'Boeng Keng Kang',
+            'PNPA002': 'Boeng Keng Kang', 'PNPS007': 'Boeng Keng Kang',
+            'PNPP005': 'Chbar Ampov',     'PNPA005': 'Chbar Ampov',
+            'PNPP010': 'Chraoy Chongvar', 'PNPA010': 'Chraoy Chongvar',
+            'PNPP011': 'Dangkao',         'PNPA011': 'Dangkao',
+            'PNPP014': 'Doun Penh',       'PNPA014': 'Doun Penh',
+            'PNPP012': 'Kamboul',         'PNPA016': 'Kamboul', 'PNPA012': 'Kamboul',
+            'PNPP002': 'Mean Chey',       'PNPP003': 'Mean Chey',
+            'PNPA029': 'Mean Chey',       'PNPA055': 'Mean Chey',
+            'PNPA003': 'Mean Chey',
+            'PNPP008': 'Pou Saen Chey',   'PNPP009': 'Pou Saen Chey',
+            'PNPA028': 'Pou Saen Chey',   'PNPA008': 'Pou Saen Chey',
+            'PNPP004': 'Preaek Pnov',     'PNPA004': 'Preaek Pnov',
+            'PNPP013': 'Saen Sokh',       'PNPA040': 'Saen Sokh', 'PNPA013': 'Saen Sokh',
+            'PNPP006': 'Tuol Kouk',       'PNPA036': 'Tuol Kouk', 'PNPA006': 'Tuol Kouk',
+            'PNPP015': 'Russey Keo',      'PNPA015': 'Russey Keo',
+            'PNPP016': 'Por Senchey',
 
-            # Kandal (KAN)
-            'KANA024': 'Kandal Stueng', 'KANA028': 'Kandal Stueng', 'KANA049': 'Kandal Stueng',
-            'KANS003': 'Kaoh Thum', 'KANA031': 'Khsach Kandal', 'KANA012': 'Kien Svay', 'KANA013': 'Kien Svay',
-            'KANA008': 'Leuk Daek', 'KANS004': 'Mukh Kampul', 'KANA019': 'Ponhea Lueu',
-            'KANA007': "S'ang", 'KANA020': "S'ang", 'KANA026': "S'ang", 'KANA040': 'Sampov Pun',
-            'KANA023': 'Ta Khmau', 'KANP001': 'Ta Khmau',
+            # ── Kandal (KAN) ──
+            'KANP001': 'Ta Khmau',
+            'KANA001': 'Ta Khmau',         'KANA023': 'Ta Khmau',
+            'KANA002': 'Kandal Stueng',    'KANA024': 'Kandal Stueng',
+            'KANA028': 'Kandal Stueng',    'KANA049': 'Kandal Stueng',
+            'KANA003': 'Kaoh Thum',        'KANS003': 'Kaoh Thum',
+            'KANA004': 'Khsach Kandal',    'KANA031': 'Khsach Kandal',
+            'KANA005': 'Kien Svay',        'KANA012': 'Kien Svay',   'KANA013': 'Kien Svay',
+            'KANA006': 'Leuk Daek',        'KANA008': 'Leuk Daek',
+            'KANA007': "S'ang",            'KANA020': "S'ang",       'KANA026': "S'ang",
+            'KANA009': 'Mukh Kampul',      'KANS004': 'Mukh Kampul',
+            'KANA010': 'Ponhea Lueu',      'KANA019': 'Ponhea Lueu',
+            'KANA017': 'Lvea Em',          'KANA018': 'Ang Snuol',
+            'KANA040': 'Sampov Pun',
 
-            # Prey Veng (PRE)
-            'PREA024': 'Ba Phnum', 'PREA023': 'Peam Ro', 'PREA020': 'Preah Sdach', 'PREA029': 'Preah Sdach', 'PREA035': 'Preah Sdach',
-            'PREP001': 'Prey Veng', 'PRES001': 'Prey Veng', 'PREA002': 'Pur Rieng', 'PREA028': 'Sithor Kandal',
+            # ── Prey Veng (PRE) ──
+            'PREP001': 'Prey Veng Town',   'PRES001': 'Prey Veng Town',
+            'PREA001': 'Prey Veng Town',   'PREA014': 'Prey Veng Town',
+            'PREA036': 'Prey Veng Town',
+            'PREA002': 'Pur Rieng',        'PREA016': 'Pur Rieng',
+            'PREA003': 'Ba Phnum',         'PREA024': 'Ba Phnum',
+            'PREA004': 'Kang Meas',        'PREA022': 'Kang Meas',
+            'PREA005': 'Kampong Trabaek',
+            'PREA006': 'Mesang',           'PREA021': 'Mesang',
+            'PREA007': 'Peam Chor',        'PREA026': 'Peam Chor',
+            'PREA008': 'Peam Ro',          'PREA023': 'Peam Ro',   'PREA032': 'Peam Ro',
+            'PREA009': 'Pea Reang',        'PREA039': 'Pea Reang',
+            'PREA010': 'Preah Sdach',      'PREA020': 'Preah Sdach',
+            'PREA029': 'Preah Sdach',      'PREA035': 'Preah Sdach',
+            'PREA030': 'Preah Sdach',      'PREA031': 'Preah Sdach',
+            'PREA011': 'Sithor Kandal',    'PREA028': 'Sithor Kandal',
+            'PREA012': 'Svay Antor',       'PREA025': 'Svay Antor',
+            'PREA013': 'Svay Teab',        'PREA038': 'Svay Teab',
+            'PREA017': 'Kamchay Mear',     'PREA037': 'Kamchay Mear',
+            'PREA033': 'Ba Phnum East',    'PREA034': 'Mesang North',
 
-            # Svay Rieng (SVA)
-            'SVAP001': 'Svay Rieng', 'SVAS002': 'Bavet', 'SVAA001': 'Bavet', 'SVAA002': 'Bavet', 'SVAA003': 'Romeas Haek', 'SVAA004': 'Rumduol', 'SVAA005': 'Svay Chrum',
+            # ── Svay Rieng (SVA) ──
+            'SVAP001': 'Svay Rieng Town',
+            'SVAA001': 'Bavet',            'SVAA002': 'Bavet',   'SVAS002': 'Bavet',
+            'SVAA003': 'Romeas Haek',
+            'SVAA004': 'Rumduol',
+            'SVAA005': 'Svay Chrum',
+            'SVAA006': 'Chantrea',
+            'SVAA007': 'Kampong Rou',
+            'SVAA008': 'Svay Teab (SVA)',
+            'SVAA009': 'Kong Pisei (SVA)',
 
-            # Battambang (BAT)
-            'BATA003': 'Banan', 'BATA016': 'Banan',
-            'BATA001': 'Battambang', 'BATA009': 'Battambang', 'BATA040': 'Battambang', 'BATA042': 'Battambang', 'BATP001': 'Battambang',
-            'BATA011': 'Kamrieng', 'BATS007': 'Moung Ruessei', 'BATA017': 'Samlout',
-            'BATA010': 'Sampov Lun', 'BATA028': 'Sampov Lun', 'BATA004': 'Sangkae', 'BATA008': 'Sangkae',
-            'BATA023': 'Thma Koul', 'BATA025': 'Thma Koul',
+            # ── Kampot (KAM) ──
+            'KAMP001': 'Kampot Town',
+            'KAMA001': 'Kampot Town',      'KAMA002': 'Angkor Chey',
+            'KAMA003': 'Banteay Meas',     'KAMA004': 'Chhouk',
+            'KAMA005': 'Dang Tong',        'KAMA006': 'Kampong Trach',
+            'KAMA007': 'Prey Nob (KAM)',   'KAMA008': 'Tuek Chhou',
 
-            # Siem Reap (SIE)
-            'SIEP001': 'Siem Reap', 'SIEA001': 'Angkor Chum', 'SIEA002': 'Angkor Thon', 'SIEA003': 'Banteay Srei', 'SIEA004': 'Chi Kraeng',
+            # ── Koh Kong (KOH) ──
+            'KOHP001': 'Koh Kong Town',
+            'KOHA001': 'Koh Kong Town',    'KOHA002': 'Botum Sakor',
+            'KOHA003': 'Kaoh Sdach',       'KOHA004': 'Mondol Seima',
+            'KOHA005': 'Smach Mean Chey',  'KOHA006': 'Sre Ambel',
+            'KOHA007': 'Thma Bang',        'KOHA008': 'Veal Veng (KOH)',
+            'KOHA009': 'Khiri Sakor',
 
-            # Sihanoukville (SIH)
-            'SIHP001': 'Sihanoukville', 'SIHA001': 'Preah Sihanouk', 'SIHA002': 'Stung Hav', 'SIHA003': 'Kampong Seila'
+            # ── Takeo (TAK) ──
+            'TAKP001': 'Takeo Town',
+            'TAKA001': 'Takeo Town',       'TAKA002': 'Angkor Borei',
+            'TAKA003': 'Bati',             'TAKA004': 'Bokor',
+            'TAKA005': 'Daun Keo',         'TAKA006': 'Kirivong',
+            'TAKA007': 'Prey Kabbas',      'TAKA008': 'Samraong (TAK)',
+            'TAKA009': 'Treang',           'TAKA010': 'Tram Kak',
+
+            # ── Battambang (BAT) ──
+            'BATP001': 'Battambang Town',
+            'BATA001': 'Battambang Town',  'BATA009': 'Battambang Town',
+            'BATA040': 'Battambang Town',  'BATA042': 'Battambang Town',
+            'BATA003': 'Banan',            'BATA016': 'Banan',
+            'BATA011': 'Kamrieng',
+            'BATA017': 'Samlout',
+            'BATA010': 'Sampov Lun',       'BATA028': 'Sampov Lun',
+            'BATA004': 'Sangkae',          'BATA008': 'Sangkae',
+            'BATA023': 'Thma Koul',        'BATA025': 'Thma Koul',
+            'BATS007': 'Moung Ruessei',
+            'BATA002': 'Ek Phnom',         'BATA005': 'Phnom Proek',
+            'BATA006': 'Rotanak Mondol',   'BATA012': 'Maung',
+            'BATA013': 'Ou Reang Ov',      'BATA014': 'Pa Oy',
+
+            # ── Banteay Meanchey (BAN) ──
+            'BANP001': 'Serei Saophoan',
+            'BANA001': 'Serei Saophoan',   'BANA002': 'Mongkol Borei',
+            'BANA003': 'Malai',            'BANA004': 'Ou Chrov',
+            'BANA005': 'Phnom Srok',       'BANA006': 'Poipet',
+            'BANA007': 'Svay Chek',        'BANA008': 'Thma Puok',
+
+            # ── Kampong Cham (CHA) ──
+            'CHAP001': 'Kampong Cham Town',
+            'CHAA001': 'Kampong Cham Town', 'CHAA002': 'Batheay',
+            'CHAA003': 'Chamkar Leu',      'CHAA004': 'Cheung Prey',
+            'CHAA005': 'Dambae',           'CHAA006': 'Kampong Siem',
+            'CHAA007': 'Kang Meas (CHA)',  'CHAA008': 'Koh Sotin',
+            'CHAA009': 'Memot',            'CHAA010': 'Mou Kinnh',
+            'CHAA011': 'Prey Chhor',       'CHAA012': 'Srei Santhor',
+            'CHAA013': 'Stueng Trang',     'CHAA015': 'Tbong Khmum Town',
+            'CHAA017': 'Krouch Chhmar',    'CHAA018': 'Ponhea Kraek',
+            'CHAA019': 'Suong',            'CHAA020': 'Tboung Khmum',
+            'CHAA021': 'Ponhea Kraek West','CHAA022': 'Koh Sotin East',
+            'CHAA023': 'Cheung Prey North','CHAA024': 'Kampong Siem South',
+            'CHAA025': 'Batheay East',
+
+            # ── Siem Reap (SIE) ──
+            'SIEP001': 'Siem Reap Town',
+            'SIEA001': 'Angkor Chum',      'SIEA002': 'Angkor Thon',
+            'SIEA003': 'Banteay Srei',     'SIEA004': 'Chi Kraeng',
+            'SIEA005': 'Kralanh',          'SIEA006': 'Prasat Bakong',
+            'SIEA007': 'Puok',             'SIEA008': 'Soutr Nikom',
+            'SIEA009': 'Srei Snam',        'SIEA010': 'Svay Leu',
+            'SIEA011': 'Varin',
+
+            # ── Sihanoukville (SIH) ──
+            'SIHP001': 'Sihanoukville Town',
+            'SIHA001': 'Preah Sihanouk',   'SIHA002': 'Stung Hav',
+            'SIHA003': 'Kampong Seila',    'SIHA004': 'Prey Nob (SIH)',
+
+            # ── Kampong Chhnang (CHH) ──
+            'CHHP001': 'Kampong Chhnang Town',
+            'CHHA001': 'Kampong Chhnang Town', 'CHHA002': 'Baribour',
+            'CHHA003': 'Chol Kiri',        'CHHA004': 'Kampong Tralach',
+            'CHHA005': 'Kirivong (CHH)',   'CHHA006': 'Oral',
+            'CHHA007': 'Rolea Bier (CHH)', 'CHHA008': 'Sameakki Mean Chey',
+            'CHHA009': 'Tuek Phos',
+
+            # ── Kampong Thom (THO) ──
+            'THOP001': 'Kampong Thom Town',
+            'THOA001': 'Kampong Thom Town', 'THOA002': 'Baray',
+            'THOA003': 'Kampong Svay',     'THOA004': 'Prasat Ballangk',
+            'THOA005': 'Prasat Sambour',   'THOA006': 'Sandan',
+            'THOA007': 'Santuk',           'THOA008': 'Stoung',
+
+            # ── Pursat (PUR) ──
+            'PURP001': 'Pursat Town',
+            'PURA001': 'Pursat Town',      'PURA002': 'Bakan',
+            'PURA003': 'Kandieng',         'PURA004': 'Krakor',
+            'PURA005': 'Phnom Kravanh',    'PURA006': 'Veal Veng (PUR)',
+
+            # ── Kratie (KRA) ──
+            'KRAP001': 'Kratie Town',
+            'KRAA001': 'Kratie Town',      'KRAA002': 'Chhloung',
+            'KRAA003': 'Koh Nhek',         'KRAA004': 'Prek Prasab',
+            'KRAA005': 'Sambour',          'KRAA006': 'Snuol',
+
+            # ── Tbong Khmum (TBK) ──
+            'TBKP001': 'Suong Town',
+            'TBKA001': 'Suong Town',       'TBKA002': 'Krouch Chhmar (TBK)',
+            'TBKA003': 'Memot (TBK)',      'TBKA004': 'Ponhea Kraek (TBK)',
+            'TBKA005': 'Tbaeng Meanchey',  'TBKA006': 'Dambae (TBK)',
+
+            # ── Kampong Speu (SPE) ──
+            'SPEP001': 'Chbar Mon',
+            'SPEA001': 'Chbar Mon',        'SPEA002': 'Basedth',
+            'SPEA003': 'Kong Pisei',       'SPEA004': 'Odong',
+            'SPEA005': 'Phnom Sruoch',     'SPEA006': 'Samraong Tong',
+            'SPEA007': 'Thpong',
+
+            # ── Preah Vihear (PRH) ──
+            'PRHP001': 'Tbeng Meanchey',
+            'PRHA001': 'Tbeng Meanchey',   'PRHA002': 'Chey Saen',
+            'PRHA003': 'Choam Ksan',       'PRHA004': 'Kulen',
+            'PRHA005': 'Rovieng',          'PRHA006': 'Sangkum Thmei',
+            'PRHA007': 'Tbaeng',
+
+            # ── Oddar Meanchey (ODD) ──
+            'ODDP001': 'Samraong (ODD)',
+            'ODDA001': 'Samraong (ODD)',   'ODDA002': 'Anlong Veng',
+            'ODDA003': 'Banteay Ampil',    'ODDA004': 'Chong Kal',
+            'ODDA005': 'Trapeang Prasat',
+
+            # ── Kep (KEP) ──
+            'KEPP001': 'Kep Town',
+            'KEPA001': 'Kep Town',         'KEPA002': 'Damnak Chang Aeur',
+
+            # ── Pailin (PAI) ──
+            'PAIP001': 'Pailin Town',
+            'PAIA001': 'Pailin Town',      'PAIA002': 'Sala Krau',
+
+            # ── Mondulkiri (MON) ──
+            'MONP001': 'Sen Monorom',
+            'MONA001': 'Sen Monorom',      'MONA002': 'Kaoh Nheak',
+            'MONA003': 'Keo Seima',        'MONA004': 'Pech Chreada',
+
+            # ── Ratanakiri (ROT) ──
+            'ROTP001': 'Banlung',
+            'ROTA001': 'Banlung',          'ROTA002': 'Andong Meas',
+            'ROTA003': 'Bar Kaev',         'ROTA004': 'Koun Mom',
+            'ROTA005': 'Lumphat',          'ROTA006': 'O Chum',
+            'ROTA007': 'Ou Ya Dav',        'ROTA008': 'Ta Veng',
+
+            # ── Stung Treng (STU) ──
+            'STUP001': 'Stung Treng Town',
+            'STUA001': 'Stung Treng Town', 'STUA002': 'Sesan',
+            'STUA003': 'Siem Bouk',        'STUA004': 'Siem Pang',
+            'STUA005': 'Thala Barivat',    'STUA006': 'Voeun Sai',
+
+
+            # ── Transit Hubs (not end-delivery) ──
+            'DVCMEGA1': 'MEGA Hub (Transit)',
+            'DVCMEGA2': 'MEGA Hub (Transit)',
+            'PNPMEGA1': 'MEGA Hub PNP (Transit)',
+
+            # ── Banteay Meanchey (BAN) – Agents / Showrooms ──
+            'BANA014': 'Koub',           'BANA015': 'Changha',
+            'BANS002': 'Paoy Paet',
+
+            # ── Battambang (BAT) – Agents / Showrooms ──
+            'BATA007': 'Snoeng',         'BATA015': 'Sdok Pravoek',
+            'BATA018': 'Kampong Lpov',   'BATA019': 'Traeng',
+            'BATA022': 'Bavel',          'BATA027': 'Ou Ta Ki',
+            'BATA037': 'Peam Aek',       'BATA041': 'Moung Ruessei',
+
+            # ── Kampong Cham (CHA) – Agents / Showrooms ──
+            'CHAS002': 'Preak Kak',      'CHAS005': 'Svay Teab',
+
+            # ── Kampong Chhnang (CHH) – Agents / Showrooms ──
+            'CHHA023': 'Rolea Bier',
+
+            # ── Kampot (KAM) – Agents / Showrooms ──
+            'KAMA013': 'Trapeang Reang', 'KAMA020': 'Kampong Trach Khang Kaeut',
+            'KAMA022': 'Praphnum',       'KAMS002': 'Tuk Meas Khang Lech',
+            'KAMS003': 'Satv Pong',
+
+            # ── Kandal (KAN) – Agents / Showrooms ──
+            'KANS001': 'Ta Khmau',       'KANS005': 'Baek Chan',
+
+            # ── Kratie (KRA) – Agents / Showrooms ──
+            'KRAS002': 'Snuol',          'KRAS004': 'Sambour',
+
+            # ── Mondulkiri (MON) – Agents / Showrooms ──
+            'MONA006': 'Srae Ampum',     'MONS001': 'Spean Mean Chey',
+
+            # ── Oddar Meanchey (ODD) – Agents / Showrooms ──
+            'ODDA006': 'Samraong (ODD)', 'ODDA008': 'Kouk Mon',
+
+            # ── Pailin (PAI) – Showrooms ──
+            'PAIS001': 'Pailin Town',
+
+            # ── Phnom Penh (PNP) – Agents / Showrooms ──
+            'PNPA031': 'Dangkao',        'PNPA051': 'Tuek L\'ak',
+            'PNPA088': 'Chaom Chau',
+            'PNPS002': 'Boeng Kak',      'PNPS003': 'Nirouth',
+            'PNPS004': 'Tuek Thla',      'PNPS005': 'Chaom Chau',
+            'PNPS006': 'Srah Chak',      'PNPS008': 'Chaom Chau',
+
+            # ── Prey Veng (PRE) – Agents / Showrooms ──
+            'PREA015': 'Banteay Chakrei','PREA027': 'Chheang Seangkhin',
+            'PRES004': 'Chheu Kach',
+
+            # ── Preah Vihear (PRH) – Agents / Showrooms ──
+            'PRHA008': 'Chamraeun',      'PRHA009': 'S\'ang',
+            'PRHA015': 'Phnum Tbaeng',
+
+            # ── Pursat (PUR) – Agents / Showrooms ──
+            'PURA013': 'Ou Saom',        'PURA015': 'Ou Sandan',
+            'PURS002': 'Boeng Khnar',
+
+            # ── Ratanakiri (ROT) – Agents / Showrooms ──
+            'ROTA009': 'Kachanh',        'ROTA011': 'Chey Otdam',
+            'ROTS001': 'Labansiek',      'ROTS002': 'La Minh',
+
+            # ── Siem Reap (SIE) – Agents / Showrooms ──
+            'SIEA014': 'Chrouy Neang Nguon', 'SIEA022': 'Puok',
+            'SIEA034': 'Anlung Samnar',  'SIEA036': 'Kaev Poar',
+            'SIES001': 'Kouk Chak',      'SIES002': 'Siem Reab',
+            'SIES003': 'Dam Daek',
+
+            # ── Sihanoukville (SIH) – Agents / Showrooms ──
+            'SIHA006': 'Cheung Kou',     'SIHA008': 'Lekh Muoy',
+            'SIHS001': 'Lekh Buon',
+
+            # ── Kampong Speu (SPE) – Agents / Showrooms ──
+            'SPEA009': 'Traeng Trayueng','SPEA010': 'Pneay',
+            'SPEA017': 'Khsem Khsan',    'SPEA020': 'Prey Sralaeng',
+            'SPEA023': 'Trapeang Chou',  'SPES002': 'Snam Krapeu',
+
+            # ── Stung Treng (STU) – Showrooms ──
+            'STUS001': 'Stung Treng Town',
+
+            # ── Svay Rieng (SVA) – Agents ──
+            'SVAA019': 'Svay Chrum',
+
+            # ── Takeo (TAK) – Agents / Showrooms ──
+            'TAKA022': 'Kandoeng',       'TAKA033': 'Prey Kabbas',
+            'TAKS002': 'Ang Ta Saom',
+
+            # ── Tbong Khmum (TBK) – Agents / Showrooms ──
+            'TBKA010': 'Dambae',         'TBKS003': 'Memut',
+            'TBKS004': 'Ampil Ta Pok',
+
+            # ── Kampong Thom (THO) – Agents / Showrooms ──
+            'THOA012': 'Steung Saen',    'THOA015': 'Kampong Chen',
+            'THOA017': 'Steung Saen',    'THOS002': 'Ballang',
+            'THOA011': 'Sala Visai',     'THOA013': 'Chhuk',
+            'THOA014': 'Krava',          'THOA016': 'Chamna Kraom',
+            'THOA018': 'Steung Saen',    'THOS001': 'Prey Ta Hu',
+            'THOS003': 'Kampong Chen',   'THOS004': 'Sandan',
+
+            # ── Kampong Speu (SPE) – Agents / Showrooms (batch 2) ──
+            'SPEA011': 'Rung Roeang',    'SPEA012': 'Amleang',
+            'SPEA014': 'Chambak',        'SPEA015': 'Roleang Kreul',
+            'SPEA019': 'Prey Kmeng',     'SPEA028': 'Veang Chas',
+            'SPEA030': 'Khtum Krang',    'SPEA032': 'Roleang Kreul',
+            'SPES001': 'Rokar Thum',
+
+            # ── Battambang (BAT) – Agents (batch 2) ──
+            'BATA021': 'Preaek Chik',    'BATA026': 'Svay Por',
+            'BATA029': 'Thipakdei',      'BATA030': 'Prey Svay',
+            'BATA035': 'Anlung Vil',     'BATA036': 'Vaot Ta Muem',
+            'BATA038': 'Prey Khpos',     'BATA039': 'Mukh Rea',
+
+            # ── Banteay Meanchey (BAN) – Agents (batch 2) ──
+            'BANA009': 'Chub Vari',      'BANA011': 'Kampong Svay',
+            'BANA016': 'Phnum Lieb',     'BANA020': 'Banteay Neang',
+            'BANA021': 'Banteay Meanchey',
+            'BANS001': 'Ou Ambel',       'BANS003': 'Thma Puok',
+            'BANS004': 'Srah Chik',
+
+            # ── Prey Veng (PRE) – Agents (batch 2) ──
+            'PREA019': 'Kampong Trabaek','PREA041': 'Prey Veng',
+            'PREA043': 'Prey Veng',      'PREA046': 'Prey Veng',
+            'PRES004': 'Chheu Kach',     'PRES005': 'Roka',
+
+            # ── Preah Vihear (PRH) – Agents (batch 2) ──
+            'PRHA013': 'Rummeakney',     'PRHA016': 'Srayang',
+            'PRHS001': 'Kampong Pranak',
+
+            # ── Pursat (PUR) – Agents (batch 2) ──
+            'PURA008': 'Anlung Tnaot',   'PURA009': 'Me Tuek',
+            'PURA014': 'Snam Preah',     'PURA016': 'Ta Lou',
+            'PURA017': 'Boeng Khnar',
+
+            # ── Ratanakiri (ROT) – Agents (batch 2) ──
+            'ROTA014': 'Trapeang Kraham','ROTA016': 'Trapeang Kraham',
+            'ROTA017': 'Srae Angkrong',  'ROTS003': 'Boeng Kansaeng',
+
+            # ── Siem Reap (SIE) – Agents (batch 2) ──
+            'SIEA030': 'Char Chhuk',     'SIEA033': 'Svay Sa',
+            'SIEA035': 'Sla Kram',       'SIEA037': 'Ruessei Lok',
+
+            # ── Sihanoukville (SIH) – Agents (batch 2) ──
+            'SIHA005': 'Andoung Thma',   'SIHA009': 'Stueng Chhay',
+
+            # ── Mondulkiri (MON) – Agents (batch 2) ──
+            'MONA005': 'Pu Chrey',       'MONA007': 'Srae Khtum',
+            'MONA008': 'Srae Chhuk',
+
+            # ── Oddar Meanchey (ODD) – Agents (batch 2) ──
+            'ODDA007': 'Chong Kal',      'ODDS002': 'Anlung Veaeng',
+
+            # ── Svay Rieng (SVA) – Agents (batch 2) ──
+            'SVAA013': 'Chres',          'SVAA020': 'Pouthi',
+            'SVAA022': 'Bos Svay',       'SVAA025': 'Chher Teal',
+            'SVAA028': 'Sambour',        'SVAA029': 'Pong Tuek',
+            'SVAA030': 'Chantrei',       'SVAS001': 'Svay Rieng Town',
+            'SVAS004': 'Kampong Trach',
+
+            # ── Takeo (TAK) – Agents (batch 2) ──
+            'TAKA020': 'Prey Khla',      'TAKA023': 'Rovieng',
+            'TAKA028': 'Borei Chulsar',  'TAKS003': 'Trapeang Sab',
+
+            # ── Tbong Khmum (TBK) – Agents (batch 2) ──
+            'TBKA009': 'Trapeang Phlong','TBKA011': 'Chong Cheach',
+            'TBKA016': 'Kraek',          'TBKA021': 'Sralab',
+            'TBKS001': 'Suong',          'TBKS002': 'Kraek',
+
+            # ── Kampong Cham (CHA) – Agents (batch 2) ──
+            'CHAS001': 'Veal Vung',      'CHAS003': 'Soutib',
+
+            # ── Kampong Chhnang (CHH) – Agents (batch 2) ──
+            'CHHA012': 'Trangel',        'CHHA015': 'Chrey Bak',
+            'CHHA016': 'Chieb',          'CHHA020': 'Krang Lvea',
+            'CHHS001': 'Kampong Chhnang Town',
+
+            # ── Kampot (KAM) – Agents (batch 2) ──
+            'KAMA017': 'Trapeang Sangkae','KAMA021': 'Trapeang Sala',
+            'KAMA028': 'Kampot',         'KAMA029': 'Dambouk Khpuos',
+            'KAMA031': 'Kampong Trach',  'KAMS001': 'Krang Ampil',
+
+            # ── Kandal (KAN) – Agents (batch 2) ──
+            'KANA011': 'Cheung Kaeub',   'KANA041': 'Leuk Daek',
+            'KANA043': 'Puk Ruessei',    'KANS002': 'Kokir',
+
+            # ── Kratie (KRA) – Agents (batch 2) ──
+            'KRAA007': 'Ou Krieng',      'KRAA009': 'Sandan',
+            'KRAS003': 'Chhloung',       'KRAS005': 'Preaek Prasab',
+
+            # ── Phnom Penh (PNP) – Agents (batch 2) ──
+            'PNPA017': 'Toul Svay Prey', 'PNPA020': 'Toul Svay Prey',
+            'PNPA034': 'Dangkao',        'PNPA035': 'Ruessei Kaev',
+            'PNPA052': 'Chak Angrae',    'PNPA074': 'Tuek Thla',
+            'PNPA080': 'Phleung Chheh',  'PNPA086': 'Phnom Penh',
+            'PNPA096': 'Tuek L\'ak',
+
+            # ── Stung Treng (STU) – Agents (batch 2) ──
+            'STUA009': 'Anlung Chrey',
+
+            # ── Koh Kong (KOH) – Showrooms ──
+            'KOHS001': 'Smach Mean Chey','DVCZ5':   'Koh Kong (Transit)',
         }
-        if dest_po in district_map:
-            dist_name = district_map[dest_po]
+
+        PROVINCE_NAME_MAP = {
+            'PNP': 'Phnom Penh',    'KAN': 'Kandal',
+            'PRE': 'Prey Veng',     'SVA': 'Svay Rieng',
+            'BAT': 'Battambang',    'SIE': 'Siem Reap',
+            'SIH': 'Sihanoukville', 'KOH': 'Koh Kong',
+            'KAM': 'Kampot',        'TAK': 'Takeo',
+            'PUR': 'Pursat',        'PRH': 'Preah Vihear',
+            'TBK': 'Tbong Khmum',   'THO': 'Kampong Thom',
+            'CHA': 'Kampong Cham',  'KRA': 'Kratie',
+            'BAN': 'Banteay Meanchey', 'CHH': 'Kampong Chhnang',
+            'MON': 'Mondulkiri',    'ROT': 'Ratanakiri',
+            'STU': 'Stung Treng',   'ODD': 'Oddar Meanchey',
+            'KEP': 'Kep',           'PAI': 'Pailin',
+            'SPE': 'Kampong Speu',
+        }
+
+        # Level 1: exact 7-char post office code
+        if dest_po in DISTRICT_BY_PO:
+            dist_name = DISTRICT_BY_PO[dest_po]
+        # Level 2: 5-char prefix (e.g. PREA0 → covers PREA036, PREA037 etc.)
+        elif len(dest_po) >= 5 and dest_po[:5] in DISTRICT_BY_PO:
+            dist_name = DISTRICT_BY_PO[dest_po[:5]]
+        # Level 3: province-code fallback
         else:
-            prov_map = {
-                'PNP': 'Phnom Penh',
-                'KAN': 'Kandal',
-                'PRE': 'Prey Veng',
-                'SVA': 'Svay Rieng',
-                'BAT': 'Battambang',
-                'SIE': 'Siem Reap',
-                'SIH': 'Sihanoukville',
-                'KOH': 'Koh Kong',
-                'KAM': 'Kampot',
-                'TAK': 'Takeo',
-                'PUR': 'Pursat',
-                'PRH': 'Preah Vihear',
-                'TBK': 'Tbong Khmum',
-                'THO': 'Kampong Thom',
-                'CHA': 'Kampong Cham',
-                'KRA': 'Kratie',
-                'BAN': 'Banteay Meanchey',
-                'CHH': 'Kampong Chhnang',
-                'MON': 'Mondulkiri',
-                'ROT': 'Ratanakiri',
-                'STU': 'Stung Treng',
-                'ODD': 'Oddar Meanchey',
-                'KEP': 'Kep',
-                'PAI': 'Pailin',
-            }
             br_prefix = dest_prov.upper()[:3] if dest_prov else (dest_po[:3] if dest_po else '')
-            dist_name = prov_map.get(br_prefix, dest_prov if dest_prov and dest_prov.upper() != 'NONE' else 'General District')
+            dist_name = PROVINCE_NAME_MAP.get(
+                br_prefix,
+                dest_prov if dest_prov and dest_prov.upper() not in ('NONE', 'NAN', '') else 'Unknown District'
+            )
 
 
 
