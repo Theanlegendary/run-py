@@ -403,12 +403,6 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             c.border = border_clean
             if r_curr % 2 == 0:
                 c.fill = fill_row_alt
-            if item["tag_color"] == "GREEN":
-                c.fill = green_fill
-            elif item["tag_color"] == "BLUE":
-                c.fill = blue_fill
-            elif item["tag_color"] == "RED":
-                c.fill = red_fill
 
         tot_pay_left += item["rate_usd"]
         r_curr += 1
@@ -575,12 +569,6 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             c.font = font_data
             c.alignment = Alignment(horizontal="center", vertical="center")
             c.border = border_clean
-            if item["tag_color"] == "GREEN":
-                c.fill = green_fill
-            elif item["tag_color"] == "BLUE":
-                c.fill = blue_fill
-            elif item["tag_color"] == "RED":
-                c.fill = red_fill
 
     for col in ws2.columns:
         max_len = max(len(str(cell.value or "")) for cell in col)
