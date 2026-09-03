@@ -308,14 +308,14 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     fill_title_right  = PatternFill("solid", fgColor="0B132B") # Deepest Midnight Navy
     fill_sub_right    = PatternFill("solid", fgColor="1C2541") # Subtitle Midnight Slate
     fill_hdr_right    = PatternFill("solid", fgColor="1C3D82") # Royal Sapphire Blue Header
-    fill_row_alt      = PatternFill("solid", fgColor="F8FAFC") # Clean Soft Zebra
+    fill_row_white    = PatternFill("solid", fgColor="FFFFFF") # 100% Pure White (No 2 alternating colors)
     fill_left_tot     = PatternFill("solid", fgColor="E2E8F0") # Soft Slate Total
     fill_sum_tot      = PatternFill("solid", fgColor="E2E8F0") # Executive Accounting Total
     fill_penalty_pink = PatternFill("solid", fgColor="FFEAEA") # Light Pink / Soft Red for penalty cells
 
     border_clean = Border(
-        left=Side(style="thin", color="E2E8F0"), right=Side(style="thin", color="E2E8F0"),
-        top=Side(style="thin", color="E2E8F0"), bottom=Side(style="thin", color="E2E8F0")
+        left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"), bottom=Side(style="thin", color="CBD5E1")
     )
     tot_border_accounting = Border(
         left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
@@ -417,8 +417,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             c.font = font_data
             c.alignment = Alignment(horizontal="center", vertical="center")
             c.border = border_clean
-            if r_curr % 2 == 0:
-                c.fill = fill_row_alt
+            c.fill = fill_row_white
 
         tot_fine_left += item["penalty_fine"]
         r_curr += 1
@@ -521,8 +520,8 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             else:
                 cell.font = font_data
 
-            if r_sum % 2 == 0 and ci != 18:
-                cell.fill = fill_row_alt
+            if ci != 18:
+                cell.fill = fill_row_white
 
         tot_ho += stats["total_handover"]
         tot_del += stats["total_delivery"]

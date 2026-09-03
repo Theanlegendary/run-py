@@ -303,13 +303,13 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     fill_title_right  = PatternFill("solid", fgColor="0B132B") # Deepest Midnight Navy
     fill_sub_right    = PatternFill("solid", fgColor="1C2541") # Subtitle Midnight Slate
     fill_hdr_right    = PatternFill("solid", fgColor="1C3D82") # Royal Sapphire Blue Header
-    fill_row_alt      = PatternFill("solid", fgColor="F8FAFC") # Clean Soft Zebra
+    fill_row_white    = PatternFill("solid", fgColor="FFFFFF") # 100% Pure White (No 2 alternating colors)
     fill_left_tot     = PatternFill("solid", fgColor="E2E8F0") # Soft Slate Total
     fill_sum_tot      = PatternFill("solid", fgColor="E2E8F0") # Executive Accounting Total
 
     border_clean = Border(
-        left=Side(style="thin", color="E2E8F0"), right=Side(style="thin", color="E2E8F0"),
-        top=Side(style="thin", color="E2E8F0"), bottom=Side(style="thin", color="E2E8F0")
+        left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"), bottom=Side(style="thin", color="CBD5E1")
     )
     tot_border_accounting = Border(
         left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
@@ -414,8 +414,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             c.font = font_data
             c.alignment = Alignment(horizontal="center", vertical="center")
             c.border = border_clean
-            if r_curr % 2 == 0:
-                c.fill = fill_row_alt
+            c.fill = fill_row_white
 
         tot_pay_left += item["rate_usd"]
         r_curr += 1
@@ -487,8 +486,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             cell.font = font_bold_data if ci in (11, 19) else font_data
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = border_clean
-            if r_sum % 2 == 0:
-                cell.fill = fill_row_alt
+            cell.fill = fill_row_white
                 
             # Clean styling - NO red fills on counts, clean normal cells
             if ci == 17:
