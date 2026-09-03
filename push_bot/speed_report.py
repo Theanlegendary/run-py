@@ -74,7 +74,8 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     col_action_time = next((c for c in df.columns if 'ACTION TIME' in c or 'CURRENT TIME' in c), 'CURRENT TIME')
     
     col_306_last = next((c for c in df.columns if '306' in c and ('STORE' in c or 'AGENT' in c) and 'LAST' in c), None)
-    col_306_first = next((c for c in df.columns if '306' in c and ('STORE' in c or 'AGENT' in c or 'HUB' in c)), None)
+    col_306_hub_first = next((c for c in df.columns if '306' in c and 'FROM HUB' in c and 'FIRST' in c), None)
+    col_306_first = next((c for c in df.columns if '306' in c and ('STORE' in c or 'AGENT' in c) and 'FIRST' in c and 'FROM HUB' not in c), None)
     col_400_time = next((c for c in df.columns if '400' in c or 'OUT' in c or 'ASSIGN' in c), None)
     col_210_time = next((c for c in df.columns if '210' in c), None)
 
@@ -216,14 +217,14 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         t410 = parse_time(row.get(col_action_time)) or parse_time(row.get(col_created))
         
         t_start = None
-        if col_210_time and pd.notna(row.get(col_210_time)):
-            t_start = parse_time(row.get(col_210_time))
-        elif col_306_last and pd.notna(row.get(col_306_last)):
+        # Priority: "306 LAST TIME at destination branch" = when branch staff finally received parcel from hub driver.
+        # This is the correct start. NOT status 210 (origin pickup), NOT 306 hub first (may be a prior hub scan).
+        if col_306_last and pd.notna(row.get(col_306_last)):
             t_start = parse_time(row.get(col_306_last))
+        elif col_306_hub_first and pd.notna(row.get(col_306_hub_first)):
+            t_start = parse_time(row.get(col_306_hub_first))
         elif col_306_first and pd.notna(row.get(col_306_first)):
             t_start = parse_time(row.get(col_306_first))
-        elif col_400_time and pd.notna(row.get(col_400_time)):
-            t_start = parse_time(row.get(col_400_time))
         else:
             t_start = parse_time(row.get(col_created))
 
