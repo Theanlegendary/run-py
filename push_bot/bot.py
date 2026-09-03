@@ -4499,7 +4499,7 @@ async def run_push(
 
         # Recalculate overall counts after filtering
         if target_handles or zone_mode:
-            overall = {"Pickup": 0, "Delivery": 0, "Pending": 0}
+            overall = {"Pickup": 0, "Delivery": 0, "Transit": 0, "Branch": 0}
             for hr in result["handle_results"]:
                 for k in overall:
                     overall[k] += hr["handle_counts"].get(k, 0)
@@ -4508,7 +4508,7 @@ async def run_push(
             label = f"{zone_mode} " if zone_mode else ""
             result["summary_caption"] = "\n".join([
                 f"📋 {label}Daily Report  {datetime.now().strftime('%d/%m/%Y %H:%M')}",
-                f"Pickup: {overall['Pickup']}  |  Delivery: {overall['Delivery']}  |  Pending: {overall['Pending']}",
+                f"Pickup: {overall['Pickup']}  |  Delivery: {overall['Delivery']}  |  Transit: {overall['Transit']}  |  Branch: {overall['Branch']}",
                 f"Grand Total: {grand_total}",
             ])
 
