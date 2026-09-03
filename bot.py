@@ -1983,33 +1983,142 @@ async def fetch_lat_long(code: str, token: str, sem: asyncio.Semaphore):
         return code, None, None
 
 
+PROVINCE_TO_MAIN_BRANCH = {
+    "BAN": "BANP001", "BAT": "BATP001", "CHA": "CHAP001", "CHH": "CHHP001",
+    "KAM": "KAMP001", "KAN": "KANP001", "KOH": "KOHP001", "KRA": "KRAP001",
+    "MON": "MONP001", "ODD": "ODDP001", "PNP": "PNPP001", "PRE": "PREP001",
+    "PRH": "PRHP001", "PUR": "PURP001", "ROT": "ROTP001", "SIE": "SIEP001",
+    "SIH": "SIHP001", "SPE": "SPEP001", "STU": "STUP001", "SVA": "SVAP001",
+    "TAK": "TAKP001", "TBK": "TBKP001", "THO": "THOP001", "KEP": "KAMP001",
+    "PAI": "BATP001"
+}
+
+_location_phones_cache = None
+
+def _get_fallback_location_phone(code: str, branch_code: str = "") -> str:
+    global _location_phones_cache
+    if _location_phones_cache is None:
+        _location_phones_cache = {}
+        here = os.path.dirname(os.path.abspath(__file__))
+        
+        # 1. Load from manager_contacts.json (main branch hubs)
+        mc_path = os.path.join(here, "manager_contacts.json")
+        if os.path.exists(mc_path):
+            try:
+                with open(mc_path, "r", encoding="utf-8") as f:
+                    mc = json.load(f)
+                    for k, v in mc.items():
+                        if isinstance(v, dict) and v.get("phone"):
+                            _location_phones_cache[k.upper()] = _clean_export_phone(v["phone"])
+            except Exception:
+                pass
+                
+        # 2. Load from post_office_lookup.csv
+        po_path = os.path.join(here, "post_office_lookup.csv")
+        if os.path.exists(po_path):
+            try:
+                import pandas as pd
+                df_po = pd.read_csv(po_path, dtype=str)
+                for _, r in df_po.iterrows():
+                    po = str(r.get("current_post_office", "")).strip().upper()
+                    ph = _clean_export_phone(r.get("phone", ""))
+                    if po and ph:
+                        _location_phones_cache[po] = ph
+            except Exception:
+                pass
+                
+        # 3. Load from pickup_branch_lookup.csv (Search Text / Phone)
+        pk_path = os.path.join(here, "pickup_branch_lookup.csv")
+        if os.path.exists(pk_path):
+            try:
+                import pandas as pd
+                df_pk = pd.read_csv(pk_path, dtype=str)
+                for _, r in df_pk.iterrows():
+                    c = str(r.get("Pickup Branch", "") or r.get("Post code", "")).strip().upper()
+                    st = str(r.get("Search Text", "")).strip()
+                    if c and st and (c not in _location_phones_cache or not _location_phones_cache[c]):
+                        parts = [p.strip() for p in st.split("|")]
+                        for p in parts:
+                            if re.match(r"^(0\d{7,10}|\d{8,10})$", p):
+                                _location_phones_cache[c] = _clean_export_phone(p)
+                                break
+            except Exception:
+                pass
+
+    code_u = str(code or "").strip().upper()
+    if code_u in _location_phones_cache and _location_phones_cache[code_u]:
+        return _location_phones_cache[code_u]
+    b_u = str(branch_code or "").strip().upper()
+    if b_u in _location_phones_cache and _location_phones_cache[b_u]:
+        return _location_phones_cache[b_u]
+    return ""
+
+
+def _classify_facility(code: str, type_label: str = "") -> str:
+    code = str(code or "").strip().upper()
+    type_label = str(type_label or "").strip()
+    
+    m = re.search(r"^[A-Z]{3}([PSA])\d+$", code)
+    if m:
+        letter = m.group(1)
+        if letter == "P": return "Post Office"
+        if letter == "S": return "Showroom"
+        if letter == "A": return "Agent"
+
+    if re.search(r"[A-Z]{3}P\d+", code): return "Post Office"
+    if re.search(r"[A-Z]{3}S\d+", code): return "Showroom"
+    if re.search(r"[A-Z]{3}A\d+", code): return "Agent"
+
+    if "Warehouse" in type_label or "Hub" in type_label or "Operations" in type_label:
+        return "Warehouse / Hub"
+
+    if "Authorized" in type_label or "Agent" in type_label or "Dealer" in type_label:
+        return "Agent"
+
+    if "Post office" in type_label or "Post Office" in type_label:
+        return "Post Office"
+
+    return "Post Office"
+
+
 def _post_office_export_row(item, fallback_branch=""):
     branch = item.get("branch") if isinstance(item.get("branch"), dict) else {}
-    code = str(item.get("code", "")).strip().upper()
+    code = str(item.get("code") or item.get("Pickup Branch") or item.get("Post code") or "").strip().upper()
     branch_code = str(
-        item.get("parentDepartmentCode")
+        item.get("main_branch_code")
+        or item.get("parentDepartmentCode")
+        or item.get("Branch Code")
         or branch.get("code")
         or fallback_branch
         or ""
     ).strip().upper()
 
+    if len(branch_code) == 3:
+        branch_code = PROVINCE_TO_MAIN_BRANCH.get(branch_code, branch_code)
+
     commune_en = _strip_department_code(
-        item.get("enUsName") or item.get("name") or item.get("viVnName"),
+        item.get("Commune EN") or item.get("Post office name") or item.get("enUsName") or item.get("name") or item.get("viVnName"),
         code,
     )
     commune_khmer = _strip_department_code(
-        item.get("kmKhmName") or item.get("enUsName") or item.get("name"),
+        item.get("Commune Khmer") or item.get("kmKhmName") or item.get("enUsName") or item.get("name"),
         code,
     )
     branch_en = _strip_department_code(
-        branch.get("enUsName") or branch.get("name") or item.get("branch_name"),
+        item.get("Branch EN") or branch.get("enUsName") or branch.get("name") or item.get("branch_name"),
         branch_code,
     )
     branch_khmer = _strip_department_code(
-        branch.get("kmKhmName") or branch.get("enUsName") or branch.get("name"),
+        item.get("Branch Khmer") or branch.get("kmKhmName") or branch.get("enUsName") or branch.get("name"),
         branch_code,
     )
-    phone = _clean_export_phone(item.get("phone"))
+    phone = _clean_export_phone(item.get("Phone Number") or item.get("Phone") or item.get("phone") or item.get("phone_detail")) or _get_fallback_location_phone(code, branch_code)
+    
+    from speed_report import MAIN_36_BRANCHES as _36
+    main_b = PROVINCE_TO_MAIN_BRANCH.get(branch_code) or PROVINCE_TO_MAIN_BRANCH.get(code[:3]) or (code if code in _36 else "PNPP001")
+    main_branch_phone = _clean_export_phone(item.get("Main Branch Phone") or item.get("main_branch_phone")) or _get_fallback_location_phone(main_b)
+
+    category = _classify_facility(code, item.get("Category") or item.get("Post office level") or item.get("typeLabel") or item.get("type"))
 
     search_parts = [
         code,
@@ -2019,20 +2128,27 @@ def _post_office_export_row(item, fallback_branch=""):
         branch_code,
         branch_en,
         branch_khmer,
+        category,
     ]
 
     return {
         "Pickup Branch": code,
+        "Post code": code,
+        "Post office name": commune_en,
         "Commune EN": commune_en,
         "Commune Khmer": commune_khmer,
         "Phone": phone,
+        "Phone Number": phone,
+        "Main Branch Phone": main_branch_phone,
         "Branch Code": branch_code,
         "Branch EN": branch_en,
         "Branch Khmer": branch_khmer,
-        "Type": str(item.get("typeLabel") or item.get("type") or "").strip(),
-        "Status": str(item.get("statusLabel") or item.get("status") or "").strip(),
-        "Latitude": item.get("latitude"),
-        "Longitude": item.get("longitude"),
+        "Category": category,
+        "Post office level": category,
+        "Type": str(item.get("Category") or item.get("typeLabel") or item.get("type") or "").strip(),
+        "Status": str(item.get("Status") or item.get("statusLabel") or item.get("status") or "In effect").strip(),
+        "Latitude": item.get("Latitude") or item.get("latitude"),
+        "Longitude": item.get("Longitude") or item.get("longitude"),
         "Search Text": " | ".join(part for part in search_parts if part),
     }
 
@@ -2213,7 +2329,7 @@ def _write_post_office_export_excel(df, out_path, sheet_label, title):
     ws.title = "Stores"
     ws.views.sheetView[0].showGridLines = True
     
-    data_headers = ["Province *", "District *", "District KH", "Delivery Store *", "Latitude", "Longitude"]
+    data_headers = ["Province *", "District *", "District KH", "Delivery Store *", "Category *", "Phone Number", "Main Branch Phone", "Latitude", "Longitude"]
     
     for col_idx, col_name in enumerate(data_headers, 1):
         cell = ws.cell(row=1, column=col_idx, value=col_name)
@@ -2228,6 +2344,9 @@ def _write_post_office_export_excel(df, out_path, sheet_label, title):
         commune_en = str(row.get("Commune EN", ""))
         commune_kh = str(row.get("Commune Khmer", ""))
         code = str(row.get("Pickup Branch", ""))
+        category = str(row.get("Category") or _classify_facility(code, row.get("Type"))).strip()
+        phone = _clean_export_phone(row.get("Phone Number") or row.get("Phone") or row.get("phone"))
+        main_branch_phone = _clean_export_phone(row.get("Main Branch Phone") or row.get("main_branch_phone"))
         lat = row.get("Latitude")
         lon = row.get("Longitude")
         
@@ -2240,21 +2359,34 @@ def _write_post_office_export_excel(df, out_path, sheet_label, title):
         ws.cell(row=row_idx, column=2, value=dist_en).font = Font(name="Calibri", size=10)
         ws.cell(row=row_idx, column=3, value=dist_kh).font = Font(name="Calibri", size=10)
         ws.cell(row=row_idx, column=4, value=store_name).font = Font(name="Calibri", size=10)
-        ws.cell(row=row_idx, column=5, value=lat).font = Font(name="Calibri", size=10)
-        ws.cell(row=row_idx, column=6, value=lon).font = Font(name="Calibri", size=10)
+        ws.cell(row=row_idx, column=5, value=category).font = Font(name="Calibri", size=10, bold=True)
         
-        for col_idx in range(1, 7):
+        c_ph = ws.cell(row=row_idx, column=6, value=phone)
+        c_ph.font = Font(name="Calibri", size=10)
+        c_ph.number_format = "@"
+        
+        c_mb = ws.cell(row=row_idx, column=7, value=main_branch_phone)
+        c_mb.font = Font(name="Calibri", size=10)
+        c_mb.number_format = "@"
+        
+        ws.cell(row=row_idx, column=8, value=lat).font = Font(name="Calibri", size=10)
+        ws.cell(row=row_idx, column=9, value=lon).font = Font(name="Calibri", size=10)
+        
+        for col_idx in range(1, 10):
             ws.cell(row=row_idx, column=col_idx).border = thin_border
             
     ws.column_dimensions["A"].width = 25
     ws.column_dimensions["B"].width = 25
     ws.column_dimensions["C"].width = 25
     ws.column_dimensions["D"].width = 45
-    ws.column_dimensions["E"].width = 15
-    ws.column_dimensions["F"].width = 15
+    ws.column_dimensions["E"].width = 20
+    ws.column_dimensions["F"].width = 20
+    ws.column_dimensions["G"].width = 20
+    ws.column_dimensions["H"].width = 15
+    ws.column_dimensions["I"].width = 15
     
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:F{len(df)+1}"
+    ws.auto_filter.ref = f"A1:I{len(df)+1}"
     
     wb.save(out_path)
 
