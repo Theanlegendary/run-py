@@ -606,12 +606,14 @@ def render_speed_summary_image(out_xlsx):
     wb_sum = openpyxl.Workbook()
     ws_sum = wb_sum.active
     ws_sum.title = 'Executive Summary'
-    ws_sum.views.sheetView[0].showGridLines = True
+    ws_sum.views.sheetView[0].showGridLines = False
 
     max_r = 1
     for r in range(1, ws.max_row + 1):
         if ws.cell(r, 10).value is not None or ws.cell(r, 19).value is not None:
             max_r = r
+
+    white_fill = PatternFill("solid", fgColor="FFFFFF")
 
     for r in range(1, max_r + 1):
         if ws.row_dimensions[r].height:
@@ -626,6 +628,9 @@ def render_speed_summary_image(out_xlsx):
                 cell_tgt.fill = copy.copy(cell_orig.fill)
                 cell_tgt.border = copy.copy(cell_orig.border)
                 cell_tgt.alignment = copy.copy(cell_orig.alignment)
+            # Force pure white fill on all data rows (not title row 1, subtitle row 2, header row 3, or grand total)
+            if 4 <= r < max_r:
+                cell_tgt.fill = white_fill
 
     col_widths = {1: 6, 2: 14, 3: 15, 4: 16, 5: 16, 6: 16, 7: 16, 8: 14, 9: 14, 10: 18}
     for c, w in col_widths.items():
