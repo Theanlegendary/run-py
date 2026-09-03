@@ -96,12 +96,15 @@ def build_mega_detail(source_path, out_path, cfg):
     excl_test = cfg.get("pivot", {}).get("exclude_test", False)
     test_kw   = cfg.get("pivot", {}).get("test_keywords", ["test"])
 
-    wb_src = openpyxl.load_workbook(source_path, data_only=True)
-    ws_src = wb_src.active
-    all_rows = list(ws_src.iter_rows(values_only=True))
-    if not all_rows:
-        return 0, 0
-    data_rows = all_rows[1:]
+    if isinstance(source_path, list):
+        data_rows = source_path
+    else:
+        wb_src = openpyxl.load_workbook(source_path, data_only=True)
+        ws_src = wb_src.active
+        all_rows = list(ws_src.iter_rows(values_only=True))
+        if not all_rows:
+            return 0, 0
+        data_rows = all_rows[1:]
 
     today = _dt.now().date()
 

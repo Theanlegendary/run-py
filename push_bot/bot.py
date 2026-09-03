@@ -1200,8 +1200,10 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
             stamp  = datetime.now().strftime("%d.%m_%HH%M")
             src    = os.path.join(tmpdir, f"export_{stamp}.xlsx")
             try:
-                downloader.download_detail(cfg["api"], src, force_refresh=force_refresh)
-                msg = await edit_or_send_requester_text(msg, update, context, "Building TỒN MEGA CHECK report...")
+                msg = await edit_or_send_requester_text(msg, update, context, "⏳ [1/4] Downloading latest TMS data...")
+                await asyncio.to_thread(downloader.download_detail, cfg["api"], src, force_refresh=force_refresh)
+
+                msg = await edit_or_send_requester_text(msg, update, context, "📊 [2/4] Processing MEGA1 & DVCMEGA1 pivots...")
                 import pivot
 
                 # Generate 2 separate pivot tables/images: MEGA1 and DVCMEGA1 (matching morning report)
@@ -1210,6 +1212,7 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     pivot.build_mega_pivot, rows, cfg.get("pivot", {}), cfg.get("zone_mapping", {})
                 )
 
+                msg = await edit_or_send_requester_text(msg, update, context, "📸 [3/4] Rendering Hub images...")
                 last_hub_xlsx = None
                 for hub in ["MEGA1", "DVCMEGA1"]:
                     if hub in tree and tree[hub]:
@@ -1235,10 +1238,11 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         )
 
                 # Build detail Excel with actual order data for MEGA/HUB/DVC
+                msg = await edit_or_send_requester_text(msg, update, context, "📁 [4/4] Building detailed Excel...")
                 try:
                     import mega_detail
                     detail_xlsx = os.path.join(tmpdir, f"MEGA_Detail_{stamp}.xlsx")
-                    result_detail = mega_detail.build_mega_detail(src, detail_xlsx, cfg)
+                    result_detail = await asyncio.to_thread(mega_detail.build_mega_detail, rows, detail_xlsx, cfg)
                     total_orders = result_detail[0] if result_detail else 0
                     urgent_orders = result_detail[1] if result_detail else 0
                     with open(detail_xlsx, "rb") as f:
@@ -1250,7 +1254,7 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     log.warning("Failed to build mega detail Excel: %s", e)
 
-                await edit_or_send_requester_text(msg, update, context, f"Done. TỒN MEGA CHECK {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+                await edit_or_send_requester_text(msg, update, context, f"✅ Done. TỒN MEGA CHECK {datetime.now().strftime('%d.%m.%Y %H:%M')}")
             except Exception as e:
                 log.exception("Error in /total mega")
                 await edit_or_send_requester_text(msg, update, context, f"Error: {e}")

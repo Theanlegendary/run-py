@@ -176,7 +176,8 @@ def download_detail(api_cfg, out_path, from_date=None, to_date=None, branch_code
             age_seconds = time.time() - mtime
             if age_seconds < (cache_minutes * 60):
                 print(f"[CACHE] Using cached Excel data ({int(age_seconds)}s old)")
-                shutil.copy2(cache_file, out_path)
+                if os.path.abspath(cache_file) != os.path.abspath(out_path):
+                    shutil.copy2(cache_file, out_path)
                 return out_path
 
     if from_date is None or to_date is None:
