@@ -201,6 +201,7 @@ warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
 import downloader
 import generate_report
+import generate_summary
 import excel_to_image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1227,16 +1228,6 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         except Exception as e_img:
                             log.warning("Failed rendering photo for %s: %s", hub, e_img)
 
-                if last_hub_xlsx and os.path.exists(last_hub_xlsx):
-                    with open(last_hub_xlsx, "rb") as f:
-                        await send_requester_document(
-                            update,
-                            context,
-                            f,
-                            os.path.basename(last_hub_xlsx),
-                            caption=f"📊 TỒN MEGA CHECK {datetime.now().strftime('%d/%m/%Y %H:%M')}",
-                        )
-
                 # Build detail Excel with actual order data for MEGA/HUB/DVC
                 msg = await edit_or_send_requester_text(msg, update, context, "📁 [4/4] Building detailed Excel...")
                 try:
@@ -1627,12 +1618,14 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cfg = load_config()
 
     args = [a.strip() for a in (context.args or []) if a.strip()]
+    is_ytd = any(a.lower() in ("ytd", "yesterday", "homqua") for a in args)
     skip_zone = any(a.lower() in ("nozone", "nozones", "no_zone", "skipzone", "skipzones", "branch", "branches", "branch_only") for a in args)
     skip_branch = any(a.lower() in ("nobranch", "nobranches", "no_branch", "skipbranch", "skipbranches", "zone_only") for a in args)
     no_fwd = any(a.lower() in ("nofwd", "no_fwd", "onlyme", "me", "self", "quiet") for a in args)
     force_refresh = any(a.lower() in ("new", "refresh", "force") for a in args)
 
     ignore_tokens = {
+        "ytd", "yesterday", "homqua",
         "new", "refresh", "force",
         "nozone", "nozones", "no_zone", "skipzone", "skipzones", "branch", "branches", "branch_only",
         "nobranch", "nobranches", "no_branch", "skipbranch", "skipbranches", "zone_only",
@@ -1640,8 +1633,11 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     filtered_args = [a for a in args if a.lower() not in ignore_tokens]
     target_label = " ".join(filtered_args) if filtered_args else "ALL"
+    target_date = (datetime.now().date() - timedelta(days=1)) if is_ytd else datetime.now().date()
+    ytd_tag = f" — YESTERDAY {target_date.strftime('%d/%m/%Y')}" if is_ytd else ""
+    suffix_file = "_YTD" if is_ytd else ""
 
-    msg = await send_requester_text(update, context, f"⏳ [1/3] Downloading TMS data ({target_label.upper()})...")
+    msg = await send_requester_text(update, context, f"⏳ [1/3] Downloading TMS data ({target_label.upper()}{ytd_tag})...")
     tmpdir = tempfile.mkdtemp(prefix="speed_")
     track_report_dir(tmpdir)
     stamp = datetime.now().strftime("%d.%m_%HH%M")
@@ -1650,7 +1646,7 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await asyncio.to_thread(downloader.download_detail, cfg["api"], src, force_refresh=force_refresh)
         
-        await edit_or_send_requester_text(msg, update, context, f"⏳ [2/3] Processing VTT speed SLA metrics ({target_label.upper()})...")
+        await edit_or_send_requester_text(msg, update, context, f"⏳ [2/3] Processing VTT speed SLA metrics ({target_label.upper()}{ytd_tag})...")
         cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
         rev_file = os.path.join(cache_dir, "latest_revenue.xlsx")
         try:
@@ -1659,17 +1655,19 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
             log.warning("Could not refresh revenue detail for /speed: %s", e_rev)
 
         import speed_report
+        shared_df, shared_vas_map = await asyncio.to_thread(speed_report.load_speed_context, src, rev_file)
         safe_label = "".join(c for c in target_label if c.isalnum() or c in ("-", "_")).strip() or "ALL"
-        out_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{safe_label}.xlsx")
+        out_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{safe_label}{suffix_file}.xlsx")
         tot_del, tot_u2, tot_24, tot_o8, tot_pay = await asyncio.to_thread(
-            speed_report.build_speed_report, src, out_xlsx, target_label=target_label
+            speed_report.build_speed_report, src, out_xlsx, target_label=target_label, report_date=target_date, revenue_path=rev_file,
+            preloaded_df=shared_df, preloaded_vas_map=shared_vas_map
         )
 
         # 1. Render Summary Image
-        await edit_or_send_requester_text(msg, update, context, f"⏳ [3/3] Rendering clean dashboard image ({target_label.upper()})...")
+        await edit_or_send_requester_text(msg, update, context, f"⏳ [3/3] Rendering clean dashboard image ({target_label.upper()}{ytd_tag})...")
         try:
             img_buf = await asyncio.to_thread(speed_report.render_speed_summary_image, out_xlsx)
-            img_buf.name = f"speed_summary_{stamp}.png"
+            img_buf.name = f"speed_summary_{stamp}{suffix_file}.png"
             await send_requester_photo(update, context, img_buf)
         except Exception as e_img:
             log.warning("Could not render speed summary image: %s", e_img)
@@ -1690,13 +1688,14 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for z_idx in range(1, 6):
                     z_name = f"Zone {z_idx}"
                     z_clean = f"zone{z_idx}"
-                    z_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{z_name.replace(' ', '_')}.xlsx")
+                    z_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{z_name.replace(' ', '_')}{suffix_file}.xlsx")
                     try:
                         z_del, z_u2, z_24, z_o8, z_pay = await asyncio.to_thread(
-                            speed_report.build_speed_report, src, z_xlsx, target_label=z_name
+                            speed_report.build_speed_report, src, z_xlsx, target_label=z_name, report_date=target_date, revenue_path=rev_file,
+                            preloaded_df=shared_df, preloaded_vas_map=shared_vas_map
                         )
                         z_caption = (
-                            f"⚡ *DELIVERY SPEED SLA REPORT ({z_name})*\n"
+                            f"⚡ *DELIVERY SPEED SLA REPORT ({z_name}{ytd_tag})*\n"
                             f"Total Delivered (410): `{z_del}`\n"
                             f"< 2 Hours (+50%): `{z_u2}`\n"
                             f"2 - 4 Hours (+25%): `{z_24}`\n"
@@ -1708,7 +1707,7 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             if str(zkey).lower().strip() == z_clean:
                                 try:
                                     z_img = await asyncio.to_thread(speed_report.render_speed_summary_image, z_xlsx)
-                                    z_img.name = f"SPEED_SUMMARY_{z_name.replace(' ', '_')}.png"
+                                    z_img.name = f"SPEED_SUMMARY_{z_name.replace(' ', '_')}{suffix_file}.png"
                                     await safe_api_call(context.bot.send_photo, chat_id=int(gid), photo=z_img, caption=z_caption, parse_mode="Markdown")
                                 except Exception as e_fwd_img:
                                     log.warning("Failed forwarding speed photo to zone group %s: %s", gid, e_fwd_img)
@@ -1737,13 +1736,14 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if br_code not in speed_report.MAIN_36_BRANCHES:
                         continue
 
-                    br_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{br_code}.xlsx")
+                    br_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{br_code}{suffix_file}.xlsx")
                     try:
                         b_del, b_u2, b_24, b_o8, b_pay = await asyncio.to_thread(
-                            speed_report.build_speed_report, src, br_xlsx, target_label=br_code
+                            speed_report.build_speed_report, src, br_xlsx, target_label=br_code, report_date=target_date, revenue_path=rev_file,
+                            preloaded_df=shared_df, preloaded_vas_map=shared_vas_map
                         )
                         b_caption = (
-                            f"⚡ *DELIVERY SPEED SLA REPORT ({br_code})*\n"
+                            f"⚡ *DELIVERY SPEED SLA REPORT ({br_code}{ytd_tag})*\n"
                             f"Total Delivered (410): `{b_del}`\n"
                             f"< 2 Hours (+50%): `{b_u2}`\n"
                             f"2 - 4 Hours (+25%): `{b_24}`\n"
@@ -1753,7 +1753,7 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                         try:
                             b_img = await asyncio.to_thread(speed_report.render_speed_summary_image, br_xlsx)
-                            b_img.name = f"SPEED_SUMMARY_{br_code}.png"
+                            b_img.name = f"SPEED_SUMMARY_{br_code}{suffix_file}.png"
                             await safe_api_call(context.bot.send_photo, chat_id=int(gid), photo=b_img, caption=b_caption, parse_mode="Markdown")
                         except Exception as e_b_img:
                             log.warning("Failed sending speed photo to branch group %s: %s", br_code, e_b_img)
@@ -1778,7 +1778,7 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif no_fwd or (skip_branch and skip_zone):
             fwd_status_msg = " [Private / No-Forward Mode]"
 
-        await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent EXECUTIVE DELIVERY SPEED DASHBOARD ({target_label.upper()}){fwd_status_msg}.")
+        await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent EXECUTIVE DELIVERY SPEED DASHBOARD ({target_label.upper()}{ytd_tag}){fwd_status_msg}.")
     except Exception as e:
         log.exception("Error in /speed command: %s", e)
         await edit_or_send_requester_text(msg, update, context, f"❌ Error generating speed report: {e}")
