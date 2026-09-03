@@ -1623,29 +1623,34 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     filtered_args = [a for a in args if a.lower() not in ignore_tokens]
     target_label = " ".join(filtered_args) if filtered_args else "ALL"
 
-    msg = await send_requester_text(update, context, f"⏳ Generating EXECUTIVE DELIVERY SPEED DASHBOARD ({target_label.upper()})...")
+    msg = await send_requester_text(update, context, f"⏳ [1/3] Downloading TMS data ({target_label.upper()})...")
     tmpdir = tempfile.mkdtemp(prefix="speed_")
     track_report_dir(tmpdir)
     stamp = datetime.now().strftime("%d.%m_%HH%M")
     src = os.path.join(tmpdir, f"export_{stamp}.xlsx")
 
     try:
-        downloader.download_detail(cfg["api"], src, force_refresh=force_refresh)
+        await asyncio.to_thread(downloader.download_detail, cfg["api"], src, force_refresh=force_refresh)
+        
+        await edit_or_send_requester_text(msg, update, context, f"⏳ [2/3] Processing VTT speed SLA metrics ({target_label.upper()})...")
         cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
         rev_file = os.path.join(cache_dir, "latest_revenue.xlsx")
         try:
-            downloader.download_revenue_detail(cfg["api"], rev_file, force_refresh=force_refresh)
+            await asyncio.to_thread(downloader.download_revenue_detail, cfg["api"], rev_file, force_refresh=force_refresh)
         except Exception as e_rev:
             log.warning("Could not refresh revenue detail for /speed: %s", e_rev)
 
         import speed_report
         safe_label = "".join(c for c in target_label if c.isalnum() or c in ("-", "_")).strip() or "ALL"
         out_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{safe_label}.xlsx")
-        tot_del, tot_u2, tot_24, tot_o8, tot_pay = speed_report.build_speed_report(src, out_xlsx, target_label=target_label)
+        tot_del, tot_u2, tot_24, tot_o8, tot_pay = await asyncio.to_thread(
+            speed_report.build_speed_report, src, out_xlsx, target_label=target_label
+        )
 
         # 1. Render Summary Image
+        await edit_or_send_requester_text(msg, update, context, f"⏳ [3/3] Rendering clean dashboard image ({target_label.upper()})...")
         try:
-            img_buf = speed_report.render_speed_summary_image(out_xlsx)
+            img_buf = await asyncio.to_thread(speed_report.render_speed_summary_image, out_xlsx)
             img_buf.name = f"speed_summary_{stamp}.png"
             await send_requester_photo(update, context, img_buf)
         except Exception as e_img:

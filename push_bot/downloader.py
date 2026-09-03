@@ -293,7 +293,8 @@ def download_revenue_detail(api_cfg, out_path, from_date=None, to_date=None, for
             age_seconds = time.time() - mtime
             if age_seconds < (cache_minutes * 60):
                 print(f"[CACHE] Using cached Revenue data ({int(age_seconds)}s old)")
-                shutil.copy2(cache_file, out_path)
+                if os.path.abspath(cache_file) != os.path.abspath(out_path):
+                    shutil.copy2(cache_file, out_path)
                 return out_path
 
     if from_date is None or to_date is None:
@@ -323,7 +324,8 @@ def download_revenue_detail(api_cfg, out_path, from_date=None, to_date=None, for
         if is_default_range and cache_minutes > 0:
             try:
                 os.makedirs(cache_dir, exist_ok=True)
-                shutil.copy2(out_path, cache_file)
+                if os.path.abspath(out_path) != os.path.abspath(cache_file):
+                    shutil.copy2(out_path, cache_file)
             except Exception as e:
                 pass
 
