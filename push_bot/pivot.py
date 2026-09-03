@@ -10,7 +10,7 @@ Doc file Excel chi tiet don (export-detail) va dung bang pivot
   - Co dong/cot Grand Total
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 
 import openpyxl
@@ -286,6 +286,29 @@ def build_mega_pivot(rows, pivot_cfg, zone_cfg):
     today = datetime.now().date()
     day_keys_seen.add((today.month, today.day))
 
+    # ── DEDUPLICATION: keep only the LATEST scan row per ORDER ID ─────────────
+    # The TMS export has one row per scan event. An order that moved from
+    # DVCMEGA1 → MEGA1 appears in BOTH hubs with status 306.
+    # We must keep only the row with the most recent CURRENT TIME (col 24).
+    latest_row_by_order = {}  # order_id → row with latest timestamp
+
+    def _parse_ts(row):
+        """Return a comparable timestamp from col 24 (CURRENT TIME), fallback to CREATED DATE."""
+        for col in (24, COL_CREATED_DATE):
+            val = row[col] if len(row) > col else None
+            if val is None:
+                continue
+            if isinstance(val, datetime):
+                return val
+            s = str(val).strip()
+            for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y",
+                        "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+                try:
+                    return datetime.strptime(s, fmt)
+                except ValueError:
+                    continue
+        return datetime.min
+
     for row in rows:
         if not row or len(row) <= COL_CURRENT_PO:
             continue
@@ -298,20 +321,29 @@ def build_mega_pivot(rows, pivot_cfg, zone_cfg):
             continue
 
         po = str(row[COL_CURRENT_PO] or "").strip().upper()
-        col35 = str(row[COL_ACTION_PO_HUB] if len(row) > COL_ACTION_PO_HUB and row[COL_ACTION_PO_HUB] else "").strip().upper()
-
-        # Filter matching Metfone Web Order Status Report (Select Branch = MEGA HUB)
-        # CURRENT POST OFFICE (Col 15) must be physically at the Hub!
-        hub_statuses = {"306", "309", "302", "311", "310"}
-        if status_code not in hub_statuses:
+        if po == "MEGA1":
+            if status_code not in ("306", "309"):
+                continue
+        elif "DVC" in po or "MEGA" in po or "HUB" in po:
+            if status_code != "306":
+                continue
+        else:
             continue
+
+        oid = str(row[COL_ORDER_ID]).strip()
+        ts = _parse_ts(row)
+        existing = latest_row_by_order.get(oid)
+        if existing is None or ts > _parse_ts(existing):
+            latest_row_by_order[oid] = row
+
+    for row in latest_row_by_order.values():
+        status_code = _status_code(row[COL_CURRENT_STATUS])
+        po = str(row[COL_CURRENT_PO] or "").strip().upper()
 
         if po == "MEGA1":
             hub_label = "MEGA1"
-        elif "DVC" in po or "MEGA" in po or "HUB" in po:
-            hub_label = "DVCMEGA1"
         else:
-            continue
+            hub_label = "DVCMEGA1"
 
 
 
@@ -320,28 +352,7 @@ def build_mega_pivot(rows, pivot_cfg, zone_cfg):
 
         prov = str(row[COL_DELIVERY_PROV] if len(row) > COL_DELIVERY_PROV and row[COL_DELIVERY_PROV] else "").strip().upper() or "KHAC"
 
-        # Use Action Time (Col 24 - CURRENT TIME) matching boss Action day pivot
-        action_time_val = row[24] if len(row) > 24 and row[24] else row[COL_CREATED_DATE]
-        month, day = _parse_day(action_time_val)
-        if day is None:
-            month, day = _parse_day(row[COL_CREATED_DATE])
-        if day is None:
-            continue
-
-
-        key = (month, day)
-        tree[hub_label][prov][key] += 1
-        day_keys_seen.add(key)
-
-        try:
-            fee_tree[hub_label][prov] += float(row[COL_TOTAL_FEE] or 0)
-        except (ValueError, TypeError):
-            pass
-        try:
-            cod_tree[hub_label][prov] += float(row[COL_COD] or 0)
-        except (ValueError, TypeError):
-            pass
-
+        # Determine Action Date (Col 24 - CURRENT TIME) matching boss Action day pivot
         act_val = row[24] if len(row) > 24 and row[24] else row[COL_CREATED_DATE]
         act_date = None
         if isinstance(act_val, datetime):
@@ -367,7 +378,28 @@ def build_mega_pivot(rows, pivot_cfg, zone_cfg):
                     except ValueError:
                         continue
 
-        if act_date and (today - act_date).days >= 1:
+        if not act_date:
+            continue
+
+        # 14-day cutoff (starts from 20/08 when today is 03/09)
+        cutoff_date = today - timedelta(days=14)
+        if act_date < cutoff_date:
+            continue
+
+        key = (act_date.month, act_date.day)
+        tree[hub_label][prov][key] += 1
+        day_keys_seen.add(key)
+
+        try:
+            fee_tree[hub_label][prov] += float(row[COL_TOTAL_FEE] or 0)
+        except (ValueError, TypeError):
+            pass
+        try:
+            cod_tree[hub_label][prov] += float(row[COL_COD] or 0)
+        except (ValueError, TypeError):
+            pass
+
+        if (today - act_date).days >= 1:
             urgent_tree[hub_label][prov] += 1
 
     day_keys = sorted(day_keys_seen)

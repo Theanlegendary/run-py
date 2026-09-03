@@ -1341,9 +1341,12 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
         downloader.download_detail(cfg["api"], src, force_refresh=force_refresh)
         msg = await edit_or_send_requester_text(msg, update, context, "Building summary...")
 
+        cache_dir = os.path.join(HERE, "cache")
+        rev_cache = os.path.join(cache_dir, "latest_revenue.xlsx")
         mode = get_mode(cfg)
         result = generate_report.generate_reports_from_data(
             src, REF_PATH, tmpdir, return_metadata=True, mode=mode,
+            revenue_path=rev_cache if os.path.exists(rev_cache) else None
         )
         update_webapp_cache(result)
         save_highlight_history(result)
@@ -4484,7 +4487,14 @@ async def run_push(
                 target_handles = group_handles
 
         mode = get_mode(cfg)
-        rev_cache = os.path.join(HERE, "cache", "latest_revenue.xlsx")
+        cache_dir = os.path.join(HERE, "cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        rev_cache = os.path.join(cache_dir, "latest_revenue.xlsx")
+        try:
+            await asyncio.to_thread(downloader.download_revenue_detail, cfg["api"], rev_cache, force_refresh=force_refresh)
+        except Exception as e_rev:
+            log.warning("Could not refresh revenue detail for /push: %s", e_rev)
+
         result = generate_report.generate_reports_from_data(
             src, REF_PATH, tmpdir, return_metadata=True, mode=mode, target_handles=target_handles,
             revenue_path=rev_cache if os.path.exists(rev_cache) else None

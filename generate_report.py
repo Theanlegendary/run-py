@@ -907,15 +907,19 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
 
     # Load revenue data and map VAS_SERVICE
     vas_mapping = {}
-    if not revenue_path:
-        default_rev = os.path.join(os.path.dirname(__file__), 'cache', 'latest_revenue.xlsx')
-        if os.path.exists(default_rev):
-            revenue_path = default_rev
+    possible_rev_paths = [
+        revenue_path,
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cache', 'latest_revenue.xlsx'),
+        os.path.join(os.getcwd(), 'cache', 'latest_revenue.xlsx'),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cache', 'latest_revenue.xlsx'),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'push_bot', 'cache', 'latest_revenue.xlsx'),
+    ]
+    resolved_rev = next((p for p in possible_rev_paths if p and os.path.exists(p)), None)
 
-    if revenue_path and os.path.exists(revenue_path):
+    if resolved_rev:
         try:
             for skiprows in range(5):
-                rev_df = pd.read_excel(revenue_path, skiprows=skiprows)
+                rev_df = pd.read_excel(resolved_rev, skiprows=skiprows)
                 rev_order_col = next((c for c in rev_df.columns if str(c).strip().upper() in ['ORDER ID', 'ORDER_NUMBER', 'MÃ ĐƠN HÀNG', 'BILL', 'MÃ ĐƠN']), None)
                 if rev_order_col and 'VAS_SERVICE' in rev_df.columns:
                     for _, row in rev_df.dropna(subset=[rev_order_col]).iterrows():
@@ -927,26 +931,36 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
         except Exception as e:
             print(f"Failed to load revenue data for VAS mapping: {e}")
 
+    # Note and Service columns across the export
+    raw_note_cols = [c for c in df.columns if any(k in str(c).upper() for k in ('NOTE', 'VAS', 'EXTRA', 'SERVICE', 'DESCRIPTION'))]
+
     # Initialize VAS Service column (from revenue VAS mapping or VAS FEE / NOTE / SERVICE detection)
     def _get_vas_service(row):
         oid = str(row.get('ORDER ID', '') or '').strip()
-        if oid in vas_mapping:
-            return vas_mapping[oid]
-        # Check VAS FEE column (Col 17 - in Metfone express, VAS Fee > 0 signifies VTT door delivery)
-        vas_fee_col = next((c for c in row.index if 'VAS' in str(c).upper() and 'FEE' in str(c).upper()), None)
-        if vas_fee_col:
-            try:
-                if float(row.get(vas_fee_col, 0) or 0) > 0:
-                    return 'VTT'
-            except (ValueError, TypeError):
-                pass
-        # Check Note or Service columns for VTT
-        for c in row.index:
-            c_up = str(c).upper()
-            if any(k in c_up for k in ('NOTE', 'VAS', 'SERVICE')):
-                val = str(row.get(c, '') or '').upper()
-                if 'VTT' in val:
-                    return 'VTT'
+        vas_mapped = str(vas_mapping.get(oid, '')).upper()
+        combined_notes = ' '.join(str(row.get(col, '') or '') for col in raw_note_cols).upper()
+
+        # In Metfone Express, VAS Fee > 0 or VTT in VAS/Service/Notes indicates VTT Door Delivery
+        is_vtt = ('VTT' in vas_mapped) or ('VTT' in combined_notes)
+        if not is_vtt:
+            vas_fee_col = next((c for c in row.index if 'VAS' in str(c).upper() and 'FEE' in str(c).upper()), None)
+            if vas_fee_col:
+                try:
+                    if float(row.get(vas_fee_col, 0) or 0) > 0:
+                        is_vtt = True
+                except (ValueError, TypeError):
+                    pass
+
+        is_ntn = ('NTN' in vas_mapped) or ('NTN' in combined_notes)
+
+        if is_vtt and is_ntn:
+            return 'VTT, NTN'
+        if is_vtt:
+            return 'VTT'
+        if is_ntn:
+            return 'NTN'
+        if vas_mapped and vas_mapped != 'NAN':
+            return vas_mapped
         return ''
 
     df['VAS Service'] = df.apply(_get_vas_service, axis=1)

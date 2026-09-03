@@ -113,29 +113,62 @@ def build_mega_detail(source_path, out_path, cfg):
 
     hub_statuses = {"306", "309", "302", "311", "310"}
 
+    # ── DEDUPLICATION: keep only the LATEST scan row per ORDER ID ─────────────
+    # TMS export has one row per scan event. Order that moved DVCMEGA1→MEGA1
+    # appears in both with status 306. Keep only the most recent row.
+    from datetime import timedelta
+
+    def _parse_ts_detail(row):
+        for col in (24, CI_CREATED):
+            val = row[col] if len(row) > col else None
+            if val is None:
+                continue
+            if isinstance(val, _dt):
+                return val
+            s = str(val).strip()
+            for fmt in ("%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y",
+                        "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+                try:
+                    return _dt.strptime(s, fmt)
+                except ValueError:
+                    continue
+        return _dt.min
+
+    latest_by_order = {}
     for row in data_rows:
         if not row or len(row) <= CI_STATUS:
             continue
         if row[CI_ORDER] is None or str(row[CI_ORDER]).strip() == "":
             continue
         sc = _sc(row[CI_STATUS])
-        if sc not in hub_statuses:
+        po = str(row[CI_CURRENT_PO] or "").strip().upper()
+        if po == "MEGA1":
+            if sc not in ("306", "309"):
+                continue
+        elif "DVC" in po or "MEGA" in po or "HUB" in po:
+            if sc != "306":
+                continue
+        else:
             continue
+
         if excl_test:
             blob = " ".join(str(row[c] or "") for c in (CI_SENDER, CI_RECEIVER)).lower()
             if any(k.lower() in blob for k in test_kw):
                 continue
+        oid = str(row[CI_ORDER]).strip()
+        ts = _parse_ts_detail(row)
+        existing = latest_by_order.get(oid)
+        if existing is None or ts > _parse_ts_detail(existing):
+            latest_by_order[oid] = row
 
-        # Filter matching Metfone Web Order Status Report (Select Branch = MEGA HUB)
-        # CURRENT POST OFFICE (Col 15) must be physically at the Hub!
+    for row in latest_by_order.values():
+        sc = _sc(row[CI_STATUS])
         po = str(row[CI_CURRENT_PO] or "").strip().upper()
 
         if po == "MEGA1":
             hub_label = "MEGA1"
-        elif "DVC" in po or "MEGA" in po or "HUB" in po:
-            hub_label = "DVMEGA"
         else:
-            continue
+            hub_label = "DVMEGA"
 
 
         # Date parsing: Use Action Date (Col 24) or Created Date
@@ -144,7 +177,15 @@ def build_mega_detail(source_path, out_path, cfg):
         if not action_date:
             action_date = _parse_created(row[CI_CREATED], _dt)
 
-        age = (today - action_date).days if action_date else 0
+        if not action_date:
+            continue
+
+        # 14-day cutoff (starts from 20/08 when today is 03/09)
+        cutoff_date = today - timedelta(days=14)
+        if action_date < cutoff_date:
+            continue
+
+        age = (today - action_date).days
         # MEGA SLA Rule: age 0 days is normal, 1 or more is urgent
         is_urgent = age >= 1
 
