@@ -292,9 +292,13 @@ def excel_to_image(xlsx_path: str) -> io.BytesIO:
     # ── 1. Build value grid (handle merged cells) ──────────────────────────────
     grid = [[''] * (max_col + 1) for _ in range(max_row + 1)]
     skip = set()
+    multi_col_merged = set()
     for mc in ws.merged_cells.ranges:
         v = ws.cell(mc.min_row, mc.min_col).value
         grid[mc.min_row][mc.min_col] = str(v) if v is not None else ''
+        if mc.max_col > mc.min_col:
+            for r in range(mc.min_row, mc.max_row + 1):
+                multi_col_merged.add((r, mc.min_col))
         for r in range(mc.min_row, mc.max_row + 1):
             for c in range(mc.min_col, mc.max_col + 1):
                 if not (r == mc.min_row and c == mc.min_col):
@@ -312,28 +316,27 @@ def excel_to_image(xlsx_path: str) -> io.BytesIO:
                 grid[r][c] = str(v) if v is not None else ''
 
     # ── 2. Classify columns ────────────────────────────────────────────────────
-    # Only scan the first 5 rows to find headers — avoids data rows like
-    # "Grand Total" row (which has a number before it) being misclassified
+    # Day columns are only classified if a header row has multiple (>=3) day numbers (01-31)
     day_ci  = set()
     zone_ci = set()
     gt_ci   = set()
 
-    HEADER_SCAN_ROWS = min(max_row, 8)
+    HEADER_SCAN_ROWS = min(max_row, 5)
     for r in range(1, HEADER_SCAN_ROWS + 1):
+        row_days = []
         for c in range(1, max_col + 1):
             val = grid[r][c].strip()
-            # Day col: exactly 2-digit 01-31 in a header row
-            # Exclude if previous or next cell in same row has content (avoids data Grand Total rows)
             if val.isdigit() and len(val) == 2 and 1 <= int(val) <= 31:
-                day_ci.add(c)
+                row_days.append(c)
             elif val == 'ZONE':
                 zone_ci.add(c)
             elif val == 'Grand Total':
-                # Only count as GT column if it's a header row (check row has other headers)
                 row_vals = [grid[r][cc].strip() for cc in range(1, max_col + 1)]
                 if any(v in ('ZONE', 'ORDER ID', 'POST OFFICE HANDLE', 'CURRENT POST OFFICE')
                        for v in row_vals):
                     gt_ci.add(c)
+        if len(row_days) >= 3:
+            day_ci.update(row_days)
 
     # Detect empty columns (gap separators between side-by-side tables)
     empty_ci = set(
@@ -367,9 +370,11 @@ def excel_to_image(xlsx_path: str) -> io.BytesIO:
         elif c in gt_ci:
             col_px.append(PX_GT)
         else:
-            # Auto-fit text columns
+            # Auto-fit text columns (ignore banner text merged across multiple columns)
             max_w = PX_MIN
             for r in range(1, max_row + 1):
+                if (r, c) in multi_col_merged:
+                    continue
                 text = grid[r][c]
                 if not text:
                     continue
@@ -385,6 +390,12 @@ def excel_to_image(xlsx_path: str) -> io.BytesIO:
                 except Exception:
                     w = len(text) * (FONT_SIZE - 2) + stroke_w * 2
                 max_w = max(max_w, w + PAD_X * 2)
+
+            # Respect explicit Excel column width if defined
+            if cd and cd.width and cd.width >= 2:
+                excel_px = int(cd.width * 7.5 * SCALE)
+                max_w = max(max_w, excel_px)
+
             col_px.append(min(max_w, PX_MAX))
 
     # Columns to actually render (skip 0-width hidden ones)
