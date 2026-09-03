@@ -279,7 +279,8 @@ def build_summary_image(
 
     # ── Canvas height ─────────────────────────────────────────────────────────
     # Title + month row + header row + data rows + grand total
-    total_h = TITLE_H + MONTH_H + ROW_H + n_data_rows * ROW_H + ROW_H + 1
+    has_month_row = bool(all_dates)
+    total_h = TITLE_H + (MONTH_H if has_month_row else 0) + ROW_H + n_data_rows * ROW_H + ROW_H + 1
 
     img  = Image.new("RGB", (total_w, total_h), C_ROW_BG)
     draw = ImageDraw.Draw(img)
@@ -311,17 +312,15 @@ def build_summary_image(
     draw.rectangle([0, 0, total_w - 1, TITLE_H - 1], outline=C_BORDER_DARK, width=sc)
     y += TITLE_H
 
-    # ── Row 2: Month sub-header ───────────────────────────────────────────────
-    # Fixed cols + tail cols are blank (same dark bg); date cols show month name merged
-    month_cells  = [""] * n_cols
-    month_bgs    = [C_MONTH_BG] * n_cols
-    month_fgs    = [C_MONTH_FG] * n_cols
-    month_fonts  = [fn_sm] * n_cols
-    month_aligns = ["center"] * n_cols
+    # ── Row 2: Month sub-header (only drawn when date columns exist) ───────────
+    if has_month_row:
+        month_cells  = [""] * n_cols
+        month_bgs    = [C_MONTH_BG] * n_cols
+        month_fgs    = [C_MONTH_FG] * n_cols
+        month_fonts  = [fn_sm] * n_cols
+        month_aligns = ["center"] * n_cols
 
-    # Group consecutive dates by month and write month name into first cell of group
-    if all_dates:
-        n_fixed = 4   # HANDLE + 3 type cols
+        n_fixed = len(fixed_cols)
         groups = []
         cur_mo, g_start = None, None
         for i, d in enumerate(all_dates):
@@ -335,23 +334,22 @@ def build_summary_image(
 
         for (yr, mo), gi_start, gi_end in groups:
             col_idx = n_fixed + gi_start   # 0-based column index
-            month_cells[col_idx] = _calendar.month_abbr[mo].upper()
+            if col_idx < n_cols:
+                month_cells[col_idx] = _calendar.month_abbr[mo].upper()
 
-    # Draw month row manually (need to visually merge month spans)
-    x = 0
-    for ci, cw in enumerate(col_widths):
-        is_date_col = (4 <= ci < 4 + len(all_dates))
-        bg = C_MONTH_BG
-        # lighter bg for non-date cols
-        cell_bg = C_MONTH_BG if is_date_col else C_HEADER_BG
-        _draw_cell(draw, x, y, cw, MONTH_H,
-                   bg=cell_bg,
-                   text=month_cells[ci],
-                   font=fn_sm, fg=C_MONTH_FG,
-                   align="center", pad=PAD,
-                   border=True, border_col=C_BORDER_DARK)
-        x += cw
-    y += MONTH_H
+        # Draw month row manually (need to visually merge month spans)
+        x = 0
+        for ci, cw in enumerate(col_widths):
+            is_date_col = (n_fixed <= ci < n_fixed + len(all_dates))
+            cell_bg = C_MONTH_BG if is_date_col else C_HEADER_BG
+            _draw_cell(draw, x, y, cw, MONTH_H,
+                       bg=cell_bg,
+                       text=month_cells[ci],
+                       font=fn_sm, fg=C_MONTH_FG,
+                       align="center", pad=PAD,
+                       border=True, border_col=C_BORDER_DARK)
+            x += cw
+        y += MONTH_H
 
     # ── Row 3: Column headers ─────────────────────────────────────────────────
     hdr_bgs = []
@@ -494,10 +492,10 @@ def build_summary_image(
         y += ROW_H
 
     # ── Grand Total row ───────────────────────────────────────────────────────
-    g_pickup   = overall.get("Pickup",   0)
-    g_delivery = overall.get("Delivery", 0)
-    g_transit  = overall.get("Transit",  0)
-    g_branch   = overall.get("Branch",   0)
+    g_pickup   = overall.get("Pickup",   0) or sum(hr["handle_counts"].get("Pickup", 0) for hr in handle_results)
+    g_delivery = overall.get("Delivery", 0) or sum(hr["handle_counts"].get("Delivery", 0) for hr in handle_results)
+    g_transit  = overall.get("Transit",  0) or sum(hr["handle_counts"].get("Transit", 0) for hr in handle_results)
+    g_branch   = overall.get("Branch",   0) or sum(hr["handle_counts"].get("Branch", 0) for hr in handle_results)
     g_total    = g_pickup + g_delivery + g_transit + g_branch
 
     gt_cells  = ([""] if show_zone_col else []) + [

@@ -4648,8 +4648,8 @@ async def run_push(
                 except ValueError:
                     group_id = group_id_str
 
-                # Calculate zone totals
-                zone_overall = {"Pickup": 0, "Delivery": 0, "Pending": 0}
+                # Calculate zone totals across all tabs
+                zone_overall = {"Pickup": 0, "Delivery": 0, "Transit": 0, "Branch": 0}
                 for hr in zone_results:
                     for k in zone_overall:
                         zone_overall[k] += hr["handle_counts"].get(k, 0)
@@ -4658,7 +4658,7 @@ async def run_push(
                 zone_label = zone_key.upper()
                 zone_caption = "\n".join([
                     f"📋 {zone_label} Report  {datetime.now().strftime('%d/%m/%Y %H:%M')}",
-                    f"Pickup: {zone_overall['Pickup']}  |  Delivery: {zone_overall['Delivery']}  |  Pending: {zone_overall['Pending']}",
+                    f"Pickup: {zone_overall['Pickup']}  |  Delivery: {zone_overall['Delivery']}  |  Transit: {zone_overall['Transit']}  |  Branch: {zone_overall['Branch']}",
                     f"Grand Total: {zone_grand}",
                 ])
                 if inline_remark:
@@ -4668,10 +4668,10 @@ async def run_push(
                 zone_result = {**result, "handle_results": zone_results, "overall_counts": zone_overall}
                 # Filter type_data DataFrames
                 zone_result["type_data"] = {}
-                for rn in ["Pickup", "Delivery", "Pending"]:
+                for rn in ["Pickup", "Delivery", "Transit", "Branch"]:
                     df = result.get("type_data", {}).get(rn)
                     if df is not None and not df.empty:
-                        filter_col = "POST OFFICE HANDLE"
+                        filter_col = generate_report.REPORT_FILTER_COLS.get(rn, "POST OFFICE HANDLE")
                         if filter_col in df.columns:
                             zone_result["type_data"][rn] = df[df[filter_col].isin(zone_handles)].copy()
                         else:
@@ -4685,7 +4685,7 @@ async def run_push(
                     zone_urgent_counts   = {}
                     today_date = datetime.now().date()
 
-                    for rn in ["Pickup", "Delivery", "Pending"]:
+                    for rn in ["Pickup", "Delivery", "Transit", "Branch"]:
                         df_z = zone_result["type_data"].get(rn)
                         if df_z is None or df_z.empty:
                             continue
