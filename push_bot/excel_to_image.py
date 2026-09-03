@@ -159,6 +159,12 @@ def _try_excel_com(xlsx_path: str):
     import os
     from PIL import ImageGrab
     
+    try:
+        import pythoncom
+        pythoncom.CoInitialize()
+    except Exception:
+        pass
+    
     abs_path = os.path.abspath(xlsx_path)
     try:
         excel = win32com.client.DispatchEx("Excel.Application")
@@ -257,6 +263,11 @@ def _try_excel_com(xlsx_path: str):
                 pass
         try:
             excel.Quit()
+        except Exception:
+            pass
+        try:
+            import pythoncom
+            pythoncom.CoUninitialize()
         except Exception:
             pass
     return None
