@@ -1462,6 +1462,205 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log.exception("Error in /total")
         await edit_or_send_requester_text(msg, update, context, f"Error: {e}")
 
+
+@pm_required_handler
+async def cmd_penalty(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Generates Stagnant Inventory & Handover Penalty Report and forwards to Zone and Branch groups."""
+    await delete_group_command(update, context)
+    cfg = load_config()
+
+    args = [a.strip() for a in (context.args or []) if a.strip()]
+    is_ytd = any(a.lower() in ("ytd", "yesterday", "homqua") for a in args)
+    skip_zone = any(a.lower() in ("nozone", "nozones", "no_zone", "skipzone", "skipzones", "branch", "branches", "branch_only") for a in args)
+    skip_branch = any(a.lower() in ("nobranch", "nobranches", "no_branch", "skipbranch", "skipbranches", "zone_only") for a in args)
+    no_fwd = any(a.lower() in ("nofwd", "no_fwd", "onlyme", "me", "self", "quiet") for a in args)
+    force_refresh = any(a.lower() in ("new", "refresh", "force") for a in args)
+
+    ignore_tokens = {
+        "ytd", "yesterday", "homqua", "new", "refresh", "force",
+        "nozone", "nozones", "no_zone", "skipzone", "skipzones", "branch", "branches", "branch_only",
+        "nobranch", "nobranches", "no_branch", "skipbranch", "skipbranches", "zone_only",
+        "nofwd", "no_fwd", "onlyme", "me", "self", "quiet"
+    }
+    filtered_args = [a for a in args if a.lower() not in ignore_tokens]
+    target_label = " ".join(filtered_args) if filtered_args else "ALL"
+    target_date = (datetime.now().date() - timedelta(days=1)) if is_ytd else datetime.now().date()
+
+    ytd_tag = f" — YESTERDAY {target_date.strftime('%d/%m/%Y')}" if is_ytd else ""
+    msg = await send_requester_text(update, context, f"⏳ Generating INVENTORY PENALTY REPORT ({target_label.upper()}{ytd_tag})...")
+    tmpdir = tempfile.mkdtemp(prefix="penalty_")
+    track_report_dir(tmpdir)
+    stamp = datetime.now().strftime("%d.%m_%HH%M")
+    src = os.path.join(tmpdir, f"export_{stamp}.xlsx")
+
+    try:
+        downloader.download_detail(cfg["api"], src, force_refresh=force_refresh)
+        import penalty_report
+        safe_label = "".join(c for c in target_label if c.isalnum() or c in ("-", "_")).strip() or "ALL"
+        suffix_file = "_YTD" if is_ytd else ""
+        out_xlsx = os.path.join(tmpdir, f"INVENTORY_PENALTY_REPORT_{stamp}_{safe_label}{suffix_file}.xlsx")
+        tot_ho, tot_del, tot_pen_cnt, tot_fine = penalty_report.build_penalty_report(src, out_xlsx, target_label=target_label, report_date=target_date)
+
+        # 1. Render Summary Image & send to requester
+        try:
+            img_buf = penalty_report.render_penalty_summary_image(out_xlsx)
+            img_buf.name = f"PENALTY_SUMMARY_{safe_label}{suffix_file}.png"
+            await send_requester_photo(update, context, img_buf)
+        except Exception as e_img:
+            log.warning("Could not render penalty summary image: %s", e_img)
+
+        # 2. Send Excel Document to requester
+        with open(out_xlsx, "rb") as f:
+            await send_requester_document(update, context, f, os.path.basename(out_xlsx))
+
+        # 3. Group Forwarding (When target is ALL, MEGA, or TOTAL)
+        tgt_upper = target_label.upper().replace(" ", "")
+        total_sent_zones = 0
+        total_sent_branches = 0
+
+        if tgt_upper in ("ALL", "TOTAL", "MEGA") and not no_fwd:
+            # A. Forward to 5 Zone Groups (Unless skip_zone)
+            if not skip_zone:
+                zone_fwd_map = cfg.get("zone_forward_mapping", {})
+                for z_idx in range(1, 6):
+                    z_name = f"Zone {z_idx}"
+                    z_clean = f"zone{z_idx}"
+                    z_xlsx = os.path.join(tmpdir, f"INVENTORY_PENALTY_REPORT_{stamp}_{z_name.replace(' ', '_')}{suffix_file}.xlsx")
+                    z_ho, z_del, z_pen, z_fine = penalty_report.build_penalty_report(src, z_xlsx, target_label=z_name, report_date=target_date)
+                    z_caption = (
+                        f"📊 *INVENTORY & SLA PENALTY REPORT ({z_name}{ytd_tag})*\n"
+                        f"Overdue Handover (> 4h): `{z_ho}`\n"
+                        f"Overdue Delivery (> 10h): `{z_del}`\n"
+                        f"Penalized Bills: `{z_pen}`\n"
+                        f"Total Fine: `${z_fine:.2f}`"
+                    )
+
+                    for gid, zkey in zone_fwd_map.items():
+                        if str(zkey).lower().strip() == z_clean:
+                            try:
+                                z_img = penalty_report.render_penalty_summary_image(z_xlsx)
+                                z_img.name = f"PENALTY_SUMMARY_{z_name.replace(' ', '_')}{suffix_file}.png"
+                                await safe_api_call(context.bot.send_photo, chat_id=int(gid), photo=z_img, caption=z_caption, parse_mode="Markdown")
+                            except Exception as e_fwd_img:
+                                log.warning("Failed forwarding penalty photo to zone group %s: %s", gid, e_fwd_img)
+
+                            try:
+                                with open(z_xlsx, "rb") as z_f_doc:
+                                    await safe_api_call(
+                                        context.bot.send_document,
+                                        chat_id=int(gid),
+                                        document=z_f_doc,
+                                        filename=os.path.basename(z_xlsx)
+                                    )
+                                total_sent_zones += 1
+                            except Exception as e_fwd_doc:
+                                log.warning("Failed forwarding penalty doc to zone group %s: %s", gid, e_fwd_doc)
+
+            # B. Forward to 36 Branch Groups in forward_mapping (Unless skip_branch)
+            if not skip_branch:
+                fwd_map = get_forward_mapping(cfg)
+                for gid, handles in fwd_map.items():
+                    if not handles or "*" in handles:
+                        continue
+                    br_code = handles[0].upper()
+                    if br_code not in penalty_report.MAIN_36_BRANCHES:
+                        continue
+
+                    br_xlsx = os.path.join(tmpdir, f"INVENTORY_PENALTY_REPORT_{stamp}_{br_code}{suffix_file}.xlsx")
+                    try:
+                        b_ho, b_del, b_pen, b_fine = penalty_report.build_penalty_report(src, br_xlsx, target_label=br_code, report_date=target_date)
+                        b_caption = (
+                            f"📊 *INVENTORY & SLA PENALTY REPORT ({br_code}{ytd_tag})*\n"
+                            f"Overdue Handover (> 4h): `{b_ho}`\n"
+                            f"Overdue Delivery (> 10h): `{b_del}`\n"
+                            f"Penalized Bills: `{b_pen}`\n"
+                            f"Total Fine: `${b_fine:.2f}`"
+                        )
+
+                        try:
+                            b_img = penalty_report.render_penalty_summary_image(br_xlsx)
+                            b_img.name = f"PENALTY_SUMMARY_{br_code}{suffix_file}.png"
+                            await safe_api_call(context.bot.send_photo, chat_id=int(gid), photo=b_img, caption=b_caption, parse_mode="Markdown")
+                        except Exception as e_b_img:
+                            log.warning("Failed sending penalty photo to branch group %s: %s", br_code, e_b_img)
+
+                        try:
+                            with open(br_xlsx, "rb") as b_f_doc:
+                                await safe_api_call(
+                                    context.bot.send_document,
+                                    chat_id=int(gid),
+                                    document=b_f_doc,
+                                    filename=os.path.basename(br_xlsx)
+                                )
+                            total_sent_branches += 1
+                        except Exception as e_b_doc:
+                            log.warning("Failed sending penalty doc to branch group %s: %s", br_code, e_b_doc)
+                    except Exception as e_br_gen:
+                        log.warning("Failed building penalty report for branch %s: %s", br_code, e_br_gen)
+
+        fwd_status_msg = ""
+        if total_sent_zones > 0 or total_sent_branches > 0:
+            fwd_status_msg = f" (Forwarded to {total_sent_zones} Zone groups & {total_sent_branches} Branch groups)"
+        elif no_fwd or skip_branch and skip_zone:
+            fwd_status_msg = " [Private / No-Forward Mode]"
+
+        await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent INVENTORY PENALTY REPORT ({target_label.upper()}){fwd_status_msg}.")
+    except Exception as e:
+        log.exception("Error in /penalty command: %s", e)
+        await edit_or_send_requester_text(msg, update, context, f"❌ Error generating penalty report: {e}")
+
+
+@pm_required_handler
+async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Generates Delivery Speed SLA Report."""
+    await delete_group_command(update, context)
+    cfg = load_config()
+
+    args = [a.strip() for a in (context.args or []) if a.strip()]
+    force_refresh = any(a.lower() in ("new", "refresh", "force") for a in args)
+
+    ignore_tokens = {"new", "refresh", "force"}
+    filtered_args = [a for a in args if a.lower() not in ignore_tokens]
+    target_label = " ".join(filtered_args) if filtered_args else "ALL"
+
+    msg = await send_requester_text(update, context, f"⏳ Generating EXECUTIVE DELIVERY SPEED DASHBOARD ({target_label.upper()})...")
+    tmpdir = tempfile.mkdtemp(prefix="speed_")
+    track_report_dir(tmpdir)
+    stamp = datetime.now().strftime("%d.%m_%HH%M")
+    src = os.path.join(tmpdir, f"export_{stamp}.xlsx")
+
+    try:
+        downloader.download_detail(cfg["api"], src, force_refresh=force_refresh)
+        cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
+        rev_file = os.path.join(cache_dir, "latest_revenue.xlsx")
+        try:
+            downloader.download_revenue_detail(cfg["api"], rev_file, force_refresh=force_refresh)
+        except Exception as e_rev:
+            log.warning("Could not refresh revenue detail for /speed: %s", e_rev)
+
+        import speed_report
+        safe_label = "".join(c for c in target_label if c.isalnum() or c in ("-", "_")).strip() or "ALL"
+        out_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{safe_label}.xlsx")
+        tot_del, tot_u2, tot_24, tot_o8, tot_pay = speed_report.build_speed_report(src, out_xlsx, target_label=target_label)
+
+        # 1. Render Summary Image
+        try:
+            img_buf = speed_report.render_speed_summary_image(out_xlsx)
+            img_buf.name = f"speed_summary_{stamp}.png"
+            await send_requester_photo(update, context, img_buf)
+        except Exception as e_img:
+            log.warning("Could not render speed summary image: %s", e_img)
+
+        # 2. Send Excel Document
+        with open(out_xlsx, "rb") as f:
+            await send_requester_document(update, context, f, os.path.basename(out_xlsx))
+
+        await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent EXECUTIVE DELIVERY SPEED DASHBOARD ({target_label.upper()}).")
+    except Exception as e:
+        log.exception("Error in /speed command: %s", e)
+        await edit_or_send_requester_text(msg, update, context, f"❌ Error generating speed report: {e}")
+
+
 def get_highlighted_order_ids(df_t, today_date):
     """Return a set of order IDs that are highlighted in this DataFrame."""
     highlighted = set()
@@ -5802,6 +6001,8 @@ def main():
     app.add_handler(CommandHandler("app",          cmd_app))
     app.add_handler(CommandHandler("push",         run_push))
     app.add_handler(CommandHandler("total",        cmd_total))
+    app.add_handler(CommandHandler("penalty",      cmd_penalty))
+    app.add_handler(CommandHandler("speed",        cmd_speed))
     app.add_handler(CommandHandler("vs",           cmd_vs))
     app.add_handler(CommandHandler("vs2",          cmd_vs2))
     app.add_handler(CommandHandler("help",         cmd_help))

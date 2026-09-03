@@ -17,6 +17,14 @@ MAIN_36_BRANCHES = [
     'SVAP001', 'TAKP001', 'TBKP001', 'THOP001'
 ]
 
+ZONE_BRANCHES_MAP = {
+    "ZONE1": ['PNPP001', 'PNPP002', 'PNPP003', 'PNPP004', 'PNPP005', 'PNPP006', 'PNPP007', 'PNPP008', 'PNPP009', 'PNPP010', 'PNPP011', 'PNPP012', 'PNPP013', 'PNPP014', 'KANP001', 'PREP001', 'SVAP001'],
+    "ZONE2": ['KAMP001', 'KOHP001', 'SIHP001', 'SPEP001', 'TAKP001'],
+    "ZONE3": ['BANP001', 'BATP001', 'CHHP001', 'PURP001'],
+    "ZONE4": ['ODDP001', 'PRHP001', 'SIEP001', 'THOP001'],
+    "ZONE5": ['CHAP001', 'KRAP001', 'MONP001', 'ROTP001', 'STUP001', 'TBKP001'],
+}
+
 def parse_date(val):
     if not val or pd.isna(val):
         return None
@@ -75,6 +83,27 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     if not tgt:
         tgt = "ALL"
 
+    # Load Revenue to get accurate VAS_SERVICE VTT mapping
+    revenue_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache", "latest_revenue.xlsx")
+    vtt_order_ids = set()
+    if os.path.exists(revenue_cache):
+        try:
+            rev_df = pd.read_excel(revenue_cache, skiprows=4)
+            rev_df['ORDER_NUMBER'] = rev_df['ORDER_NUMBER'].dropna().astype(str).str.split('.').str[0].str.strip()
+            vtt_rev = rev_df[rev_df['VAS_SERVICE'].astype(str).str.contains('VTT', case=False, na=False)]
+            vtt_order_ids = set(vtt_rev['ORDER_NUMBER'])
+        except Exception as e:
+            pass
+
+    df['order_clean'] = df[col_order].astype(str).str.split('.').str[0].str.strip()
+    
+    # STRICT VTT FILTER: Order must be in VTT revenue list OR have SERVICE/NOTE as VTT
+    if vtt_order_ids:
+        df = df[
+            (df['order_clean'].isin(vtt_order_ids)) |
+            (df['SERVICE'].astype(str).str.contains('VTT', case=False, na=False))
+        ].copy()
+
     df['sc'] = df[col_status].astype(str).str.extract(r'^(\d{3})')[0]
     df['curr_po_clean'] = df[col_orig_po].astype(str).str.strip().str.upper()
     df['deliv_po_clean'] = df[col_dest_po].astype(str).str.strip().str.upper()
@@ -131,6 +160,17 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
                 "over_8h": 0,
                 "total_commission": 0.0
             }
+    elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
+        for b in ZONE_BRANCHES_MAP[tgt]:
+            summary_data[b] = {
+                "po": b,
+                "total_delivered": 0,
+                "under_2h": 0,
+                "between_2_4h": 0,
+                "between_4_8h": 0,
+                "over_8h": 0,
+                "total_commission": 0.0
+            }
 
     base_rows = []
     r_idx = 1
@@ -148,11 +188,17 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             if raw_po not in MAIN_36_BRANCHES:
                 continue
             po = raw_po
+        elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
+            if raw_po not in ZONE_BRANCHES_MAP[tgt]:
+                continue
+            po = raw_po
         elif len(tgt) >= 7:
             po = tgt
             if raw_po != tgt:
                 continue
         else:
+            if raw_po not in MAIN_36_BRANCHES:
+                continue
             po = raw_po
 
         if po not in summary_data:
@@ -170,15 +216,15 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         t410 = parse_time(row.get(col_action_time)) or parse_time(row.get(col_created))
         
         t_start = None
-        if col_306_last and pd.notna(row.get(col_306_last)):
-            t_start = parse_time(row.get(col_306_last))
-        if not t_start and col_306_first and pd.notna(row.get(col_306_first)):
-            t_start = parse_time(row.get(col_306_first))
-        if not t_start and col_400_time and pd.notna(row.get(col_400_time)):
-            t_start = parse_time(row.get(col_400_time))
-        if not t_start and col_210_time and pd.notna(row.get(col_210_time)):
+        if col_210_time and pd.notna(row.get(col_210_time)):
             t_start = parse_time(row.get(col_210_time))
-        if not t_start:
+        elif col_306_last and pd.notna(row.get(col_306_last)):
+            t_start = parse_time(row.get(col_306_last))
+        elif col_306_first and pd.notna(row.get(col_306_first)):
+            t_start = parse_time(row.get(col_306_first))
+        elif col_400_time and pd.notna(row.get(col_400_time)):
+            t_start = parse_time(row.get(col_400_time))
+        else:
             t_start = parse_time(row.get(col_created))
 
         if t410 and t_start and t410 >= t_start:
@@ -395,6 +441,8 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
     if tgt in ("ALL", "TOTAL"):
         sorted_branches = [summary_data[b] for b in MAIN_36_BRANCHES if b in summary_data]
+    elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
+        sorted_branches = [summary_data[b] for b in ZONE_BRANCHES_MAP[tgt] if b in summary_data]
     else:
         sorted_branches = sorted(summary_data.values(), key=lambda x: x["po"])
 

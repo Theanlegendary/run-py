@@ -17,6 +17,14 @@ MAIN_36_BRANCHES = [
     'SVAP001', 'TAKP001', 'TBKP001', 'THOP001'
 ]
 
+ZONE_BRANCHES_MAP = {
+    "ZONE1": ['PNPP001', 'PNPP002', 'PNPP003', 'PNPP004', 'PNPP005', 'PNPP006', 'PNPP007', 'PNPP008', 'PNPP009', 'PNPP010', 'PNPP011', 'PNPP012', 'PNPP013', 'PNPP014', 'KANP001', 'PREP001', 'SVAP001'],
+    "ZONE2": ['KAMP001', 'KOHP001', 'SIHP001', 'SPEP001', 'TAKP001'],
+    "ZONE3": ['BANP001', 'BATP001', 'CHHP001', 'PURP001'],
+    "ZONE4": ['ODDP001', 'PRHP001', 'SIEP001', 'THOP001'],
+    "ZONE5": ['CHAP001', 'KRAP001', 'MONP001', 'ROTP001', 'STUP001', 'TBKP001'],
+}
+
 def parse_date(val):
     if not val or pd.isna(val):
         return None
@@ -75,6 +83,27 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     if not tgt:
         tgt = "ALL"
 
+    # Load Revenue to get accurate VAS_SERVICE VTT mapping
+    revenue_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache", "latest_revenue.xlsx")
+    vtt_order_ids = set()
+    if os.path.exists(revenue_cache):
+        try:
+            rev_df = pd.read_excel(revenue_cache, skiprows=4)
+            rev_df['ORDER_NUMBER'] = rev_df['ORDER_NUMBER'].dropna().astype(str).str.split('.').str[0].str.strip()
+            vtt_rev = rev_df[rev_df['VAS_SERVICE'].astype(str).str.contains('VTT', case=False, na=False)]
+            vtt_order_ids = set(vtt_rev['ORDER_NUMBER'])
+        except Exception as e:
+            pass
+
+    df['order_clean'] = df[col_order].astype(str).str.split('.').str[0].str.strip()
+    
+    # STRICT VTT FILTER: Order must be in VTT revenue list OR have SERVICE/NOTE as VTT
+    if vtt_order_ids:
+        df = df[
+            (df['order_clean'].isin(vtt_order_ids)) |
+            (df['SERVICE'].astype(str).str.contains('VTT', case=False, na=False))
+        ].copy()
+
     df['sc'] = df[col_status].astype(str).str.extract(r'^(\d{3})')[0]
     df['curr_po_clean'] = df[col_orig_po].astype(str).str.strip().str.upper()
     df['deliv_po_clean'] = df[col_dest_po].astype(str).str.strip().str.upper()
@@ -131,6 +160,17 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
                 "over_8h": 0,
                 "total_commission": 0.0
             }
+    elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
+        for b in ZONE_BRANCHES_MAP[tgt]:
+            summary_data[b] = {
+                "po": b,
+                "total_delivered": 0,
+                "under_2h": 0,
+                "between_2_4h": 0,
+                "between_4_8h": 0,
+                "over_8h": 0,
+                "total_commission": 0.0
+            }
 
     base_rows = []
     r_idx = 1
@@ -148,11 +188,17 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             if raw_po not in MAIN_36_BRANCHES:
                 continue
             po = raw_po
+        elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
+            if raw_po not in ZONE_BRANCHES_MAP[tgt]:
+                continue
+            po = raw_po
         elif len(tgt) >= 7:
             po = tgt
             if raw_po != tgt:
                 continue
         else:
+            if raw_po not in MAIN_36_BRANCHES:
+                continue
             po = raw_po
 
         if po not in summary_data:
@@ -170,15 +216,15 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         t410 = parse_time(row.get(col_action_time)) or parse_time(row.get(col_created))
         
         t_start = None
-        if col_306_last and pd.notna(row.get(col_306_last)):
-            t_start = parse_time(row.get(col_306_last))
-        if not t_start and col_306_first and pd.notna(row.get(col_306_first)):
-            t_start = parse_time(row.get(col_306_first))
-        if not t_start and col_400_time and pd.notna(row.get(col_400_time)):
-            t_start = parse_time(row.get(col_400_time))
-        if not t_start and col_210_time and pd.notna(row.get(col_210_time)):
+        if col_210_time and pd.notna(row.get(col_210_time)):
             t_start = parse_time(row.get(col_210_time))
-        if not t_start:
+        elif col_306_last and pd.notna(row.get(col_306_last)):
+            t_start = parse_time(row.get(col_306_last))
+        elif col_306_first and pd.notna(row.get(col_306_first)):
+            t_start = parse_time(row.get(col_306_first))
+        elif col_400_time and pd.notna(row.get(col_400_time)):
+            t_start = parse_time(row.get(col_400_time))
+        else:
             t_start = parse_time(row.get(col_created))
 
         if t410 and t_start and t410 >= t_start:
@@ -280,6 +326,9 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     font_bold_data = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")
     font_tot = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
     font_tot_green = Font(name="Segoe UI", size=9.5, bold=True, color="15803D")
+    font_green = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")
+    font_blue = Font(name="Segoe UI", size=8.5, bold=True, color="2563EB")
+    font_red = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626")
 
     date_str = today.strftime('%d/%m/%Y')
 
@@ -291,17 +340,17 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         ws1.cell(1, c).fill = fill_title_left
     ws1.row_dimensions[1].height = 26.0
 
-    # 2. Right Title Banner (2-Tier Executive Header)
-    ws1.merge_cells("J1:Q1")
+    # 2. Right Title Banner
+    ws1.merge_cells("J1:S1")
     ws1.cell(1, 10, f"EXECUTIVE DELIVERY SPEED DASHBOARD ({tgt})").font = font_banner
     ws1.cell(1, 10).alignment = Alignment(horizontal="center", vertical="center")
-    for c in range(10, 18):
+    for c in range(10, 20):
         ws1.cell(1, c).fill = fill_title_right
 
-    ws1.merge_cells("J2:Q2")
+    ws1.merge_cells("J2:S2")
     ws1.cell(2, 10, "Speed Bonus: < 2h (+50% / $0.30) • 2-4h (+25% / $0.25) • 4-8h ($0.20) • > 8h (-25% / $0.15)").font = font_sub
     ws1.cell(2, 10).alignment = Alignment(horizontal="center", vertical="center")
-    for c in range(10, 18):
+    for c in range(10, 20):
         ws1.cell(2, c).fill = fill_sub_right
     ws1.row_dimensions[2].height = 18.0
 
@@ -312,22 +361,23 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     ]
     headers_right = [
         "No", "Post Office", "Delivered (410)", "< 2 Hours (+50%)",
-        "2 - 4 Hours (+25%)", "4 - 8 Hours (Normal)", "> 8 Hours (-25%)", "Commission ($)"
+        "2 - 4 Hours (+25%)", "4 - 8 Hours (Normal)", "> 8 Hours (-25%)",
+        "% < 8 HOUR", "% > 8 HOUR", "Commission ($)"
     ]
 
-    ws1.row_dimensions[3].height = 24.0
+    ws1.row_dimensions[3].height = 26.0
     for ci, h in enumerate(headers_left, 1):
         cell = ws1.cell(3, ci, h)
         cell.font = font_hdr
         cell.fill = fill_hdr_left
-        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = border_clean
 
     for ci, h in enumerate(headers_right, 10):
         cell = ws1.cell(3, ci, h)
         cell.font = font_hdr
         cell.fill = fill_hdr_right
-        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = border_clean
 
     # Populate Left Detail Order Rows
@@ -391,11 +441,22 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
 
     if tgt in ("ALL", "TOTAL"):
         sorted_branches = [summary_data[b] for b in MAIN_36_BRANCHES if b in summary_data]
+    elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
+        sorted_branches = [summary_data[b] for b in ZONE_BRANCHES_MAP[tgt] if b in summary_data]
     else:
         sorted_branches = sorted(summary_data.values(), key=lambda x: x["po"])
 
+    fill_pen_red = PatternFill("solid", fgColor="FFEAEA") # Light Red/Pink highlight
+    font_pen_red = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # Bold Red
+
     for stats in sorted_branches:
         ws1.row_dimensions[r_sum].height = 18.0
+        
+        tot_b = stats["total_delivered"]
+        on_time_b = stats["under_2h"] + stats["between_2_4h"] + stats["between_4_8h"]
+        pct_under_8h = (on_time_b / tot_b * 100.0) if tot_b > 0 else 100.0
+        pct_over_8h = (stats["over_8h"] / tot_b * 100.0) if tot_b > 0 else 0.0
+        
         s_vals = [
             n_idx,
             stats["po"],
@@ -404,16 +465,27 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             stats["between_2_4h"],
             stats["between_4_8h"],
             stats["over_8h"],
+            f"{pct_under_8h:.1f}%",
+            f"{pct_over_8h:.1f}%",
             f"${stats['total_commission']:.2f}"
         ]
         for ci, val in enumerate(s_vals, 10):
             cell = ws1.cell(r_sum, ci, val)
-            cell.font = font_bold_data if ci in (11, 17) else font_data
+            cell.font = font_bold_data if ci in (11, 19) else font_data
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = border_clean
             if r_sum % 2 == 0:
                 cell.fill = fill_row_alt
-            if ci == 17:
+                
+            if ci == 16 and stats["over_8h"] > 0:
+                cell.fill = fill_pen_red
+                cell.font = font_pen_red
+            elif ci == 17:
+                cell.font = font_green if pct_under_8h >= 90 else (font_blue if pct_under_8h >= 75 else font_red)
+            elif ci == 18:
+                if stats["over_8h"] > 0:
+                    cell.font = font_red
+            elif ci == 19:
                 cell.font = font_tot_green
                 if stats["total_commission"] > 0:
                     cell.fill = green_fill
@@ -434,12 +506,19 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     rt_tot.font = font_tot
     rt_tot.alignment = Alignment(horizontal="left", vertical="center")
 
-    tot_vals_right = ["", "", tot_del, tot_u2, tot_24, tot_48, tot_o8, f"${tot_pay:.2f}"]
-    for c in range(10, 18):
+    tot_on_time = tot_u2 + tot_24 + tot_48
+    tot_pct_u8 = (tot_on_time / tot_del * 100.0) if tot_del > 0 else 100.0
+    tot_pct_o8 = (tot_o8 / tot_del * 100.0) if tot_del > 0 else 0.0
+
+    tot_vals_right = [
+        "", "", tot_del, tot_u2, tot_24, tot_48, tot_o8,
+        f"{tot_pct_u8:.1f}%", f"{tot_pct_o8:.1f}%", f"${tot_pay:.2f}"
+    ]
+    for c in range(10, 20):
         cell = ws1.cell(r_sum, c)
         if c >= 12:
             cell.value = tot_vals_right[c-10]
-        cell.font = font_tot_green if c == 17 else font_tot
+        cell.font = font_tot_green if c == 19 else font_tot
         cell.fill = fill_sum_tot
         cell.border = tot_border_accounting
         cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -447,7 +526,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     col_widths = {
         1: 5, 2: 15, 3: 20, 4: 12, 5: 12, 6: 12, 7: 18, 8: 14,
         9: 4,
-        10: 5, 11: 12, 12: 13, 13: 14, 14: 14, 15: 14, 16: 14, 17: 15
+        10: 5, 11: 12, 12: 13, 13: 14, 14: 14, 15: 14, 16: 14, 17: 14, 18: 14, 19: 15
     }
     for c, w in col_widths.items():
         ws1.column_dimensions[get_column_letter(c)].width = w
@@ -523,13 +602,13 @@ def render_speed_summary_image(out_xlsx):
 
     max_r = 1
     for r in range(1, ws.max_row + 1):
-        if ws.cell(r, 10).value is not None or ws.cell(r, 17).value is not None:
+        if ws.cell(r, 10).value is not None or ws.cell(r, 19).value is not None:
             max_r = r
 
     for r in range(1, max_r + 1):
         if ws.row_dimensions[r].height:
             ws_sum.row_dimensions[r].height = ws.row_dimensions[r].height
-        for c_idx in range(8):
+        for c_idx in range(10):
             orig_c = 10 + c_idx
             tgt_c = 1 + c_idx
             cell_orig = ws.cell(r, orig_c)
@@ -540,12 +619,12 @@ def render_speed_summary_image(out_xlsx):
                 cell_tgt.border = copy.copy(cell_orig.border)
                 cell_tgt.alignment = copy.copy(cell_orig.alignment)
 
-    col_widths = {1: 6, 2: 14, 3: 15, 4: 16, 5: 16, 6: 16, 7: 16, 8: 18}
+    col_widths = {1: 6, 2: 14, 3: 15, 4: 16, 5: 16, 6: 16, 7: 16, 8: 14, 9: 14, 10: 18}
     for c, w in col_widths.items():
         ws_sum.column_dimensions[get_column_letter(c)].width = w
 
-    ws_sum.merge_cells("A1:H1")
-    ws_sum.merge_cells("A2:H2")
+    ws_sum.merge_cells("A1:J1")
+    ws_sum.merge_cells("A2:J2")
     ws_sum.merge_cells(start_row=max_r, start_column=1, end_row=max_r, end_column=2)
 
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_f:

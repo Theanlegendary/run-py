@@ -17,6 +17,41 @@ MAIN_36_BRANCHES = [
     'SVAP001', 'TAKP001', 'TBKP001', 'THOP001'
 ]
 
+ZONE_BRANCHES_MAP = {
+    "ZONE1": ['PNPP001', 'PNPP002', 'PNPP003', 'PNPP004', 'PNPP005', 'PNPP006', 'PNPP007', 'PNPP008', 'PNPP009', 'PNPP010', 'PNPP011', 'PNPP012', 'PNPP013', 'PNPP014', 'KANP001', 'PREP001', 'SVAP001'],
+    "ZONE2": ['KAMP001', 'KOHP001', 'SIHP001', 'SPEP001', 'TAKP001'],
+    "ZONE3": ['BANP001', 'BATP001', 'CHHP001', 'PURP001'],
+    "ZONE4": ['ODDP001', 'PRHP001', 'SIEP001', 'THOP001'],
+    "ZONE5": ['CHAP001', 'KRAP001', 'MONP001', 'ROTP001', 'STUP001', 'TBKP001'],
+}
+
+STATUS_NAME_EN = {
+    '110': 'Not Received',
+    '210': 'Pickup Collected',
+    '230': 'Pickup Failed',
+    '300': 'Assigned to Bag / Transit',
+    '302': 'Bag / Transit Completed',
+    '306': 'In Storage / Handover',
+    '309': 'Received at Post Office',
+    '310': 'Packing / Sorting',
+    '311': 'In Transit to Hub',
+    '400': 'Assigned to Rider (Pending)',
+    '401': 'Delivery Dispatched (Completed)',
+    '402': 'Confirmed Dispatch',
+    '410': 'Delivered Successfully',
+    '420': 'Rescheduled / Customer Appointment',
+    '430': 'Delivery Failed (Undelivered)',
+    '460': 'Return Notice Created',
+    '470': 'Return in Progress',
+    '471': 'Checking Customer Info',
+    '472': 'Resolving Delivery Issue',
+    '480': 'Confirming New Address',
+    '500': 'Out for Return to Sender',
+    '512': 'Return Dispatch Confirmed',
+    '520': 'Returned to Hub',
+    '540': 'Return Completed to Merchant',
+}
+
 def parse_date(val):
     if not val or pd.isna(val):
         return None
@@ -120,6 +155,17 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
                 "excused_count": 0,
                 "total_fine": 0.0
             }
+    elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
+        for b in ZONE_BRANCHES_MAP[tgt]:
+            summary_data[b] = {
+                "po": b,
+                "total_handover": 0,
+                "total_delivery": 0,
+                "penalty_handover": 0,
+                "penalty_delivery": 0,
+                "excused_count": 0,
+                "total_fine": 0.0
+            }
 
     base_rows = []
     r_idx = 1
@@ -147,11 +193,17 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             if raw_po not in MAIN_36_BRANCHES:
                 continue
             po = raw_po
+        elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
+            if raw_po not in ZONE_BRANCHES_MAP[tgt]:
+                continue
+            po = raw_po
         elif len(tgt) >= 7:
             po = tgt
             if raw_po != tgt:
                 continue
         else:
+            if raw_po not in MAIN_36_BRANCHES:
+                continue
             po = raw_po
 
         if po not in summary_data:
@@ -222,7 +274,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             "created_at": str(row.get(col_created, '')),
             "last_action_time": str(act_val or ""),
             "status_code": sc,
-            "status_name": status_raw,
+            "status_name": STATUS_NAME_EN.get(sc, "Processing"),
             "type": "Handover" if is_handover else "Delivery",
             "age_days": age_days,
             "penalty_fine": fine,
@@ -355,7 +407,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             item["order_number"],
             item["customer"],
             item["assigned_branch"],
-            f"{item['status_code']} - {item['status_name']}",
+            item["status_code"],
             item["type"],
             item["age_days"],
             fine_text
@@ -398,6 +450,8 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
 
     if tgt in ("ALL", "TOTAL"):
         all_branches = [summary_data[b] for b in MAIN_36_BRANCHES if b in summary_data]
+    elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
+        all_branches = [summary_data[b] for b in ZONE_BRANCHES_MAP[tgt] if b in summary_data]
     else:
         all_branches = list(summary_data.values())
 
