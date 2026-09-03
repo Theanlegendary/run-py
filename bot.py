@@ -1204,29 +1204,35 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 msg = await edit_or_send_requester_text(msg, update, context, "Building TỒN MEGA CHECK report...")
                 import pivot
 
-                # 1. Combined Excel (Zone + Mega tables)
-                combined_xlsx = os.path.join(tmpdir, f"Report_MEGA_Combined_{stamp}.xlsx")
-                pivot.run_mega_combined(src, combined_xlsx, cfg)
-                img_combined = excel_to_image.excel_to_image(combined_xlsx)
-                img_combined.name = "mega_zone_combined.png"
-                await send_requester_photo(update, context, img_combined)
+                # Generate 2 separate pivot tables/images: MEGA1 and DVCMEGA1 (matching morning report)
+                rows = await asyncio.to_thread(pivot.read_source, src)
+                tree, day_keys, extra_data = await asyncio.to_thread(
+                    pivot.build_mega_pivot, rows, cfg.get("pivot", {}), cfg.get("zone_mapping", {})
+                )
 
-                # 2. Mega-only pivot Excel + image
-                mega_xlsx = os.path.join(tmpdir, f"Report_MEGA_{stamp}.xlsx")
-                _, grand_total = pivot.run_mega(src, mega_xlsx, cfg)
-                img_buf = excel_to_image.excel_to_image(mega_xlsx)
-                img_buf.name = "mega_check.png"
-                await send_requester_photo(update, context, img_buf)
+                last_hub_xlsx = None
+                for hub in ["MEGA1", "DVCMEGA1"]:
+                    if hub in tree and tree[hub]:
+                        sub_tree = {hub: tree[hub]}
+                        hub_xlsx = os.path.join(tmpdir, f"Report_{hub}_{stamp}.xlsx")
+                        await asyncio.to_thread(pivot.export_mega_pivot, sub_tree, day_keys, hub_xlsx, extra_data=extra_data)
+                        last_hub_xlsx = hub_xlsx
+                        try:
+                            img_buf = await asyncio.to_thread(excel_to_image.excel_to_image, hub_xlsx)
+                            img_buf.name = f"{hub}_check.png"
+                            await send_requester_photo(update, context, img_buf)
+                        except Exception as e_img:
+                            log.warning("Failed rendering photo for %s: %s", hub, e_img)
 
-                caption = f"TỒN MEGA CHECK {datetime.now().strftime('%d/%m/%Y %H:%M')}\nGrand Total: {grand_total}"
-                with open(combined_xlsx, "rb") as f:
-                    await send_requester_document(
-                        update,
-                        context,
-                        f,
-                        os.path.basename(combined_xlsx),
-                        caption=caption,
-                    )
+                if last_hub_xlsx and os.path.exists(last_hub_xlsx):
+                    with open(last_hub_xlsx, "rb") as f:
+                        await send_requester_document(
+                            update,
+                            context,
+                            f,
+                            os.path.basename(last_hub_xlsx),
+                            caption=f"📊 TỒN MEGA CHECK {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                        )
 
                 # Build detail Excel with actual order data for MEGA/HUB/DVC
                 try:
@@ -1425,9 +1431,9 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Build final formatted caption
         result["summary_caption"] = "\n".join([
             f"📋 {zone_label} Report  {datetime.now().strftime('%d/%m/%Y %H:%M')}",
-            f"Pickup: {overall['Pickup']} (Urgent: {urgent_by_type['Pickup']})  |  "
-            f"Delivery: {overall['Delivery']} (Urgent: {urgent_by_type['Delivery']})  |  "
-            f"Pending: {overall['Pending']} (Urgent: {urgent_by_type['Pending']})",
+            f"Pickup: {overall.get('Pickup', 0)} (Urgent: {urgent_by_type.get('Pickup', 0)})  |  "
+            f"Delivery: {overall.get('Delivery', 0)} (Urgent: {urgent_by_type.get('Delivery', 0)})  |  "
+            f"Pending: {overall.get('Pending', 0)} (Urgent: {urgent_by_type.get('Pending', 0)})",
             f"Grand Total: {grand_total}  |  Total Urgent: {total_urgent_sum}",
         ])
 

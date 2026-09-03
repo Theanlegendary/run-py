@@ -430,6 +430,14 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
     else:
         hub_title = "MEGA (Status 306/309)"
 
+    # Filter day_keys to only dates that have orders in this tree (eliminates 25 empty columns)
+    active_days = [
+        dk for dk in day_keys
+        if any(tree[h][p].get(dk, 0) > 0 for h in tree for p in tree[h])
+    ]
+    if active_days:
+        day_keys = active_days
+
     tot_col = 2 + len(day_keys)
     fee_col = tot_col + 1
     cod_col = fee_col + 1
