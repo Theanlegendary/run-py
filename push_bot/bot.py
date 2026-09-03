@@ -4484,8 +4484,10 @@ async def run_push(
                 target_handles = group_handles
 
         mode = get_mode(cfg)
+        rev_cache = os.path.join(HERE, "cache", "latest_revenue.xlsx")
         result = generate_report.generate_reports_from_data(
-            src, REF_PATH, tmpdir, return_metadata=True, mode=mode, target_handles=target_handles
+            src, REF_PATH, tmpdir, return_metadata=True, mode=mode, target_handles=target_handles,
+            revenue_path=rev_cache if os.path.exists(rev_cache) else None
         )
         update_webapp_cache(result)
         save_highlight_history(result)

@@ -907,6 +907,11 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
 
     # Load revenue data and map VAS_SERVICE
     vas_mapping = {}
+    if not revenue_path:
+        default_rev = os.path.join(os.path.dirname(__file__), 'cache', 'latest_revenue.xlsx')
+        if os.path.exists(default_rev):
+            revenue_path = default_rev
+
     if revenue_path and os.path.exists(revenue_path):
         try:
             for skiprows in range(5):
@@ -922,11 +927,29 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
         except Exception as e:
             print(f"Failed to load revenue data for VAS mapping: {e}")
 
-    # Initialize VAS Service column
-    if 'ORDER ID' in df.columns:
-        df['VAS Service'] = df['ORDER ID'].astype(str).str.strip().map(vas_mapping).fillna('')
-    else:
-        df['VAS Service'] = ''
+    # Initialize VAS Service column (from revenue VAS mapping or VAS FEE / NOTE / SERVICE detection)
+    def _get_vas_service(row):
+        oid = str(row.get('ORDER ID', '') or '').strip()
+        if oid in vas_mapping:
+            return vas_mapping[oid]
+        # Check VAS FEE column (Col 17 - in Metfone express, VAS Fee > 0 signifies VTT door delivery)
+        vas_fee_col = next((c for c in row.index if 'VAS' in str(c).upper() and 'FEE' in str(c).upper()), None)
+        if vas_fee_col:
+            try:
+                if float(row.get(vas_fee_col, 0) or 0) > 0:
+                    return 'VTT'
+            except (ValueError, TypeError):
+                pass
+        # Check Note or Service columns for VTT
+        for c in row.index:
+            c_up = str(c).upper()
+            if any(k in c_up for k in ('NOTE', 'VAS', 'SERVICE')):
+                val = str(row.get(c, '') or '').upper()
+                if 'VTT' in val:
+                    return 'VTT'
+        return ''
+
+    df['VAS Service'] = df.apply(_get_vas_service, axis=1)
 
     # Clean up column names
     df.columns = [str(c).strip() for c in df.columns]
