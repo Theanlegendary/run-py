@@ -297,18 +297,15 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     ws1.title = "DELIVERY SPEED REPORT"
     ws1.views.sheetView[0].showGridLines = True
 
-    # ── CEO SPEED THEME: Deep Emerald (#064E3B) & Cobalt Cyan (#0284C7) ──
+    # ── CEO MIDNIGHT & ROYAL SAPPHIRE BLUE PALETTE (Exact Match to Executive Dashboard) ──
     fill_title_left   = PatternFill("solid", fgColor="0F172A") # Midnight Navy
-    fill_hdr_left     = PatternFill("solid", fgColor="1E293B") # Executive Slate
-    fill_title_right  = PatternFill("solid", fgColor="064E3B") # Deep Forest Emerald
-    fill_sub_right    = PatternFill("solid", fgColor="022C22") # Dark Emerald Subtitle
-    fill_hdr_right    = PatternFill("solid", fgColor="047857") # Vivid Emerald
-    fill_row_alt      = PatternFill("solid", fgColor="F8FAFC") # Soft Clean Zebra
+    fill_hdr_left     = PatternFill("solid", fgColor="1E293B") # Midnight Slate
+    fill_title_right  = PatternFill("solid", fgColor="0B132B") # Deepest Midnight Navy
+    fill_sub_right    = PatternFill("solid", fgColor="1C2541") # Subtitle Midnight Slate
+    fill_hdr_right    = PatternFill("solid", fgColor="1C3D82") # Royal Sapphire Blue Header
+    fill_row_alt      = PatternFill("solid", fgColor="F8FAFC") # Clean Soft Zebra
     fill_left_tot     = PatternFill("solid", fgColor="E2E8F0") # Soft Slate Total
-    fill_sum_tot      = PatternFill("solid", fgColor="DCFCE7") # Light Green Accounting Total
-    green_fill        = PatternFill("solid", fgColor="DCFCE7") # Light Green
-    blue_fill         = PatternFill("solid", fgColor="EFF6FF") # Light Blue
-    red_fill          = PatternFill("solid", fgColor="FEE2E2") # Light Red
+    fill_sum_tot      = PatternFill("solid", fgColor="E2E8F0") # Executive Accounting Total
 
     border_clean = Border(
         left=Side(style="thin", color="E2E8F0"), right=Side(style="thin", color="E2E8F0"),
@@ -316,19 +313,35 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     )
     tot_border_accounting = Border(
         left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
-        top=Side(style="thin", color="86EFAC"), bottom=Side(style="double", color="064E3B")
+        top=Side(style="thin", color="94A3B8"), bottom=Side(style="double", color="0B132B")
     )
 
     font_banner = Font(name="Segoe UI", size=10.5, bold=True, color="FFFFFF")
-    font_sub = Font(name="Segoe UI", size=8.0, italic=True, color="A7F3D0")
+    font_sub = Font(name="Segoe UI", size=8.0, italic=True, color="93C5FD")
     font_hdr = Font(name="Segoe UI", size=8.5, bold=True, color="FFFFFF")
     font_data = Font(name="Segoe UI", size=8.5, color="0F172A")
     font_bold_data = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")
     font_tot = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
-    font_tot_green = Font(name="Segoe UI", size=9.5, bold=True, color="15803D")
-    font_green = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")
-    font_blue = Font(name="Segoe UI", size=8.5, bold=True, color="2563EB")
-    font_red = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626")
+
+    # High-contrast bold font colors for % on-time metrics (matching Penalty Dashboard)
+    font_pct_green = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A") # >= 90%
+    font_pct_amber = Font(name="Segoe UI", size=8.5, bold=True, color="D97706") # 75% - 89.9%
+    font_pct_red   = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # < 75%
+
+    font_tot_pct_green = Font(name="Segoe UI", size=9.5, bold=True, color="16A34A")
+    font_tot_pct_amber = Font(name="Segoe UI", size=9.5, bold=True, color="D97706")
+    font_tot_pct_red   = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626")
+
+    font_comm_green = Font(name="Segoe UI", size=8.5, bold=True, color="047857") # Clean Emerald Green
+    font_tot_comm_green = Font(name="Segoe UI", size=9.5, bold=True, color="047857")
+
+    def get_pct_font(pct_val, is_tot=False):
+        if pct_val >= 90.0:
+            return font_tot_pct_green if is_tot else font_pct_green
+        elif pct_val >= 75.0:
+            return font_tot_pct_amber if is_tot else font_pct_amber
+        else:
+            return font_tot_pct_red if is_tot else font_pct_red
 
     date_str = today.strftime('%d/%m/%Y')
 
@@ -348,7 +361,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         ws1.cell(1, c).fill = fill_title_right
 
     ws1.merge_cells("J2:S2")
-    ws1.cell(2, 10, "Speed Bonus: < 2h (+50% / $0.30) • 2-4h (+25% / $0.25) • 4-8h ($0.20) • > 8h (-25% / $0.15)").font = font_sub
+    ws1.cell(2, 10, "Speed SLA Bonus: < 2h (+50% / $0.30) • 2-4h (+25% / $0.25) • 4-8h ($0.20) • > 8h (-25% / $0.15)").font = font_sub
     ws1.cell(2, 10).alignment = Alignment(horizontal="center", vertical="center")
     for c in range(10, 20):
         ws1.cell(2, c).fill = fill_sub_right
@@ -420,10 +433,26 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         cell.border = tot_border_accounting
         if c == 8:
             cell.value = f"${tot_pay_left:.2f}"
-            cell.font = font_tot_green
+            cell.font = font_tot_comm_green
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # Populate Right Executive Summary Table
+    # Sort: Active branches first, then % < 8h ascending (worst SLA on top for CEO review), then deliveries descending
+    def calc_speed_sort_key(stats):
+        tot_b = stats["total_delivered"]
+        on_time_b = stats["under_2h"] + stats["between_2_4h"] + stats["between_4_8h"]
+        pct_u8 = (on_time_b / tot_b * 100.0) if tot_b > 0 else 100.0
+        return (0 if tot_b > 0 else 1, pct_u8, -tot_b)
+
+    if tgt in ("ALL", "TOTAL"):
+        all_branches = [summary_data[b] for b in MAIN_36_BRANCHES if b in summary_data]
+    elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
+        all_branches = [summary_data[b] for b in ZONE_BRANCHES_MAP[tgt] if b in summary_data]
+    else:
+        all_branches = list(summary_data.values())
+
+    sorted_branches = sorted(all_branches, key=calc_speed_sort_key)
+
     r_sum = 4
     n_idx = 1
     tot_del = 0
@@ -432,16 +461,6 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
     tot_48 = 0
     tot_o8 = 0
     tot_pay = 0.0
-
-    if tgt in ("ALL", "TOTAL"):
-        sorted_branches = [summary_data[b] for b in MAIN_36_BRANCHES if b in summary_data]
-    elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
-        sorted_branches = [summary_data[b] for b in ZONE_BRANCHES_MAP[tgt] if b in summary_data]
-    else:
-        sorted_branches = sorted(summary_data.values(), key=lambda x: x["po"])
-
-    fill_pen_red = PatternFill("solid", fgColor="FFEAEA") # Light Red/Pink highlight
-    font_pen_red = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # Bold Red
 
     for stats in sorted_branches:
         ws1.row_dimensions[r_sum].height = 18.0
@@ -471,18 +490,13 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
             if r_sum % 2 == 0:
                 cell.fill = fill_row_alt
                 
-            if ci == 16 and stats["over_8h"] > 0:
-                cell.fill = fill_pen_red
-                cell.font = font_pen_red
-            elif ci == 17:
-                cell.font = font_green if pct_under_8h >= 90 else (font_blue if pct_under_8h >= 75 else font_red)
+            # Clean styling - NO red fills on counts, clean normal cells
+            if ci == 17:
+                cell.font = get_pct_font(pct_under_8h)
             elif ci == 18:
-                if stats["over_8h"] > 0:
-                    cell.font = font_red
+                cell.font = font_pct_red if stats["over_8h"] > 0 else font_data
             elif ci == 19:
-                cell.font = font_tot_green
-                if stats["total_commission"] > 0:
-                    cell.fill = green_fill
+                cell.font = font_comm_green
 
         tot_del += stats["total_delivered"]
         tot_u2 += stats["under_2h"]
@@ -512,7 +526,14 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None)
         cell = ws1.cell(r_sum, c)
         if c >= 12:
             cell.value = tot_vals_right[c-10]
-        cell.font = font_tot_green if c == 19 else font_tot
+        if c == 17:
+            cell.font = get_pct_font(tot_pct_u8, is_tot=True)
+        elif c == 18:
+            cell.font = font_tot_pct_red if tot_o8 > 0 else font_tot
+        elif c == 19:
+            cell.font = font_tot_comm_green
+        else:
+            cell.font = font_tot
         cell.fill = fill_sum_tot
         cell.border = tot_border_accounting
         cell.alignment = Alignment(horizontal="center", vertical="center")
