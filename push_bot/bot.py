@@ -1617,9 +1617,17 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cfg = load_config()
 
     args = [a.strip() for a in (context.args or []) if a.strip()]
+    skip_zone = any(a.lower() in ("nozone", "nozones", "no_zone", "skipzone", "skipzones", "branch", "branches", "branch_only") for a in args)
+    skip_branch = any(a.lower() in ("nobranch", "nobranches", "no_branch", "skipbranch", "skipbranches", "zone_only") for a in args)
+    no_fwd = any(a.lower() in ("nofwd", "no_fwd", "onlyme", "me", "self", "quiet") for a in args)
     force_refresh = any(a.lower() in ("new", "refresh", "force") for a in args)
 
-    ignore_tokens = {"new", "refresh", "force"}
+    ignore_tokens = {
+        "new", "refresh", "force",
+        "nozone", "nozones", "no_zone", "skipzone", "skipzones", "branch", "branches", "branch_only",
+        "nobranch", "nobranches", "no_branch", "skipbranch", "skipbranches", "zone_only",
+        "nofwd", "no_fwd", "onlyme", "me", "self", "quiet"
+    }
     filtered_args = [a for a in args if a.lower() not in ignore_tokens]
     target_label = " ".join(filtered_args) if filtered_args else "ALL"
 
@@ -1660,7 +1668,107 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         with open(out_xlsx, "rb") as f:
             await send_requester_document(update, context, f, os.path.basename(out_xlsx))
 
-        await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent EXECUTIVE DELIVERY SPEED DASHBOARD ({target_label.upper()}).")
+        # 3. Group Forwarding (When target is ALL, MEGA, or TOTAL)
+        tgt_upper = target_label.upper().replace(" ", "")
+        total_sent_zones = 0
+        total_sent_branches = 0
+
+        if tgt_upper in ("ALL", "TOTAL", "MEGA") and not no_fwd:
+            # A. Forward to 5 Zone Groups (Unless skip_zone)
+            if not skip_zone:
+                zone_fwd_map = cfg.get("zone_forward_mapping", {})
+                for z_idx in range(1, 6):
+                    z_name = f"Zone {z_idx}"
+                    z_clean = f"zone{z_idx}"
+                    z_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{z_name.replace(' ', '_')}.xlsx")
+                    try:
+                        z_del, z_u2, z_24, z_o8, z_pay = await asyncio.to_thread(
+                            speed_report.build_speed_report, src, z_xlsx, target_label=z_name
+                        )
+                        z_caption = (
+                            f"⚡ *DELIVERY SPEED SLA REPORT ({z_name})*\n"
+                            f"Total Delivered (410): `{z_del}`\n"
+                            f"< 2 Hours (+50%): `{z_u2}`\n"
+                            f"2 - 4 Hours (+25%): `{z_24}`\n"
+                            f"> 8 Hours (-25%): `{z_o8}`\n"
+                            f"Total Commission: `${z_pay:.2f}`"
+                        )
+
+                        for gid, zkey in zone_fwd_map.items():
+                            if str(zkey).lower().strip() == z_clean:
+                                try:
+                                    z_img = await asyncio.to_thread(speed_report.render_speed_summary_image, z_xlsx)
+                                    z_img.name = f"SPEED_SUMMARY_{z_name.replace(' ', '_')}.png"
+                                    await safe_api_call(context.bot.send_photo, chat_id=int(gid), photo=z_img, caption=z_caption, parse_mode="Markdown")
+                                except Exception as e_fwd_img:
+                                    log.warning("Failed forwarding speed photo to zone group %s: %s", gid, e_fwd_img)
+
+                                try:
+                                    with open(z_xlsx, "rb") as z_f_doc:
+                                        await safe_api_call(
+                                            context.bot.send_document,
+                                            chat_id=int(gid),
+                                            document=z_f_doc,
+                                            filename=os.path.basename(z_xlsx)
+                                        )
+                                    total_sent_zones += 1
+                                except Exception as e_fwd_doc:
+                                    log.warning("Failed forwarding speed doc to zone group %s: %s", gid, e_fwd_doc)
+                    except Exception as e_z_gen:
+                        log.warning("Failed building speed report for zone %s: %s", z_name, e_z_gen)
+
+            # B. Forward to 36 Branch Groups in forward_mapping (Unless skip_branch)
+            if not skip_branch:
+                fwd_map = get_forward_mapping(cfg)
+                for gid, handles in fwd_map.items():
+                    if not handles or "*" in handles:
+                        continue
+                    br_code = handles[0].upper()
+                    if br_code not in speed_report.MAIN_36_BRANCHES:
+                        continue
+
+                    br_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{br_code}.xlsx")
+                    try:
+                        b_del, b_u2, b_24, b_o8, b_pay = await asyncio.to_thread(
+                            speed_report.build_speed_report, src, br_xlsx, target_label=br_code
+                        )
+                        b_caption = (
+                            f"⚡ *DELIVERY SPEED SLA REPORT ({br_code})*\n"
+                            f"Total Delivered (410): `{b_del}`\n"
+                            f"< 2 Hours (+50%): `{b_u2}`\n"
+                            f"2 - 4 Hours (+25%): `{b_24}`\n"
+                            f"> 8 Hours (-25%): `{b_o8}`\n"
+                            f"Total Commission: `${b_pay:.2f}`"
+                        )
+
+                        try:
+                            b_img = await asyncio.to_thread(speed_report.render_speed_summary_image, br_xlsx)
+                            b_img.name = f"SPEED_SUMMARY_{br_code}.png"
+                            await safe_api_call(context.bot.send_photo, chat_id=int(gid), photo=b_img, caption=b_caption, parse_mode="Markdown")
+                        except Exception as e_b_img:
+                            log.warning("Failed sending speed photo to branch group %s: %s", br_code, e_b_img)
+
+                        try:
+                            with open(br_xlsx, "rb") as b_f_doc:
+                                await safe_api_call(
+                                    context.bot.send_document,
+                                    chat_id=int(gid),
+                                    document=b_f_doc,
+                                    filename=os.path.basename(br_xlsx)
+                                )
+                            total_sent_branches += 1
+                        except Exception as e_b_doc:
+                            log.warning("Failed sending speed doc to branch group %s: %s", br_code, e_b_doc)
+                    except Exception as e_br_gen:
+                        log.warning("Failed building speed report for branch %s: %s", br_code, e_br_gen)
+
+        fwd_status_msg = ""
+        if total_sent_zones > 0 or total_sent_branches > 0:
+            fwd_status_msg = f" (Forwarded to {total_sent_zones} Zone groups & {total_sent_branches} Branch groups)"
+        elif no_fwd or (skip_branch and skip_zone):
+            fwd_status_msg = " [Private / No-Forward Mode]"
+
+        await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent EXECUTIVE DELIVERY SPEED DASHBOARD ({target_label.upper()}){fwd_status_msg}.")
     except Exception as e:
         log.exception("Error in /speed command: %s", e)
         await edit_or_send_requester_text(msg, update, context, f"❌ Error generating speed report: {e}")
