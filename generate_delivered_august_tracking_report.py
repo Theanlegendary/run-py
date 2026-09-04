@@ -337,4 +337,3 @@ if __name__ == "__main__":
     src = os.path.join(HERE, "latest_august_detail.xlsx")
     out_xlsx = os.path.join(HERE, f"Bill_Tracking_Status_Logs_Done_Delivered_August_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx")
     generate_delivered_tracking_logs(src, out_xlsx)
-
