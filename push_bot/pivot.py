@@ -324,7 +324,7 @@ def build_mega_pivot(rows, pivot_cfg, zone_cfg):
         if po == "MEGA1":
             if status_code not in ("306", "309"):
                 continue
-        elif "DVC" in po or "MEGA" in po or "HUB" in po:
+        elif po in ("DVCMEGA1", "DVCMEGA", "DVMEGA") or "DVCMEGA" in po or "DVMEGA" in po:
             if status_code != "306":
                 continue
         else:
