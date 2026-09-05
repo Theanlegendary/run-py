@@ -1,0 +1,391 @@
+1	api.sessionExpired	Your session has expired. Please reopen Metfone Express.	Phiên đăng nhập của bạn đã hết hạn. Vui lòng mở lại Metfone Express.
+2	api.systemError	System error. Please try again.	Lỗi hệ thống. Vui lòng thử lại.
+3	api.unknownError	Unknown error. Please try again.	Lỗi không xác định. Vui lòng thử lại.
+4	app.name	Metfone Express	Metfone Express
+5	app.slogan	Deliver Faster, Deliver Better	Giao nhanh hơn, giao tốt hơn
+6	checkAccount.checkingSubtitle	Please wait a moment while we securely verify your credentials.	Vui lòng chờ trong giây lát trong khi chúng tôi xác minh thông tin của bạn một cách an toàn.
+7	checkAccount.checkingTitle	Checking your Express account	Đang kiểm tra tài khoản Express của bạn
+8	checkAccount.exitApp	Exit	Thoát
+9	checkAccount.failedSubtitle	Please check your connection and try again.	Vui lòng kiểm tra kết nối và thử lại.
+10	checkAccount.failedTitle	We couldn’t verify your account	Không thể xác minh tài khoản của bạn
+11	checkAccount.locationRequired	Could not get your current location. Please allow location access and try again.	Không thể lấy vị trí hiện tại của bạn. Vui lòng cho phép truy cập vị trí và thử lại.
+12	checkAccount.missingToken	Missing session token. Please reopen Metfone Express.	Thiếu session token. Vui lòng mở lại Metfone Express.
+13	checkAccount.tryAgain	Try again	Thử lại
+14	common.back	Back	Quay lại
+15	common.cancel	Cancel	Hủy
+16	common.close	Close	Đóng
+17	common.closeConfirm	Are you sure you want to close Metfone Express?	Bạn có chắc chắn muốn đóng Metfone Express không?
+18	common.continue	Continue	Tiếp tục
+19	common.error	Error	Lỗi
+20	common.guest	Guest	Khách
+21	common.info	Info	Thông tin
+22	common.loading	Loading…	Đang tải…
+23	common.notice	Notice	Thông báo
+24	common.ok	OK	OK
+25	common.pleaseWait	Please wait…	Vui lòng chờ…
+26	common.retry	Retry	Thử lại
+27	common.track	Track	Theo dõi
+28	common.tracking	Tracking…	Đang theo dõi…
+29	common.view	View	Xem
+30	express.actions.createOrder	Create Order	Tạo đơn hàng
+31	express.actions.myOrder	My Order	Đơn hàng của tôi
+32	express.actions.shippingFee	Shipping fee	Phí vận chuyển
+33	express.actions.trackOrder	Track Order	Theo dõi đơn hàng
+34	express.addressBook.active	Active	Đang hoạt động
+35	express.addressBook.confirm	Confirm	Xác nhận
+36	express.addressBook.count	{count} addresses	{count} địa chỉ
+37	express.addressBook.default	DEFAULT	MẶC ĐỊNH
+38	express.addressBook.defaultAddress	Default address	Địa chỉ mặc định
+39	express.addressBook.edit	EDIT	CHỈNH SỬA
+40	express.addressBook.empty	No addresses yet	Chưa có địa chỉ nào
+41	express.addressBook.loadError	Could not load addresses.	Không thể tải danh sách địa chỉ.
+42	express.addressBook.searchPlaceholder	Enter address name or phone number	Nhập tên hoặc số điện thoại
+43	express.addressBook.selectAll	Select all	Chọn tất cả
+44	express.addressBook.setAsDefaultAddress	Set as Default Address	Đặt làm địa chỉ mặc định
+45	express.addressBook.setDefault	SET DEFAULT	ĐẶT LÀM MẶC ĐỊNH
+46	express.addressBook.statusActivate	Activate	Kích hoạt
+47	express.addressBook.statusDeactivate	Deactivate	Vô hiệu hóa
+48	express.addressBook.statusTitle	Status	Trạng thái
+49	express.addressBook.title	Shipping Address	Địa chỉ giao hàng
+50	express.createOrder.addAddress	Add Address	Thêm địa chỉ
+51	express.createOrder.addNewAddress	Add New Address	Thêm địa chỉ mới
+52	express.createOrder.addNewShippingAddress	Add New Shipping Address	Thêm địa chỉ giao hàng mới
+53	express.createOrder.addressType	Address Type	Loại địa chỉ
+54	express.createOrder.addressTypeHome	Home	Nhà
+55	express.createOrder.addressTypeOffice	Office	Văn phòng
+56	express.createOrder.addressTypePostOffice	Post Office	Bưu cục
+57	express.createOrder.addressTypeWarehouse	Warehouse	Kho hàng
+58	express.createOrder.confirm	Confirm	Xác nhận
+59	express.createOrder.confirmCreate	Confirm & Create Order	Xác nhận & Tạo đơn hàng
+60	express.createOrder.creating	Creating order…	Đang tạo đơn hàng…
+61	express.createOrder.crossCheck	Cross-Check	Đồng kiểm
+62	express.createOrder.crossCheckHint	Verify item details at pickup	Đồng kiểm hàng khi lấy hàng
+63	express.createOrder.deliveryNotification	Delivery Notification	Thông báo giao hàng
+64	express.createOrder.deliveryNotificationHint	SMS & App alerts	Thông báo qua SMS & ứng dụng
+65	express.createOrder.detailedAddress	Detailed Address	Địa chỉ chi tiết
+66	express.createOrder.detailedAddressPlaceholder	Street number, Building name, Floor...	Số nhà, tên tòa nhà, tầng...
+67	express.createOrder.dimensionsLabel	Size (LxWxH) (cm)	Kích thước (Dài x Rộng x Cao) (cm)
+68	express.createOrder.documentUpper	DOCUMENT	TÀI LIỆU
+69	express.createOrder.dropOffPoint	Drop-off at Point	Gửi hàng tại bưu cục
+70	express.createOrder.dropOffStore	Send at store	Gửi tại bưu cục 
+71	express.createOrder.editAddress	Edit Address	Chỉnh sửa địa chỉ
+72	express.createOrder.expectedDeliveryAfter	Expected delivery after {days} days	Dự kiến giao sau {days} ngày
+73	express.createOrder.expressEta	1 - 2 Days	1 - 2 ngày
+74	express.createOrder.expressService	Express	Chuyển phát nhanh
+75	express.createOrder.extraServiceDefault	Extra service	Dịch vụ bổ sung
+76	express.createOrder.extraServiceDefaultHint	Optional add-on for your shipment	Tùy chọn bổ sung cho đơn hàng của bạn
+77	express.createOrder.extraServicePriceHint	+ ${price}	+ ${giá}
+78	express.createOrder.extraServices	Extra Services	Dịch vụ bổ sung
+79	express.createOrder.fullName	Full Name	Họ và tên
+80	express.createOrder.goodsName	Goods Name	Tên hàng hóa
+81	express.createOrder.goodsNamePlaceholder	e.g. Electronic Accessories	Ví dụ: Phụ kiện điện tử
+82	express.createOrder.homeDelivery	Home Delivery	Giao hàng tận nhà
+83	express.createOrder.insuranceValue	Insurance Value	Giá trị bảo hiểm
+84	express.createOrder.insuranceValueHint	Protection for high-value items	Bảo vệ hàng hóa có giá trị cao
+85	express.createOrder.locationSelection	Location Selection	Chọn vị trí
+86	express.createOrder.mapPreview	Map preview	Xem trước trên bản đồ
+87	express.createOrder.missingPriceJose	Could not get the signed shipping price. Please try again.	Không thể lấy giá vận chuyển đã ký. Vui lòng thử lại.
+88	express.createOrder.next	Next	Tiếp theo
+89	express.createOrder.nextStep	Next Step	Bước tiếp theo
+90	express.createOrder.noMatchingSearchResults	No matching search results	Không tìm thấy kết quả phù hợp
+91	express.createOrder.noServices	No shipping service is available for this route.	Không có dịch vụ vận chuyển nào khả dụng cho tuyến đường này.
+92	express.createOrder.note	Note	Ghi chú
+93	express.createOrder.notePlaceholder	Enter your note	Nhập ghi chú
+94	express.createOrder.optional	(Optional)	(Không bắt buộc)
+95	express.createOrder.packageUpper	PACKAGE	KIỆN HÀNG
+96	express.createOrder.paymentResponsibility	Payment Responsibility	Bên thanh toán
+97	express.createOrder.phoneNumber	Phone Number	Số điện thoại
+98	express.createOrder.pickUpHome	Send at home	Lấy hàng tại nhà
+99	express.createOrder.progress	Order progress	Tiến trình đơn hàng
+100	express.createOrder.receiverInformation	Receiver Information	Thông tin người nhận
+101	express.createOrder.receiverNamePlaceholder	Enter receiver's name	Nhập tên người nhận
+102	express.createOrder.receivingMethod	Receiving Method	Phương thức nhận hàng
+103	express.createOrder.recommend	Recommend	Khuyên dùng
+104	express.createOrder.saveAddress	Update address	Cập nhật địa chỉ
+105	express.createOrder.searchAddress	Search address	Tìm kiếm địa chỉ
+106	express.createOrder.searchOwnerPlaceholder	Enter owner name,...	Nhập tên chủ địa chỉ,...
+107	express.createOrder.selectPreferredAddress	Select your preferred address...	Chọn địa chỉ bạn muốn sử dụng...
+108	express.createOrder.selectSendingAddress	Select Sending Address	Chọn địa chỉ gửi hàng
+109	express.createOrder.selectService	Select service	Chọn dịch vụ
+110	express.createOrder.selectServiceAction	Select Service	Chọn dịch vụ
+111	express.createOrder.senderInformation	Sender Information	Thông tin người gửi
+112	express.createOrder.senderPays	Sender Pays	Người gửi thanh toán
+113	express.createOrder.senderPaysHint	Pay now via eMoney wallet	Thanh toán ngay qua ví eMoney
+114	express.createOrder.serviceList	Service List	Danh sách dịch vụ
+115	express.createOrder.serviceSelection	Service Selection	Lựa chọn dịch vụ
+116	express.createOrder.setAsDefaultAddress	Set as default address	Đặt làm địa chỉ mặc định
+117	express.createOrder.steps.details	Details	Chi tiết
+118	express.createOrder.steps.goods	Goods	Hàng hóa
+119	express.createOrder.steps.package	Package	Kiện hàng
+120	express.createOrder.steps.payment	Payment	Thanh toán
+121	express.createOrder.steps.review	Review	Kiểm tra lại
+122	express.createOrder.steps.sender	Sender	Người gửi
+123	express.createOrder.stepSlash	Step {current}/{total}	Bước {current}/{total}
+124	express.createOrder.submitError	Could not create the order. Please try again.	Không thể tạo đơn hàng. Vui lòng thử lại.
+125	express.createOrder.title	Create Order	Tạo đơn hàng
+126	express.createOrder.valueUsd	Value (USD)	Giá trị (USD)
+127	express.createOrder.warehouseName	Warehouse Name	Tên kho
+128	express.home.loadingOrders	Loading orders…	Đang tải đơn hàng…
+129	express.home.loadOrdersError	Could not load orders.	Không thể tải đơn hàng.
+130	express.home.noOrders	No orders yet.	Chưa có đơn hàng nào.
+131	express.home.notifications	Notifications	Thông báo
+132	express.home.recentOrders	Recent Orders	Đơn hàng gần đây
+133	express.home.searchPlaceholder	Track your shipment...	Theo dõi đơn hàng của bạn...
+134	express.home.viewAll	View All	Xem tất cả
+135	express.home.welcome	Welcome,	Chào mừng,
+136	express.orderDetail.estimatedDelivery	Estimated Delivery	Dự kiến giao hàng
+137	express.orderDetail.loadError	Could not load order.	Không thể tải đơn hàng.
+138	express.orderDetail.loading	Loading order…	Đang tải đơn hàng…
+139	express.orderDetail.orderInformation	Order Information	Thông tin đơn hàng
+140	express.orderDetail.receiver	Receiver	Người nhận
+141	express.orderDetail.sender	Sender	Người gửi
+142	express.orderDetail.serviceType	Service Type	Loại dịch vụ
+143	express.orderDetail.shippingFee	Shipping Fee	Phí vận chuyển
+144	express.orderDetail.title	Order Detail	Chi tiết đơn hàng
+145	express.orderDetail.totalAmount	Total Amount	Tổng tiền
+146	express.orderDetail.viewTracking	View Tracking	Xem hành trình đơn hàng
+147	express.orderDetail.weightSize	Weight / Size	Khối lượng / Kích thước
+148	express.orderNotSuccessful.backToHome	Back to Home	Quay về Trang chủ
+149	express.orderNotSuccessful.copyReference	Copy reference number	Sao chép mã tham chiếu
+150	express.orderNotSuccessful.heading	Order Not Successful	Tạo đơn hàng không thành công
+151	express.orderNotSuccessful.referenceNo	Reference No.	Mã tham chiếu
+152	express.orderNotSuccessful.subtitle	We couldn't create your order. Please try again.	Không thể tạo đơn hàng. Vui lòng thử lại.
+153	express.orderNotSuccessful.title	Order Not Successful	Tạo đơn hàng không thành công
+154	express.orderNotSuccessful.tryAgain	Try Again	Thử lại
+155	express.orders.filter	Filter	Bộ lọc
+156	express.orders.filterAll	All	Tất cả
+157	express.orders.filterApply	Apply filter	Áp dụng bộ lọc
+158	express.orders.filterCompleted	Completed	Hoàn tất
+159	express.orders.filterProcessing	Processing	Đang xử lý
+160	express.orders.filterSelectAll	Select all	Chọn tất cả
+161	express.orders.filterStatusTitle	Status filter order	Lọc đơn hàng theo trạng thái
+162	express.orders.loadingMore	Loading more…	Đang tải thêm…
+163	express.orders.loadingOrders	Loading orders…	Đang tải đơn hàng…
+164	express.orders.loadOrdersError	Could not load orders.	Không thể tải đơn hàng.
+165	express.orders.noMoreOrders	No more orders	Không còn đơn hàng nào
+166	express.orders.noOrders	No orders yet.	Chưa có đơn hàng nào.
+167	express.orders.pullToRefresh	Pull to refresh	Kéo xuống để làm mới
+168	express.orders.refreshing	Refreshing…	Đang làm mới…
+169	express.orders.releaseToRefresh	Release to refresh	Thả để làm mới
+170	express.orders.title	My Orders	Đơn hàng của tôi
+171	express.orderStatus.CANCELLED	Cancelled	Đã hủy
+172	express.orderStatus.CHANGE_ADDRESS	Change address	Thay đổi địa chỉ
+173	express.orderStatus.CONFIRM_STORAGE	Confirm storage	Xác nhận lưu kho
+174	express.orderStatus.CONFIRMED	Confirmed	Đã xác nhận
+175	express.orderStatus.DISPOSAL	Disposal	Tiêu hủy
+176	express.orderStatus.DRAFT	Draft	Bản nháp
+177	express.orderStatus.FORWARDING_REQUEST	Forwarding request	Yêu cầu chuyển tiếp
+178	express.orderStatus.NEW	New	Mới
+179	express.orderStatus.PARTIAL_SHIP_REQUEST	Partial ship request	Yêu cầu giao một phần
+180	express.orderStatus.PARTIALLY_SHIPPED	Partially shipped	Đã giao một phần
+181	express.orderStatus.RECEIVE_AGAIN	Receive again	Nhận lại
+182	express.orderStatus.RECEIVE_FAILED	Receive failed	Nhận hàng thất bại
+183	express.orderStatus.RECEIVED	Received	Đã nhận
+184	express.orderStatus.RECEIVING	Receiving	Đang nhận hàng
+185	express.orderStatus.RETURN_AGAIN	Return again	Thử trả hàng lại
+186	express.orderStatus.RETURN_CONFIRMED	Return confirmed	Đã xác nhận trả hàng
+187	express.orderStatus.RETURN_FAILED	Return failed	Hoàn trả thất bại
+188	express.orderStatus.RETURN_REQUEST	Return request	Yêu cầu hoàn hàng
+189	express.orderStatus.RETURN_SUCCESSFUL	Return successful	Hoàn trả hàng thành công
+190	express.orderStatus.RETURNING	Returning	Đang hoàn hàng
+191	express.orderStatus.SHIP_AGAIN	Ship again	Thử giao lại
+192	express.orderStatus.SHIP_FAILED	Ship failed	Giao hàng thất bại
+193	express.orderStatus.SHIPPED	Shipped	Đã giao hàng
+194	express.orderStatus.SHIPPER_RETURN	Shipper return	Nhân viên giao hàng hoàn trả
+195	express.orderStatus.SHIPPING	Shipping	Đang giao hàng
+196	express.orderStatus.TRANSITING	Transiting	Đang trung chuyển
+197	express.orderStatus.WAITING_TO_RECEIVE	Waiting to receive	Đang chờ nhận hàng
+198	express.orderSuccess.backToHome	Back to Home	Quay về Trang chủ
+199	express.orderSuccess.copyTracking	Copy tracking number	Sao chép mã vận đơn
+200	express.orderSuccess.createdAt	Created At	Ngày tạo
+201	express.orderSuccess.createNewOrder	Create New Order	Tạo đơn hàng mới
+202	express.orderSuccess.estimatedDelivery	Estimated Delivery	Dự kiến giao hàng
+203	express.orderSuccess.heading	Order Created Successfully!	Tạo đơn hàng thành công!
+204	express.orderSuccess.payer	Paid By	Bên thanh toán
+205	express.orderSuccess.receiverPays	Receiver Pays	Người nhận thanh toán
+206	express.orderSuccess.status	Status	Trạng thái
+207	express.orderSuccess.subtitle	Your shipment has been created.	Đơn hàng của bạn đã được tạo.
+208	express.orderSuccess.tax	Tax	Thuế
+209	express.orderSuccess.title	Order Success	Tạo đơn hàng thành công
+210	express.orderSuccess.trackingNumber	Tracking Number	Mã vận đơn
+211	express.orderSuccess.viewTracking	View Tracking	Xem hành trình đơn hàng
+212	express.payment.deadlineHint	You need to complete the payment within 15 minutes. Otherwise, your order will expire.	Bạn cần hoàn tất thanh toán trong vòng 15 phút. Nếu không, đơn hàng sẽ hết hạn.
+213	express.payment.enterPin	Enter PIN	Nhập PIN
+214	express.payment.keypadLabel	PIN keypad	Bàn phím PIN
+215	express.payment.orderInformation	Order Information	Thông tin đơn hàng
+216	express.payment.payButton	Payment {amount}	Thanh toán {amount}
+217	express.payment.payError	Could not complete payment. Please try again.	Không thể hoàn tất thanh toán. Vui lòng thử lại.
+218	express.payment.paying	Processing payment…	Đang xử lý thanh toán…
+219	express.payment.pinError	Incorrect PIN. Please try again.	PIN không chính xác. Vui lòng thử lại.
+220	express.payment.pinHelpBody	Your eMoney PIN is the 6-digit code you use to authorize payments in the eMoney app.	PIN eMoney là mã gồm 6 chữ số dùng để xác nhận thanh toán trong ứng dụng eMoney.
+221	express.payment.pinHelpClose	Got it	Đã hiểu
+222	express.payment.receiver	Receiver	Người nhận
+223	express.payment.sender	Sender	Người gửi
+224	express.payment.serviceType	Service Type	Loại dịch vụ
+225	express.payment.shippingFee	Shipping Fee	Phí vận chuyển
+226	express.payment.title	Payment	Thanh toán
+227	express.payment.totalAmount	Total Amount	Tổng tiền
+228	express.payment.whatIsPin	What is PIN?	PIN là gì?
+229	express.paymentFailed.backToHome	Back to Home	Quay về Trang chủ
+230	express.paymentFailed.copyReference	Copy reference number	Sao chép mã tham chiếu
+231	express.paymentFailed.heading	Payment Failed	Thanh toán thất bại
+232	express.paymentFailed.referenceNo	Reference No.	Mã tham chiếu
+233	express.paymentFailed.subtitle	We couldn't complete your payment. Please try again.	Không thể hoàn tất thanh toán. Vui lòng thử lại.
+234	express.paymentFailed.title	Payment Failed	Thanh toán thất bại
+235	express.paymentFailed.tryAgain	Try Again	Thử lại
+236	express.profile.about	About Metfone Express	Giới thiệu về Metfone Express
+237	express.profile.aboutLoadError	Could not load this information.	Không thể tải thông tin này.
+238	express.profile.aboutTitle	About Metfone Express	Giới thiệu về Metfone Express
+239	express.profile.addressBook	Address Book	Sổ địa chỉ
+240	express.profile.language	Language	Ngôn ngữ
+241	express.profile.notifications	Notifications	Thông báo
+242	express.profile.paymentMethods	Payment Methods	Phương thức thanh toán
+243	express.profile.terms	Terms & Conditions	Điều khoản & Điều kiện
+244	express.profile.termsLoadError	Could not load the terms.	Không thể tải Điều khoản & Điều kiện.
+245	express.profile.termsTitle	Terms and Conditions	Điều khoản và Điều kiện
+246	express.profile.title	Profile	Hồ sơ
+247	express.profile.version	Version {version} (Build {build})	Phiên bản {version} (Build {build})
+248	express.shippingFee.checkFees	Check fees	Tra cước 
+249	express.shippingFee.checking	Checking…	Đang kiểm tra…
+250	express.shippingFee.commune	Commune	Xã/Phường
+251	express.shippingFee.district	District	Quận/Huyện
+252	express.shippingFee.document	Document	Tài liệu
+253	express.shippingFee.domestic	Domestic	Nội địa
+254	express.shippingFee.estimatedDays	{days} days	{days} ngày
+255	express.shippingFee.goodsInformation	Goods Information	Thông tin hàng hóa
+256	express.shippingFee.package	Package	Kiện hàng
+257	express.shippingFee.province	Province	Tỉnh/Thành phố
+258	express.shippingFee.quoteError	Please complete the required fields to check fees.	Vui lòng điền đầy đủ các trường bắt buộc để kiểm tra phí.
+259	express.shippingFee.quoteResult	Estimated shipping fee: {quote}	Phí vận chuyển dự kiến: {quote}
+260	express.shippingFee.searchCommune	Search Commune	Tìm kiếm Xã/Phường
+261	express.shippingFee.searchDistrict	Search District	Tìm kiếm Quận/Huyện
+262	express.shippingFee.searchProvince	Search Province	Tìm kiếm Tỉnh/Thành phố
+263	express.shippingFee.selectCommune	Select Commune	Chọn Xã/Phường
+264	express.shippingFee.selectDistrict	Select District	Chọn Quận/Huyện
+265	express.shippingFee.selectProvince	Select Province	Chọn Tỉnh/Thành phố
+266	express.shippingFee.sendTo	Come from	Nơi gửi
+267	express.shippingFee.sentFrom	Sent from	Gửi từ
+268	express.shippingFee.shippingRoute	Shipping Route	Tuyến vận chuyển
+269	express.shippingFee.sizeLabel	Size (LxWxH) (cm)	Kích thước (Dài x Rộng x Cao) (cm)
+270	express.shippingFee.sizePlaceholder	cm	cm
+271	express.shippingFee.title	Shipping Fee	Phí vận chuyển
+272	express.shippingFee.weightGrams	Weight (g)	Khối lượng (g)
+273	express.shippingFee.weightPlaceholder	Weight (g)	Khối lượng (g)
+274	express.shippingResults.chargeableWeight	Chargeable weight : {weight}g {dimensions}	Khối lượng tính cước: {weight}g {dimensions}
+275	express.shippingResults.contactTitle	Contact the nearest location for better rates	Liên hệ bưu cục gần nhất để nhận mức giá tốt hơn
+276	express.shippingResults.day	day	ngày
+277	express.shippingResults.days	days	ngày
+278	express.shippingResults.destination	Destination	Điểm đến
+279	express.shippingResults.distanceKm	{distance} km	{distance} km
+280	express.shippingResults.estimatedDeliveryTime	Estimated delivery time: {days} {unit}	Thời gian giao hàng dự kiến: {days} {unit}
+281	express.shippingResults.findPostOffice	Find the nearest post office	Tìm bưu cục gần nhất
+282	express.shippingResults.mainService	MAIN SERVICE	DỊCH VỤ CHÍNH
+283	express.shippingResults.nearbyPostOffices	Nearby post offices	Các bưu cục gần đây
+284	express.shippingResults.noPostOffices	No post offices found.	Không tìm thấy bưu cục nào.
+285	express.shippingResults.noServices	No services available.	Không có dịch vụ khả dụng.
+286	express.shippingResults.origin	Origin	Điểm gửi
+287	express.shippingResults.quoteTitle	Send {goods} - {route}	Gửi {goods} - {route}
+288	express.shippingResults.selectService	Select Service	Chọn dịch vụ
+289	express.shippingResults.selectServiceTitle	Select service	Chọn dịch vụ
+290	express.shippingResults.suitableService	Suitable service	Dịch vụ phù hợp
+291	express.shippingResults.title	Shipping Results	Kết quả vận chuyển
+292	express.shippingResults.viewMap	View locations on map	Xem các địa điểm trên bản đồ
+293	express.stack.createOrderHint	The order form will be wired to {api} in a later iteration.	Biểu mẫu tạo đơn hàng sẽ được kết nối với {api} trong phiên bản sau.
+294	express.stack.shippingFeeHint	The quote form will be wired to {api} in a later iteration.	Biểu mẫu báo giá sẽ được kết nối với {api} trong phiên bản sau.
+295	express.support.email	Email	Email
+296	express.support.emailValue	express{'@'}metfone.com.kh	express{'@'}metfone.com.kh
+297	express.support.facebook	Facebook	Facebook
+298	express.support.facebookValue	Metfone Express	Metfone Express
+299	express.support.heroSubtitle	The Metfone Express team is available 24/7 to assist you.	Đội ngũ Metfone Express luôn sẵn sàng hỗ trợ bạn 24/7.
+300	express.support.heroTitle	How can we help?	Chúng tôi có thể hỗ trợ gì cho bạn?
+301	express.support.hotline	Hotline	Hotline
+302	express.support.telegram	Telegram	Telegram
+303	express.support.telegramValue	{'@'}metfone_express	{'@'}metfone_express
+304	express.support.title	Support	Hỗ trợ
+305	express.tabs.home	Home	Trang chủ
+306	express.tabs.orders	Orders	Đơn hàng
+307	express.tabs.profile	Profile	Tài khoản
+308	express.tabs.support	Support	Hỗ trợ
+309	express.track.contactSupport	Contact Support	Liên hệ hỗ trợ
+310	express.track.empty	No tracking information.	Chưa có thông tin theo dõi.
+311	express.track.estimatedDelivery	Estimated Delivery	Dự kiến giao hàng
+312	express.track.loadError	Could not load tracking.	Không thể tải thông tin theo dõi.
+313	express.track.loading	Loading tracking…	Đang tải thông tin theo dõi…
+314	express.track.needHelp	Need Help?	Cần hỗ trợ?
+315	express.track.needHelpSubtitle	Our support team is available 24/7 to assist you.	Đội ngũ hỗ trợ của chúng tôi luôn sẵn sàng hỗ trợ bạn 24/7.
+316	express.track.notFound	Tracking code not found.	Không tìm thấy mã vận đơn.
+317	express.track.orderCode	Order Code	Mã đơn hàng
+318	express.track.placeholder	Enter tracking code	Nhập mã vận đơn
+319	express.track.referenceCode	Reference Code	Mã tham chiếu
+320	express.track.searchAction	Search	Tìm kiếm
+321	express.track.title	Track Order	Theo dõi đơn hàng
+322	onboarding.accept	Accept	Đồng ý
+323	onboarding.address	Address	Địa chỉ
+324	onboarding.agreeLink	Terms and Conditions	Điều khoản và Điều kiện
+325	onboarding.agreePrefix	I agree to Metfone Express’s	Tôi đồng ý với
+326	onboarding.connectionDetails	Connection details	Chi tiết liên kết
+327	onboarding.continue	Continue	Tiếp tục
+328	onboarding.createAccountPageSubtitle	Create Metfone Express Account	Tạo tài khoản Metfone Express
+329	onboarding.createAccountSubtitle	Share your information with Metfone Express to create your account?	Chia sẻ thông tin của bạn với Metfone Express để tạo tài khoản?
+330	onboarding.createAccountTitle	Create Account	Tạo tài khoản
+331	onboarding.decline	Decline	Từ chối
+332	onboarding.emoneyWallet	eMoney Wallet	Ví eMoney
+333	onboarding.fullName	Full name	Họ và tên
+334	onboarding.goBack	Go Back	Quay lại
+335	onboarding.heroSubtitle	Helps individuals and businesses create and manage shipments in one place.	Giúp cá nhân và doanh nghiệp tạo và quản lý các đơn hàng tại một nơi.
+336	onboarding.heroTitle	Metfone Express	Metfone Express
+337	onboarding.infoTagline	Metfone Express helps manage shipments easily.	Metfone Express giúp bạn dễ dàng quản lý các đơn hàng.
+338	onboarding.linkAccountSubtitle	Metfone Express helps you create and manage shipments in one place.	Metfone Express giúp bạn tạo và quản lý các đơn hàng tại một nơi.
+339	onboarding.linkAccountTitle	Account created successfully	Tạo tài khoản thành công
+340	onboarding.linkFailedHint	Please check your account details and try again.	Vui lòng kiểm tra thông tin tài khoản và thử lại.
+341	onboarding.linkFailedSubtitle	Your eMoney wallet is failed to link to Metfone Express account.	Không thể liên kết ví eMoney của bạn với tài khoản Metfone Express.
+342	onboarding.linkFailedTitle	Account linked failed	Liên kết tài khoản thất bại
+343	onboarding.linkNow	LINK NOW	LIÊN KẾT NGAY
+344	onboarding.linkPendingHint	Please wait while we verify your account details. This may take a few minutes.	Vui lòng chờ trong khi chúng tôi xác minh thông tin tài khoản của bạn. Quá trình này có thể mất vài phút.
+345	onboarding.linkPendingSubtitle	Your eMoney wallet link to Metfone Express account is being processed.	Yêu cầu liên kết ví eMoney với tài khoản Metfone Express của bạn đang được xử lý.
+346	onboarding.linkPendingTitle	Link account Pending	Đang xử lý liên kết tài khoản
+347	onboarding.linkTryAgain	TRY AGAIN	THỬ LẠI
+348	onboarding.linkWalletBody	Metfone Express uses your eMoney wallet to pay for orders, so linking is required before you can start shipping.	Metfone Express sử dụng ví eMoney của bạn để thanh toán đơn hàng, vì vậy bạn cần liên kết ví trước khi bắt đầu gửi hàng.
+349	onboarding.linkWalletTitle	Link your eMoney wallet	Liên kết ví eMoney của bạn
+350	onboarding.loadingTerms	Loading terms…	Đang tải điều khoản…
+351	onboarding.loadTermsError	Could not load the terms.	Không thể tải điều khoản.
+352	onboarding.phoneNumber	Phone Number	Số điện thoại
+353	onboarding.popupFailed	Could not create the account. Please try again.	Không thể tạo tài khoản. Vui lòng thử lại.
+354	onboarding.popupTimeout	The request timed out. Please try again.	Yêu cầu đã hết thời gian chờ. Vui lòng thử lại.
+355	onboarding.start	Start	Bắt đầu
+356	onboarding.successSubtitle	Your account has been verified successfully	Tài khoản của bạn đã được xác minh thành công
+357	onboarding.successTitle	Success!	Thành công!
+358	onboarding.termsHeading	Terms & Condition	Điều khoản & Điều kiện
+359	routes.checkAccount	Metfone Express	Metfone Express
+360	routes.expressAddAddress	Add New Address	Thêm địa chỉ mới
+361	routes.expressAddressBook	Shipping Address	Địa chỉ giao hàng
+362	routes.expressCreateOrder	Create Order	Tạo đơn hàng
+363	routes.expressHome	Metfone Express	Metfone Express
+364	routes.expressOrderDetail	Order Detail	Chi tiết đơn hàng
+365	routes.expressOrderNotSuccessful	Order Not Successful	Tạo đơn hàng không thành công
+366	routes.expressOrders	Orders	Đơn hàng
+367	routes.expressOrderSuccess	Order Success	Tạo đơn hàng thành công
+368	routes.expressPaymentFailed	Payment Failed	Thanh toán thất bại
+369	routes.expressProfile	Profile	Hồ sơ
+370	routes.expressShippingFee	Shipping Fee	Phí vận chuyển
+371	routes.expressShippingResults	Shipping Results	Kết quả vận chuyển
+372	routes.expressSupport	Support	Hỗ trợ
+373	routes.expressTrackOrder	Track Order	Theo dõi đơn hàng
+374	routes.onboardingAccountSuccess	Metfone Express	Metfone Express
+375	routes.onboardingCreateAccount	Metfone Express	Metfone Express
+376	routes.onboardingLinkAccount	Metfone Express	Metfone Express
+377	routes.onboardingLinkAccountFailed	Metfone Express	Metfone Express
+378	routes.onboardingLinkAccountPending	Metfone Express	Metfone Express
+379	routes.onboardingTerms	Terms & Condition	Điều khoản & Điều kiện
+380	routes.splash	Authenticating Identity	Đang xác thực danh tính
+381	splash.authenticating	Authenticating...	Đang xác thực...
+382	splash.pageLabel	Authenticating Identity	Đang xác thực danh tính
+383	splash.verifying	Verifying your identity	Đang xác minh danh tính của bạn
+384	terms.sections.emoney.body	eMoney stands for E-MONEY PAYMENT SOLUTIONS PLC, is one of the leading mobile finance service providers. We are providing services: Transfer money, Bill Payments, Phone Topup. Customers can use service by eMoney application or through network of over 8,000 agents nationwide.	eMoney là E-MONEY PAYMENT SOLUTIONS PLC, một trong những nhà cung cấp dịch vụ tài chính di động hàng đầu. Chúng tôi cung cấp các dịch vụ: Chuyển tiền, Thanh toán hóa đơn, Nạp tiền điện thoại. Khách hàng có thể sử dụng dịch vụ qua ứng dụng eMoney hoặc thông qua mạng lưới hơn 8.000 đại lý trên toàn quốc.
+385	terms.sections.emoney.title	What is eMoney?	eMoney là gì?
+386	terms.sections.express.body	To become a leading Digital Banking, providing financial services faster, easier and safer to every Cambodian.	Trở thành ngân hàng số hàng đầu, cung cấp dịch vụ tài chính nhanh hơn, dễ dàng hơn và an toàn hơn cho mọi người dân Campuchia.
+387	terms.sections.express.title	What is Metfone Express?	Metfone Express là gì?
+388	terms.sections.privacy.body	Your personal information is processed only to deliver the requested service and is stored according to the regulations of the National Bank of Cambodia.	Thông tin cá nhân của bạn chỉ được xử lý để cung cấp dịch vụ theo yêu cầu và được lưu trữ theo quy định của Ngân hàng Quốc gia Campuchia.
+389	terms.sections.privacy.title	How is my data protected?	Dữ liệu của tôi được bảo vệ như thế nào?
+390	terms.sections.who.body	eMoney's customers, eMoney provides services for both individual and Corporate customer.	Khách hàng của eMoney. eMoney cung cấp dịch vụ cho cả khách hàng cá nhân và doanh nghiệp.
+391	terms.sections.who.title	Who can use Metfone Express?	Ai có thể sử dụng Metfone Express?

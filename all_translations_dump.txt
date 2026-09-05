@@ -1,0 +1,1955 @@
+=== ROW 1 | api.sessionExpired ===
+EN: Your session has expired. Please reopen Metfone Express.
+VI: Phiên đăng nhập của bạn đã hết hạn. Vui lòng mở lại Metfone Express.
+KH: វគ្គប្រើប្រាស់របស់អ្នកបានផុតកំណត់។ សូមបើកកម្មវិធី Metfone Express ឡើងវិញ
+
+=== ROW 2 | api.systemError ===
+EN: System error. Please try again.
+VI: Lỗi hệ thống. Vui lòng thử lại.
+KH: បញ្ហាប្រព័ន្ធ។ សូមព្យាយាមម្តងទៀត
+
+=== ROW 3 | api.unknownError ===
+EN: Unknown error. Please try again.
+VI: Lỗi không xác định. Vui lòng thử lại.
+KH: កំហុសមិនស្គាល់។ សូមព្យាយាមម្តងទៀត
+
+=== ROW 4 | app.name ===
+EN: Metfone Express
+VI: Metfone Express
+KH: មិត្តហ្វូនអ៊ិចប្រេស
+
+=== ROW 5 | app.slogan ===
+EN: Deliver Faster, Deliver Better
+VI: Giao nhanh hơn, giao tốt hơn
+KH: ដឹកជញ្ជូនលឿនជាង ដឹកជញ្ជូនប្រសើរជាង
+
+=== ROW 6 | checkAccount.checkingSubtitle ===
+EN: Please wait a moment while we securely verify your credentials.
+VI: Vui lòng chờ trong giây lát trong khi chúng tôi xác minh thông tin của bạn một cách an toàn.
+KH: សូមរង់ចាំមួយភ្លែត កំឡុងពេលប្រព័ន្ធផ្ទៀងផ្ទាត់ព័ត៌មានរបស់អ្នកដោយសុវត្ថិភាព
+
+=== ROW 7 | checkAccount.checkingTitle ===
+EN: Checking your Express account
+VI: Đang kiểm tra tài khoản Express của bạn
+KH: សូមរង់ចាំមួយភ្លែត កំឡុងពេលប្រព័ន្ធផ្ទៀងផ្ទាត់ព័ត៌មានរបស់អ្នកដោយសុវត្ថិភាព
+
+=== ROW 8 | checkAccount.exitApp ===
+EN: Exit
+VI: Thoát
+KH: ចាកចេញ
+
+=== ROW 9 | checkAccount.failedSubtitle ===
+EN: Please check your connection and try again.
+VI: Vui lòng kiểm tra kết nối và thử lại.
+KH: សូមពិនិត្យមើលការតភ្ជាប់អ៊ីនធឺណិត ហើយព្យាយាមម្តងទៀត
+
+=== ROW 10 | checkAccount.failedTitle ===
+EN: We couldn’t verify your account
+VI: Không thể xác minh tài khoản của bạn
+KH: មិនអាចផ្ទៀងផ្ទាត់គណនីរបស់អ្នកបានទេ
+
+=== ROW 11 | checkAccount.locationRequired ===
+EN: Could not get your current location. Please allow location access and try again.
+VI: Không thể lấy vị trí hiện tại của bạn. Vui lòng cho phép truy cập vị trí và thử lại.
+KH: មិនអាចទាញយកទីតាំងបច្ចុប្បន្នបានទេ។ សូមអនុញ្ញាតឱ្យចូលប្រើទីតាំង ហើយព្យាយាមម្តងទៀត។
+
+=== ROW 12 | checkAccount.missingToken ===
+EN: Missing session token. Please reopen Metfone Express.
+VI: Thiếu session token. Vui lòng mở lại Metfone Express.
+KH: បាត់បង់ Session Token។ សូមបើក Metfone Express ឡើងវិញ។
+
+=== ROW 13 | checkAccount.tryAgain ===
+EN: Try again
+VI: Thử lại
+KH: ព្យាយាមម្តងទៀត
+
+=== ROW 14 | common.back ===
+EN: Back
+VI: Quay lại
+KH: ត្រឡប់ក្រោយ
+
+=== ROW 15 | common.cancel ===
+EN: Cancel
+VI: Hủy
+KH: បោះបង់
+
+=== ROW 16 | common.close ===
+EN: Close
+VI: Đóng
+KH: បិទ
+
+=== ROW 17 | common.closeConfirm ===
+EN: Are you sure you want to close Metfone Express?
+VI: Bạn có chắc chắn muốn đóng Metfone Express không?
+KH: តើអ្នកប្រាកដជាចង់បិទ Metfone Express ឬ?
+
+=== ROW 18 | common.continue ===
+EN: Continue
+VI: Tiếp tục
+KH: បន្ត
+
+=== ROW 19 | common.error ===
+EN: Error
+VI: Lỗi
+KH: កំហុស
+
+=== ROW 20 | common.guest ===
+EN: Guest
+VI: Khách
+KH: ភ្ញៀវ
+
+=== ROW 21 | common.info ===
+EN: Info
+VI: Thông tin
+KH: ព័ត៌មាន
+
+=== ROW 22 | common.loading ===
+EN: Loading…
+VI: Đang tải…
+KH: កំពុងផ្ទុក...
+
+=== ROW 23 | common.notice ===
+EN: Notice
+VI: Thông báo
+KH: ការជូនដំណឹង
+
+=== ROW 24 | common.ok ===
+EN: OK
+VI: OK
+KH: យល់ព្រម
+
+=== ROW 25 | common.pleaseWait ===
+EN: Please wait…
+VI: Vui lòng chờ…
+KH: សូមរង់ចាំ...
+
+=== ROW 26 | common.retry ===
+EN: Retry
+VI: Thử lại
+KH: ព្យាយាមឡើងវិញ
+
+=== ROW 27 | common.track ===
+EN: Track
+VI: Theo dõi
+KH: តាមដាន
+
+=== ROW 28 | common.tracking ===
+EN: Tracking…
+VI: Đang theo dõi…
+KH: កំពុងតាមដាន...
+
+=== ROW 29 | common.view ===
+EN: View
+VI: Xem
+KH: មើល
+
+=== ROW 30 | express.actions.createOrder ===
+EN: Create Order
+VI: Tạo đơn hàng
+KH: បង្កើតការកុម្ម៉ង់
+
+=== ROW 31 | express.actions.myOrder ===
+EN: My Order
+VI: Đơn hàng của tôi
+KH: ការកុម្ម៉ង់របស់ខ្ញុំ
+
+=== ROW 32 | express.actions.shippingFee ===
+EN: Shipping fee
+VI: Phí vận chuyển
+KH: ថ្លៃដឹកជញ្ជូន
+
+=== ROW 33 | express.actions.trackOrder ===
+EN: Track Order
+VI: Theo dõi đơn hàng
+KH: តាមដានការដឹកជញ្ជូន
+
+=== ROW 34 | express.addressBook.active ===
+EN: Active
+VI: Đang hoạt động
+KH: សកម្ម
+
+=== ROW 35 | express.addressBook.confirm ===
+EN: Confirm
+VI: Xác nhận
+KH: ផ្ទៀងផ្ទាត់
+
+=== ROW 36 | express.addressBook.count ===
+EN: {count} addresses
+VI: {count} địa chỉ
+KH: អាសយដ្ឋានចំនួន {count}
+
+=== ROW 37 | express.addressBook.default ===
+EN: DEFAULT
+VI: MẶC ĐỊNH
+KH: លំនាំដើម
+
+=== ROW 38 | express.addressBook.defaultAddress ===
+EN: Default address
+VI: Địa chỉ mặc định
+KH: អាសយដ្ឋានលំនាំដើម
+
+=== ROW 39 | express.addressBook.edit ===
+EN: EDIT
+VI: CHỈNH SỬA
+KH: កែប្រែ
+
+=== ROW 40 | express.addressBook.empty ===
+EN: No addresses yet
+VI: Chưa có địa chỉ nào
+KH: មិនទាន់មានអាសយដ្ឋាននៅឡើយទេ
+
+=== ROW 41 | express.addressBook.loadError ===
+EN: Could not load addresses.
+VI: Không thể tải danh sách địa chỉ.
+KH: មិនអាចទាញយកទិន្នន័យអាសយដ្ឋានបានទេ។
+
+=== ROW 42 | express.addressBook.searchPlaceholder ===
+EN: Enter address name or phone number
+VI: Nhập tên hoặc số điện thoại
+KH: បញ្ចូលឈ្មោះអាសយដ្ឋាន ឬលេខទូរស័ព្ទ
+
+=== ROW 43 | express.addressBook.selectAll ===
+EN: Select all
+VI: Chọn tất cả
+KH: ជ្រើសរើសទាំងអស់
+
+=== ROW 44 | express.addressBook.setAsDefaultAddress ===
+EN: Set as Default Address
+VI: Đặt làm địa chỉ mặc định
+KH: កំណត់ជាអាសយដ្ឋានលំនាំដើម
+
+=== ROW 45 | express.addressBook.setDefault ===
+EN: SET DEFAULT
+VI: ĐẶT LÀM MẶC ĐỊNH
+KH: កំណត់ជាលំនាំដើម
+
+=== ROW 46 | express.addressBook.statusActivate ===
+EN: Activate
+VI: Kích hoạt
+KH: បើកដំណើរការ
+
+=== ROW 47 | express.addressBook.statusDeactivate ===
+EN: Deactivate
+VI: Vô hiệu hóa
+KH: បិទដំណើរការ
+
+=== ROW 48 | express.addressBook.statusTitle ===
+EN: Status
+VI: Trạng thái
+KH: ស្ថានភាព
+
+=== ROW 49 | express.addressBook.title ===
+EN: Shipping Address
+VI: Địa chỉ giao hàng
+KH: អាសយដ្ឋានដឹកជញ្ជូន
+
+=== ROW 50 | express.createOrder.addAddress ===
+EN: Add Address
+VI: Thêm địa chỉ
+KH: បន្ថែមអាសយដ្ឋាន
+
+=== ROW 51 | express.createOrder.addNewAddress ===
+EN: Add New Address
+VI: Thêm địa chỉ mới
+KH: បន្ថែមអាសយដ្ឋានថ្មី
+
+=== ROW 52 | express.createOrder.addNewShippingAddress ===
+EN: Add New Shipping Address
+VI: Thêm địa chỉ giao hàng mới
+KH: បន្ថែមអាសយដ្ឋានដឹកជញ្ជូនថ្មី
+
+=== ROW 53 | express.createOrder.addressType ===
+EN: Address Type
+VI: Loại địa chỉ
+KH: ប្រភេទអាសយដ្ឋាន
+
+=== ROW 54 | express.createOrder.addressTypeHome ===
+EN: Home
+VI: Nhà
+KH: ផ្ទះ
+
+=== ROW 55 | express.createOrder.addressTypeOffice ===
+EN: Office
+VI: Văn phòng
+KH: ការិយាល័យ
+
+=== ROW 56 | express.createOrder.addressTypePostOffice ===
+EN: Post Office
+VI: Bưu cục
+KH: ប្រៃសណីយ៍
+
+=== ROW 57 | express.createOrder.addressTypeWarehouse ===
+EN: Warehouse
+VI: Kho hàng
+KH: ឃ្លាំង
+
+=== ROW 58 | express.createOrder.confirm ===
+EN: Confirm
+VI: Xác nhận
+KH: ផ្ទៀងផ្ទាត់ 
+
+=== ROW 59 | express.createOrder.confirmCreate ===
+EN: Confirm & Create Order
+VI: Xác nhận & Tạo đơn hàng
+KH: ផ្ទៀងផ្ទាត់ & បង្កើតការកុម្ម៉ង់
+
+=== ROW 60 | express.createOrder.creating ===
+EN: Creating order…
+VI: Đang tạo đơn hàng…
+KH: កំពុងបង្កើតការកុម្ម៉ង់...
+
+=== ROW 61 | express.createOrder.crossCheck ===
+EN: Cross-Check
+VI: Đồng kiểm
+KH: ពិនិត្យផ្ទៀងផ្ទាត់ឡើងវិញ
+
+=== ROW 62 | express.createOrder.crossCheckHint ===
+EN: Verify item details at pickup
+VI: Đồng kiểm hàng khi lấy hàng
+KH: ផ្ទៀងផ្ទាត់ព័ត៌មានលម្អិតទំនិញពេលទទួលយក
+
+=== ROW 63 | express.createOrder.deliveryNotification ===
+EN: Delivery Notification
+VI: Thông báo giao hàng
+KH: ការជូនដំណឹងការដឹកជញ្ជូន
+
+=== ROW 64 | express.createOrder.deliveryNotificationHint ===
+EN: SMS & App alerts
+VI: Thông báo qua SMS & ứng dụng
+KH: ការជូនដំណឹងតាម SMS និង App
+
+=== ROW 65 | express.createOrder.detailedAddress ===
+EN: Detailed Address
+VI: Địa chỉ chi tiết
+KH: អាសយដ្ឋានលម្អិត
+
+=== ROW 66 | express.createOrder.detailedAddressPlaceholder ===
+EN: Street number, Building name, Floor...
+VI: Số nhà, tên tòa nhà, tầng...
+KH: លេខផ្លូវ, ឈ្មោះអគារ, ជាន់...
+
+=== ROW 67 | express.createOrder.dimensionsLabel ===
+EN: Size (LxWxH) (cm)
+VI: Kích thước (Dài x Rộng x Cao) (cm)
+KH: ទំហំ (បណ្តោយxទទឹងxកម្ពស់) (ស.ម)
+
+=== ROW 68 | express.createOrder.documentUpper ===
+EN: DOCUMENT
+VI: TÀI LIỆU
+KH: ឯកសារ
+
+=== ROW 69 | express.createOrder.dropOffPoint ===
+EN: Drop-off at Point
+VI: Gửi hàng tại bưu cục
+KH: ផ្ញើនៅសាខា/ចំណុចផ្ញើ
+
+=== ROW 70 | express.createOrder.dropOffStore ===
+EN: Send at store
+VI: Gửi tại bưu cục 
+KH: ផ្ញើនៅហាង/សាខា
+
+=== ROW 71 | express.createOrder.editAddress ===
+EN: Edit Address
+VI: Chỉnh sửa địa chỉ
+KH: កែប្រែអាសយដ្ឋាន
+
+=== ROW 72 | express.createOrder.expectedDeliveryAfter ===
+EN: Expected delivery after {days} days
+VI: Dự kiến giao sau {days} ngày
+KH: រំពឹងទុកថានឹងដឹកជញ្ជូនក្នុងរយៈពេល {days} ថ្ងៃ
+
+=== ROW 73 | express.createOrder.expressEta ===
+EN: 1 - 2 Days
+VI: 1 - 2 ngày
+KH: ១ - ២ ថ្ងៃ
+
+=== ROW 74 | express.createOrder.expressService ===
+EN: Express
+VI: Chuyển phát nhanh
+KH: ដឹកជញ្ជូនរហ័ស (Express)
+
+=== ROW 75 | express.createOrder.extraServiceDefault ===
+EN: Extra service
+VI: Dịch vụ bổ sung
+KH: សេវាកម្មបន្ថែម
+
+=== ROW 76 | express.createOrder.extraServiceDefaultHint ===
+EN: Optional add-on for your shipment
+VI: Tùy chọn bổ sung cho đơn hàng của bạn
+KH: សេវាកម្មបន្ថែមជម្រើសសម្រាប់ការដឹកជញ្ជូន
+
+=== ROW 77 | express.createOrder.extraServicePriceHint ===
+EN: + ${price}
+VI: + ${giá}
+KH: ${តម្លៃ}
+
+=== ROW 78 | express.createOrder.extraServices ===
+EN: Extra Services
+VI: Dịch vụ bổ sung
+KH: សេវាកម្មបន្ថែម
+
+=== ROW 79 | express.createOrder.fullName ===
+EN: Full Name
+VI: Họ và tên
+KH: ឈ្មោះពេញ
+
+=== ROW 80 | express.createOrder.goodsName ===
+EN: Goods Name
+VI: Tên hàng hóa
+KH: ឈ្មោះទំនិញ
+
+=== ROW 81 | express.createOrder.goodsNamePlaceholder ===
+EN: e.g. Electronic Accessories
+VI: Ví dụ: Phụ kiện điện tử
+KH: ឧទាហរណ៍៖ គ្រឿងបន្លាស់អេឡិចត្រូនិក
+
+=== ROW 82 | express.createOrder.homeDelivery ===
+EN: Home Delivery
+VI: Giao hàng tận nhà
+KH: ដឹកជញ្ជូនដល់ផ្ទះ
+
+=== ROW 83 | express.createOrder.insuranceValue ===
+EN: Insurance Value
+VI: Giá trị bảo hiểm
+KH: តម្លៃធានារ៉ាប់រង
+
+=== ROW 84 | express.createOrder.insuranceValueHint ===
+EN: Protection for high-value items
+VI: Bảo vệ hàng hóa có giá trị cao
+KH: ការពារសម្រាប់ទំនិញដែលមានតម្លៃខ្ពស់
+
+=== ROW 85 | express.createOrder.locationSelection ===
+EN: Location Selection
+VI: Chọn vị trí
+KH: ការជ្រើសរើសទីតាំង
+
+=== ROW 86 | express.createOrder.mapPreview ===
+EN: Map preview
+VI: Xem trước trên bản đồ
+KH: មើលទីតាំងលើផែនទី
+
+=== ROW 87 | express.createOrder.missingPriceJose ===
+EN: Could not get the signed shipping price. Please try again.
+VI: Không thể lấy giá vận chuyển đã ký. Vui lòng thử lại.
+KH: មិនអាចទាញយកតម្លៃដឹកជញ្ជូនបានទេ។ សូមព្យាយាមម្តងទៀត។
+
+=== ROW 88 | express.createOrder.next ===
+EN: Next
+VI: Tiếp theo
+KH: បន្ទាប់
+
+=== ROW 89 | express.createOrder.nextStep ===
+EN: Next Step
+VI: Bước tiếp theo
+KH: ជំហានបន្ទាប់
+
+=== ROW 90 | express.createOrder.noMatchingSearchResults ===
+EN: No matching search results
+VI: Không tìm thấy kết quả phù hợp
+KH: មិនមានលទ្ធផលស្វែងរកដែលត្រូវគ្នាទេ
+
+=== ROW 91 | express.createOrder.noServices ===
+EN: No shipping service is available for this route.
+VI: Không có dịch vụ vận chuyển nào khả dụng cho tuyến đường này.
+KH: មិនមានសេវាកម្មដឹកជញ្ជូនសម្រាប់ផ្លូវនេះទេ។
+
+=== ROW 92 | express.createOrder.note ===
+EN: Note
+VI: Ghi chú
+KH: កំណត់សម្គាល់
+
+=== ROW 93 | express.createOrder.notePlaceholder ===
+EN: Enter your note
+VI: Nhập ghi chú
+KH: បញ្ចូលកំណត់សម្គាល់របស់អ្នក
+
+=== ROW 94 | express.createOrder.optional ===
+EN: (Optional)
+VI: (Không bắt buộc)
+KH: (ជម្រើស)
+
+=== ROW 95 | express.createOrder.packageUpper ===
+EN: PACKAGE
+VI: KIỆN HÀNG
+KH: កញ្ចប់ទំនិញ
+
+=== ROW 96 | express.createOrder.paymentResponsibility ===
+EN: Payment Responsibility
+VI: Bên thanh toán
+KH: អ្នកទទួលខុសត្រូវបង់ប្រាក់
+
+=== ROW 97 | express.createOrder.phoneNumber ===
+EN: Phone Number
+VI: Số điện thoại
+KH: លេខទូរស័ព្ទ
+
+=== ROW 98 | express.createOrder.pickUpHome ===
+EN: Send at home
+VI: Lấy hàng tại nhà
+KH: ផ្ញើនៅផ្ទះ
+
+=== ROW 99 | express.createOrder.progress ===
+EN: Order progress
+VI: Tiến trình đơn hàng
+KH: ដំណាក់កាលបុងបញ្ញើ
+
+=== ROW 100 | express.createOrder.receiverInformation ===
+EN: Receiver Information
+VI: Thông tin người nhận
+KH: ព័ត៌មានអ្នកទទួល
+
+=== ROW 101 | express.createOrder.receiverNamePlaceholder ===
+EN: Enter receiver's name
+VI: Nhập tên người nhận
+KH: បញ្ចូលឈ្មោះអ្នកទទួល
+
+=== ROW 102 | express.createOrder.receivingMethod ===
+EN: Receiving Method
+VI: Phương thức nhận hàng
+KH: វិធីសាស្ត្រទទួលទំនិញ
+
+=== ROW 103 | express.createOrder.recommend ===
+EN: Recommend
+VI: Khuyên dùng
+KH: ណែនាំ
+
+=== ROW 104 | express.createOrder.saveAddress ===
+EN: Update address
+VI: Cập nhật địa chỉ
+KH: បច្ចុប្បន្នភាពអាសយដ្ឋាន
+
+=== ROW 105 | express.createOrder.searchAddress ===
+EN: Search address
+VI: Tìm kiếm địa chỉ
+KH: ស្វែងរកអាសយដ្ឋាន
+
+=== ROW 106 | express.createOrder.searchOwnerPlaceholder ===
+EN: Enter owner name,...
+VI: Nhập tên chủ địa chỉ,...
+KH: បញ្ចូលឈ្មោះម្ចាស់...
+
+=== ROW 107 | express.createOrder.selectPreferredAddress ===
+EN: Select your preferred address...
+VI: Chọn địa chỉ bạn muốn sử dụng...
+KH: ជ្រើសរើសអាសយដ្ឋានដែលអ្នកពេញចិត្ត...
+
+=== ROW 108 | express.createOrder.selectSendingAddress ===
+EN: Select Sending Address
+VI: Chọn địa chỉ gửi hàng
+KH: ជ្រើសរើសអាសយដ្ឋានផ្ញើ
+
+=== ROW 109 | express.createOrder.selectService ===
+EN: Select service
+VI: Chọn dịch vụ
+KH: ជ្រើសរើសសេវាកម្ម
+
+=== ROW 110 | express.createOrder.selectServiceAction ===
+EN: Select Service
+VI: Chọn dịch vụ
+KH: ជ្រើសរើសសេវាកម្ម
+
+=== ROW 111 | express.createOrder.senderInformation ===
+EN: Sender Information
+VI: Thông tin người gửi
+KH: ព័ត៌មានអ្នកផ្ញើ
+
+=== ROW 112 | express.createOrder.senderPays ===
+EN: Sender Pays
+VI: Người gửi thanh toán
+KH: អ្នកផ្ញើជាអ្នកបង់
+
+=== ROW 113 | express.createOrder.senderPaysHint ===
+EN: Pay now via eMoney wallet
+VI: Thanh toán ngay qua ví eMoney
+KH: បង់ប្រាក់ឥឡូវនេះតាមកាបូបប្រាក់ eMoney
+
+=== ROW 114 | express.createOrder.serviceList ===
+EN: Service List
+VI: Danh sách dịch vụ
+KH: បញ្ជីសេវាកម្ម
+
+=== ROW 115 | express.createOrder.serviceSelection ===
+EN: Service Selection
+VI: Lựa chọn dịch vụ
+KH: ការជ្រើសរើសសេវាកម្ម
+
+=== ROW 116 | express.createOrder.setAsDefaultAddress ===
+EN: Set as default address
+VI: Đặt làm địa chỉ mặc định
+KH: កំណត់ជាអាសយដ្ឋានលំនាំដើម
+
+=== ROW 117 | express.createOrder.steps.details ===
+EN: Details
+VI: Chi tiết
+KH: ព័ត៌មានលម្អិត
+
+=== ROW 118 | express.createOrder.steps.goods ===
+EN: Goods
+VI: Hàng hóa
+KH: ទំនិញ
+
+=== ROW 119 | express.createOrder.steps.package ===
+EN: Package
+VI: Kiện hàng
+KH: កញ្ចប់ទំនិញ
+
+=== ROW 120 | express.createOrder.steps.payment ===
+EN: Payment
+VI: Thanh toán
+KH: ការទូទាត់ប្រាក់
+
+=== ROW 121 | express.createOrder.steps.review ===
+EN: Review
+VI: Kiểm tra lại
+KH: ពិនិត្យឡើងវិញ
+
+=== ROW 122 | express.createOrder.steps.sender ===
+EN: Sender
+VI: Người gửi
+KH: អ្នកផ្ញើ
+
+=== ROW 123 | express.createOrder.stepSlash ===
+EN: Step {current}/{total}
+VI: Bước {current}/{total}
+KH: ជំហាន {បច្ចុប្បន្ន}/{សរុប}
+
+=== ROW 124 | express.createOrder.submitError ===
+EN: Could not create the order. Please try again.
+VI: Không thể tạo đơn hàng. Vui lòng thử lại.
+KH: មិនអាចបង្កើតការកុម្ម៉ង់បានទេ។ សូមព្យាយាមម្តងទៀត។
+
+=== ROW 125 | express.createOrder.title ===
+EN: Create Order
+VI: Tạo đơn hàng
+KH: បង្កើតបុងបញ្ញើ
+
+=== ROW 126 | express.createOrder.valueUsd ===
+EN: Value (USD)
+VI: Giá trị (USD)
+KH: តម្លៃ (USD)
+
+=== ROW 127 | express.createOrder.warehouseName ===
+EN: Warehouse Name
+VI: Tên kho
+KH: ឈ្មោះឃ្លាំង
+
+=== ROW 128 | express.home.loadingOrders ===
+EN: Loading orders…
+VI: Đang tải đơn hàng…
+KH: កំពុងផ្ទុកទិន្នន័យបុងបញ្ញើ...
+
+=== ROW 129 | express.home.loadOrdersError ===
+EN: Could not load orders.
+VI: Không thể tải đơn hàng.
+KH: មិនអាចទាញយកទិន្នន័យបុងបញ្ញើបានទេ។
+
+=== ROW 130 | express.home.noOrders ===
+EN: No orders yet.
+VI: Chưa có đơn hàng nào.
+KH: មិនទាន់មានការកុម្ម៉ង់នៅឡើយទេ
+
+=== ROW 131 | express.home.notifications ===
+EN: Notifications
+VI: Thông báo
+KH: ការជូនដំណឹង
+
+=== ROW 132 | express.home.recentOrders ===
+EN: Recent Orders
+VI: Đơn hàng gần đây
+KH: បុងបញ្ញើថ្មីៗ
+
+=== ROW 133 | express.home.searchPlaceholder ===
+EN: Track your shipment...
+VI: Theo dõi đơn hàng của bạn...
+KH: តាមដានការដឹកជញ្ជូនរបស់អ្នក...
+
+=== ROW 134 | express.home.viewAll ===
+EN: View All
+VI: Xem tất cả
+KH: មើលទាំងអស់
+
+=== ROW 135 | express.home.welcome ===
+EN: Welcome,
+VI: Chào mừng,
+KH: សូមស្វាគមន៍,
+
+=== ROW 136 | express.orderDetail.estimatedDelivery ===
+EN: Estimated Delivery
+VI: Dự kiến giao hàng
+KH: ពេលវេលាដឹកជញ្ជូនប៉ាន់ស្មាន
+
+=== ROW 137 | express.orderDetail.loadError ===
+EN: Could not load order.
+VI: Không thể tải đơn hàng.
+KH: មិនអាចទាញយកទិន្នន័យបុងបញ្ញើបានទេ។
+
+=== ROW 138 | express.orderDetail.loading ===
+EN: Loading order…
+VI: Đang tải đơn hàng…
+KH: កំពុងផ្ទុកទិន្នន័យបុងបញ្ញើ...
+
+=== ROW 139 | express.orderDetail.orderInformation ===
+EN: Order Information
+VI: Thông tin đơn hàng
+KH: ព័ត៌មានការកុម្ម៉ង់
+
+=== ROW 140 | express.orderDetail.receiver ===
+EN: Receiver
+VI: Người nhận
+KH: អ្នកទទួល
+
+=== ROW 141 | express.orderDetail.sender ===
+EN: Sender
+VI: Người gửi
+KH: អ្នកផ្ញើ
+
+=== ROW 142 | express.orderDetail.serviceType ===
+EN: Service Type
+VI: Loại dịch vụ
+KH: ប្រភេទសេវាកម្ម
+
+=== ROW 143 | express.orderDetail.shippingFee ===
+EN: Shipping Fee
+VI: Phí vận chuyển
+KH: ថ្លៃដឹកជញ្ជូន
+
+=== ROW 144 | express.orderDetail.title ===
+EN: Order Detail
+VI: Chi tiết đơn hàng
+KH: ព័ត៌មានលម្អិតនៃការកុម្ម៉ង់
+
+=== ROW 145 | express.orderDetail.totalAmount ===
+EN: Total Amount
+VI: Tổng tiền
+KH: ចំនួនទឹកប្រាក់សរុប
+
+=== ROW 146 | express.orderDetail.viewTracking ===
+EN: View Tracking
+VI: Xem hành trình đơn hàng
+KH: មើលការតាមដាន
+
+=== ROW 147 | express.orderDetail.weightSize ===
+EN: Weight / Size
+VI: Khối lượng / Kích thước
+KH: ទម្ងន់ / ទំហំ
+
+=== ROW 148 | express.orderNotSuccessful.backToHome ===
+EN: Back to Home
+VI: Quay về Trang chủ
+KH: ត្រឡប់ទៅទំព័រដើម
+
+=== ROW 149 | express.orderNotSuccessful.copyReference ===
+EN: Copy reference number
+VI: Sao chép mã tham chiếu
+KH: ចម្លងលេខយោង
+
+=== ROW 150 | express.orderNotSuccessful.heading ===
+EN: Order Not Successful
+VI: Tạo đơn hàng không thành công
+KH: បង្កើតការកុម្ម៉ង់មិនជោគជ័យ
+
+=== ROW 151 | express.orderNotSuccessful.referenceNo ===
+EN: Reference No.
+VI: Mã tham chiếu
+KH: លេខយោង
+
+=== ROW 152 | express.orderNotSuccessful.subtitle ===
+EN: We couldn't create your order. Please try again.
+VI: Không thể tạo đơn hàng. Vui lòng thử lại.
+KH: យើងមិនអាចបង្កើតការកុម្ម៉ង់របស់អ្នកបានទេ។ សូមព្យាយាមម្តងទៀត។
+
+=== ROW 153 | express.orderNotSuccessful.title ===
+EN: Order Not Successful
+VI: Tạo đơn hàng không thành công
+KH: បង្កើតការកុម្ម៉ង់មិនជោគជ័យ
+
+=== ROW 154 | express.orderNotSuccessful.tryAgain ===
+EN: Try Again
+VI: Thử lại
+KH: ព្យាយាមម្តងទៀត
+
+=== ROW 155 | express.orders.filter ===
+EN: Filter
+VI: Bộ lọc
+KH: តម្រង
+
+=== ROW 156 | express.orders.filterAll ===
+EN: All
+VI: Tất cả
+KH: ទាំងអស់
+
+=== ROW 157 | express.orders.filterApply ===
+EN: Apply filter
+VI: Áp dụng bộ lọc
+KH: អនុវត្តតម្រង
+
+=== ROW 158 | express.orders.filterCompleted ===
+EN: Completed
+VI: Hoàn tất
+KH: បានបញ្ចប់
+
+=== ROW 159 | express.orders.filterProcessing ===
+EN: Processing
+VI: Đang xử lý
+KH: កំពុងដំណើរការ
+
+=== ROW 160 | express.orders.filterSelectAll ===
+EN: Select all
+VI: Chọn tất cả
+KH: ជ្រើសរើសទាំងអស់
+
+=== ROW 161 | express.orders.filterStatusTitle ===
+EN: Status filter order
+VI: Lọc đơn hàng theo trạng thái
+KH: តម្រងស្ថានភាពបុងបញើ
+
+=== ROW 162 | express.orders.loadingMore ===
+EN: Loading more…
+VI: Đang tải thêm…
+KH: កំពុងអាប់ដេត...
+
+=== ROW 163 | express.orders.loadingOrders ===
+EN: Loading orders…
+VI: Đang tải đơn hàng…
+KH: កំពុងផ្ទុកទិន្នន័យបុងបញើ...
+
+=== ROW 164 | express.orders.loadOrdersError ===
+EN: Could not load orders.
+VI: Không thể tải đơn hàng.
+KH: មិនអាចទាញយកទិន្នន័យបុងបញ្ញើបានទេ
+
+=== ROW 165 | express.orders.noMoreOrders ===
+EN: No more orders
+VI: Không còn đơn hàng nào
+KH: គ្មានបុងបញ្ញើទៀតទេ
+
+=== ROW 166 | express.orders.noOrders ===
+EN: No orders yet.
+VI: Chưa có đơn hàng nào.
+KH: មិនទាន់មានបុងបញ្ញើនៅឡើយទេ
+
+=== ROW 167 | express.orders.pullToRefresh ===
+EN: Pull to refresh
+VI: Kéo xuống để làm mới
+KH: ទាញចុះក្រោមដើម្បីអាប់ដេត
+
+=== ROW 168 | express.orders.refreshing ===
+EN: Refreshing…
+VI: Đang làm mới…
+KH: កំពុងអាប់ដេត...
+
+=== ROW 169 | express.orders.releaseToRefresh ===
+EN: Release to refresh
+VI: Thả để làm mới
+KH: លែងដើម្បីអាប់ដេត
+
+=== ROW 170 | express.orders.title ===
+EN: My Orders
+VI: Đơn hàng của tôi
+KH: បុងបញ្ញើរបស់ខ្ញុំ
+
+=== ROW 171 | express.orderStatus.CANCELLED ===
+EN: Cancelled
+VI: Đã hủy
+KH: បានបោះបង់
+
+=== ROW 172 | express.orderStatus.CHANGE_ADDRESS ===
+EN: Change address
+VI: Thay đổi địa chỉ
+KH: ផ្លាស់ប្តូរអាសយដ្ឋាន
+
+=== ROW 173 | express.orderStatus.CONFIRM_STORAGE ===
+EN: Confirm storage
+VI: Xác nhận lưu kho
+KH: ផ្ទៀងផ្ទាត់ការរក្សាទុក
+
+=== ROW 174 | express.orderStatus.CONFIRMED ===
+EN: Confirmed
+VI: Đã xác nhận
+KH: បានផ្ទៀងផ្ទាត់
+
+=== ROW 175 | express.orderStatus.DISPOSAL ===
+EN: Disposal
+VI: Tiêu hủy
+KH: ការបោះបង់/កម្ទេចចោល
+
+=== ROW 176 | express.orderStatus.DRAFT ===
+EN: Draft
+VI: Bản nháp
+KH: សេចក្តីព្រាង
+
+=== ROW 177 | express.orderStatus.FORWARDING_REQUEST ===
+EN: Forwarding request
+VI: Yêu cầu chuyển tiếp
+KH: សំណើបញ្ជូនបន្ត
+
+=== ROW 178 | express.orderStatus.NEW ===
+EN: New
+VI: Mới
+KH: ថ្មី
+
+=== ROW 179 | express.orderStatus.PARTIAL_SHIP_REQUEST ===
+EN: Partial ship request
+VI: Yêu cầu giao một phần
+KH: សំណើដឹកជញ្ជូនមួយផ្នែក
+
+=== ROW 180 | express.orderStatus.PARTIALLY_SHIPPED ===
+EN: Partially shipped
+VI: Đã giao một phần
+KH: បានដឹកជញ្ជូនមួយផ្នែក
+
+=== ROW 181 | express.orderStatus.RECEIVE_AGAIN ===
+EN: Receive again
+VI: Nhận lại
+KH: ទទួលម្តងទៀត
+
+=== ROW 182 | express.orderStatus.RECEIVE_FAILED ===
+EN: Receive failed
+VI: Nhận hàng thất bại
+KH: ការទទួលបរាជ័យ
+
+=== ROW 183 | express.orderStatus.RECEIVED ===
+EN: Received
+VI: Đã nhận
+KH: បានទទួល
+
+=== ROW 184 | express.orderStatus.RECEIVING ===
+EN: Receiving
+VI: Đang nhận hàng
+KH: កំពុងទទួល
+
+=== ROW 185 | express.orderStatus.RETURN_AGAIN ===
+EN: Return again
+VI: Thử trả hàng lại
+KH: ត្រឡប់មកវិញម្តងទៀត
+
+=== ROW 186 | express.orderStatus.RETURN_CONFIRMED ===
+EN: Return confirmed
+VI: Đã xác nhận trả hàng
+KH: បានផ្ទៀងផ្ទាត់ការត្រឡប់មកវិញ
+
+=== ROW 187 | express.orderStatus.RETURN_FAILED ===
+EN: Return failed
+VI: Hoàn trả thất bại
+KH: ការត្រឡប់មកវិញបរាជ័យ
+
+=== ROW 188 | express.orderStatus.RETURN_REQUEST ===
+EN: Return request
+VI: Yêu cầu hoàn hàng
+KH: សំណើត្រឡប់មកវិញ
+
+=== ROW 189 | express.orderStatus.RETURN_SUCCESSFUL ===
+EN: Return successful
+VI: Hoàn trả hàng thành công
+KH: ត្រឡប់មកវិញជោគជ័យ
+
+=== ROW 190 | express.orderStatus.RETURNING ===
+EN: Returning
+VI: Đang hoàn hàng
+KH: កំពុងត្រឡប់មកវិញ
+
+=== ROW 191 | express.orderStatus.SHIP_AGAIN ===
+EN: Ship again
+VI: Thử giao lại
+KH: ដឹកជញ្ជូនម្តងទៀត
+
+=== ROW 192 | express.orderStatus.SHIP_FAILED ===
+EN: Ship failed
+VI: Giao hàng thất bại
+KH: ការដឹកជញ្ជូនបរាជ័យ
+
+=== ROW 193 | express.orderStatus.SHIPPED ===
+EN: Shipped
+VI: Đã giao hàng
+KH: បានដឹកជញ្ជូន
+
+=== ROW 194 | express.orderStatus.SHIPPER_RETURN ===
+EN: Shipper return
+VI: Nhân viên giao hàng hoàn trả
+KH: អ្នកដឹកជញ្ជូនត្រឡប់មកវិញ
+
+=== ROW 195 | express.orderStatus.SHIPPING ===
+EN: Shipping
+VI: Đang giao hàng
+KH: កំពុងដឹកជញ្ជូន
+
+=== ROW 196 | express.orderStatus.TRANSITING ===
+EN: Transiting
+VI: Đang trung chuyển
+KH: កំពុងដឹកជញ្ជូនតាមផ្លូវ
+
+=== ROW 197 | express.orderStatus.WAITING_TO_RECEIVE ===
+EN: Waiting to receive
+VI: Đang chờ nhận hàng
+KH: រង់ចាំការទទួល
+
+=== ROW 198 | express.orderSuccess.backToHome ===
+EN: Back to Home
+VI: Quay về Trang chủ
+KH: ត្រឡប់ទៅទំព័រដើម
+
+=== ROW 199 | express.orderSuccess.copyTracking ===
+EN: Copy tracking number
+VI: Sao chép mã vận đơn
+KH: ចម្លងលេខកូដតាមដាន
+
+=== ROW 200 | express.orderSuccess.createdAt ===
+EN: Created At
+VI: Ngày tạo
+KH: បានបង្កើតនៅ
+
+=== ROW 201 | express.orderSuccess.createNewOrder ===
+EN: Create New Order
+VI: Tạo đơn hàng mới
+KH: បង្កើតបុងបញ្ញើថ្មី
+
+=== ROW 202 | express.orderSuccess.estimatedDelivery ===
+EN: Estimated Delivery
+VI: Dự kiến giao hàng
+KH: ពេលវេលាដឹកជញ្ជូនប៉ាន់ស្មាន
+
+=== ROW 203 | express.orderSuccess.heading ===
+EN: Order Created Successfully!
+VI: Tạo đơn hàng thành công!
+KH: បង្កើតបុងបញ្ញើជោគជ័យ!
+
+=== ROW 204 | express.orderSuccess.payer ===
+EN: Paid By
+VI: Bên thanh toán
+KH: បង់ប្រាក់ដោយ
+
+=== ROW 205 | express.orderSuccess.receiverPays ===
+EN: Receiver Pays
+VI: Người nhận thanh toán
+KH: អ្នកទទួលជាអ្នកបង់
+
+=== ROW 206 | express.orderSuccess.status ===
+EN: Status
+VI: Trạng thái
+KH: ស្ថានភាព
+
+=== ROW 207 | express.orderSuccess.subtitle ===
+EN: Your shipment has been created.
+VI: Đơn hàng của bạn đã được tạo.
+KH: ការដឹកជញ្ជូនរបស់អ្នកត្រូវបានបង្កើតរួចរាល់។
+
+=== ROW 208 | express.orderSuccess.tax ===
+EN: Tax
+VI: Thuế
+KH: ពន្ធ
+
+=== ROW 209 | express.orderSuccess.title ===
+EN: Order Success
+VI: Tạo đơn hàng thành công
+KH: បង្កើតបុងបញ្ញើជោគជ័យ
+
+=== ROW 210 | express.orderSuccess.trackingNumber ===
+EN: Tracking Number
+VI: Mã vận đơn
+KH: លេខកូដតាមដាន
+
+=== ROW 211 | express.orderSuccess.viewTracking ===
+EN: View Tracking
+VI: Xem hành trình đơn hàng
+KH: មើលការតាមដាន
+
+=== ROW 212 | express.payment.deadlineHint ===
+EN: You need to complete the payment within 15 minutes. Otherwise, your order will expire.
+VI: Bạn cần hoàn tất thanh toán trong vòng 15 phút. Nếu không, đơn hàng sẽ hết hạn.
+KH: អ្នកត្រូវទូទាត់ប្រាក់ក្នុងរយៈពេល ១៥ នាទី។ បើពុំនោះទេ បុងបញ្ញើរបស់អ្នកនឹងផុតកំណត់។
+
+=== ROW 213 | express.payment.enterPin ===
+EN: Enter PIN
+VI: Nhập PIN
+KH: បញ្ចូលលេខ PIN
+
+=== ROW 214 | express.payment.keypadLabel ===
+EN: PIN keypad
+VI: Bàn phím PIN
+KH: ក្តារចុច PIN
+
+=== ROW 215 | express.payment.orderInformation ===
+EN: Order Information
+VI: Thông tin đơn hàng
+KH: ព័ត៌មានបុងបញ្ញើ
+
+=== ROW 216 | express.payment.payButton ===
+EN: Payment {amount}
+VI: Thanh toán {amount}
+KH: ទូទាត់ប្រាក់ {amount}
+
+=== ROW 217 | express.payment.payError ===
+EN: Could not complete payment. Please try again.
+VI: Không thể hoàn tất thanh toán. Vui lòng thử lại.
+KH: មិនអាចបញ្ចប់ការទូទាត់បានទេ។ សូមព្យាយាមម្តងទៀត។
+
+=== ROW 218 | express.payment.paying ===
+EN: Processing payment…
+VI: Đang xử lý thanh toán…
+KH: កំពុងដំណើរការការទូទាត់...
+
+=== ROW 219 | express.payment.pinError ===
+EN: Incorrect PIN. Please try again.
+VI: PIN không chính xác. Vui lòng thử lại.
+KH: លេខ PIN មិនត្រឹមត្រូវទេ។ សូមព្យាយាមម្តងទៀត។
+
+=== ROW 220 | express.payment.pinHelpBody ===
+EN: Your eMoney PIN is the 6-digit code you use to authorize payments in the eMoney app.
+VI: PIN eMoney là mã gồm 6 chữ số dùng để xác nhận thanh toán trong ứng dụng eMoney.
+KH: លេខ PIN eMoney របស់អ្នក គឺជាលេខកូដ ៦ ខ្ទង់ដែលប្រើសម្រាប់អនុម័តការទូទាត់ក្នុង App eMoney។
+
+=== ROW 221 | express.payment.pinHelpClose ===
+EN: Got it
+VI: Đã hiểu
+KH: យល់ព្រម
+
+=== ROW 222 | express.payment.receiver ===
+EN: Receiver
+VI: Người nhận
+KH: អ្នកទទួល
+
+=== ROW 223 | express.payment.sender ===
+EN: Sender
+VI: Người gửi
+KH: អ្នកផ្ញើ
+
+=== ROW 224 | express.payment.serviceType ===
+EN: Service Type
+VI: Loại dịch vụ
+KH: ប្រភេទសេវាកម្ម
+
+=== ROW 225 | express.payment.shippingFee ===
+EN: Shipping Fee
+VI: Phí vận chuyển
+KH: ថ្លៃដឹកជញ្ជូន
+
+=== ROW 226 | express.payment.title ===
+EN: Payment
+VI: Thanh toán
+KH: ការទូទាត់ប្រាក់
+
+=== ROW 227 | express.payment.totalAmount ===
+EN: Total Amount
+VI: Tổng tiền
+KH: ចំនួនទឹកប្រាក់សរុប
+
+=== ROW 228 | express.payment.whatIsPin ===
+EN: What is PIN?
+VI: PIN là gì?
+KH: តើ PIN ជាអ្វី?
+
+=== ROW 229 | express.paymentFailed.backToHome ===
+EN: Back to Home
+VI: Quay về Trang chủ
+KH: ត្រឡប់ទៅទំព័រដើម
+
+=== ROW 230 | express.paymentFailed.copyReference ===
+EN: Copy reference number
+VI: Sao chép mã tham chiếu
+KH: ចម្លងលេខយោង
+
+=== ROW 231 | express.paymentFailed.heading ===
+EN: Payment Failed
+VI: Thanh toán thất bại
+KH: ការទូទាត់បរាជ័យ
+
+=== ROW 232 | express.paymentFailed.referenceNo ===
+EN: Reference No.
+VI: Mã tham chiếu
+KH: លេខយោង
+
+=== ROW 233 | express.paymentFailed.subtitle ===
+EN: We couldn't complete your payment. Please try again.
+VI: Không thể hoàn tất thanh toán. Vui lòng thử lại.
+KH: យើងមិនអាចបញ្ចប់ការទូទាត់របស់អ្នកបានទេ។ សូមព្យាយាមម្តងទៀត។
+
+=== ROW 234 | express.paymentFailed.title ===
+EN: Payment Failed
+VI: Thanh toán thất bại
+KH: ការទូទាត់បរាជ័យ
+
+=== ROW 235 | express.paymentFailed.tryAgain ===
+EN: Try Again
+VI: Thử lại
+KH: ព្យាយាមម្តងទៀត
+
+=== ROW 236 | express.profile.about ===
+EN: About Metfone Express
+VI: Giới thiệu về Metfone Express
+KH: អំពី Metfone Express
+
+=== ROW 237 | express.profile.aboutLoadError ===
+EN: Could not load this information.
+VI: Không thể tải thông tin này.
+KH: មិនអាចទាញយកព័ត៌មាននេះបានទេ។
+
+=== ROW 238 | express.profile.aboutTitle ===
+EN: About Metfone Express
+VI: Giới thiệu về Metfone Express
+KH: អំពី Metfone Express
+
+=== ROW 239 | express.profile.addressBook ===
+EN: Address Book
+VI: Sổ địa chỉ
+KH: សៀវភៅអាសយដ្ឋាន
+
+=== ROW 240 | express.profile.language ===
+EN: Language
+VI: Ngôn ngữ
+KH: ភាសា
+
+=== ROW 241 | express.profile.notifications ===
+EN: Notifications
+VI: Thông báo
+KH: ការជូនដំណឹង
+
+=== ROW 242 | express.profile.paymentMethods ===
+EN: Payment Methods
+VI: Phương thức thanh toán
+KH: វិធីសាស្ត្រទូទាត់ប្រាក់
+
+=== ROW 243 | express.profile.terms ===
+EN: Terms & Conditions
+VI: Điều khoản & Điều kiện
+KH: លក្ខខណ្ឌ និងបទប្បញ្ញត្តិ
+
+=== ROW 244 | express.profile.termsLoadError ===
+EN: Could not load the terms.
+VI: Không thể tải Điều khoản & Điều kiện.
+KH: មិនអាចទាញយកខសន្យាបានទេ។
+
+=== ROW 245 | express.profile.termsTitle ===
+EN: Terms and Conditions
+VI: Điều khoản và Điều kiện
+KH: លក្ខខណ្ឌ និងបទប្បញ្ញត្តិ
+
+=== ROW 246 | express.profile.title ===
+EN: Profile
+VI: Hồ sơ
+KH: គណនី
+
+=== ROW 247 | express.profile.version ===
+EN: Version {version} (Build {build})
+VI: Phiên bản {version} (Build {build})
+KH: កំណែ {version}
+
+=== ROW 248 | express.shippingFee.checkFees ===
+EN: Check fees
+VI: Tra cước 
+KH: ពិនិត្យថ្លៃសេវា
+
+=== ROW 249 | express.shippingFee.checking ===
+EN: Checking…
+VI: Đang kiểm tra…
+KH: កំពុងពិនិត្យ...
+
+=== ROW 250 | express.shippingFee.commune ===
+EN: Commune
+VI: Xã/Phường
+KH: ឃុំ/សង្កាត់
+
+=== ROW 251 | express.shippingFee.district ===
+EN: District
+VI: Quận/Huyện
+KH: ស្រុក/ខណ្ឌ
+
+=== ROW 252 | express.shippingFee.document ===
+EN: Document
+VI: Tài liệu
+KH: ឯកសារ
+
+=== ROW 253 | express.shippingFee.domestic ===
+EN: Domestic
+VI: Nội địa
+KH: ក្នុងស្រុក
+
+=== ROW 254 | express.shippingFee.estimatedDays ===
+EN: {days} days
+VI: {days} ngày
+KH: ថ្ងៃ
+
+=== ROW 255 | express.shippingFee.goodsInformation ===
+EN: Goods Information
+VI: Thông tin hàng hóa
+KH: ព័ត៌មានទំនិញ
+
+=== ROW 256 | express.shippingFee.package ===
+EN: Package
+VI: Kiện hàng
+KH: កញ្ចប់ទំនិញ
+
+=== ROW 257 | express.shippingFee.province ===
+EN: Province
+VI: Tỉnh/Thành phố
+KH: ខេត្ត/រាជធានី
+
+=== ROW 258 | express.shippingFee.quoteError ===
+EN: Please complete the required fields to check fees.
+VI: Vui lòng điền đầy đủ các trường bắt buộc để kiểm tra phí.
+KH: សូមបំពេញព័ត៌មានចាំបាច់ដើម្បីពិនិត្យថ្លៃសេវា
+
+=== ROW 259 | express.shippingFee.quoteResult ===
+EN: Estimated shipping fee: {quote}
+VI: Phí vận chuyển dự kiến: {quote}
+KH: ថ្លៃដឹកជញ្ជូនប៉ាន់ស្មាន៖ {quote}
+
+=== ROW 260 | express.shippingFee.searchCommune ===
+EN: Search Commune
+VI: Tìm kiếm Xã/Phường
+KH: ស្វែងរកឃុំ/សង្កាត់
+
+=== ROW 261 | express.shippingFee.searchDistrict ===
+EN: Search District
+VI: Tìm kiếm Quận/Huyện
+KH: ស្វែងរកស្រុក/ខណ្ឌ
+
+=== ROW 262 | express.shippingFee.searchProvince ===
+EN: Search Province
+VI: Tìm kiếm Tỉnh/Thành phố
+KH: ស្វែងរកខេត្ត/រាជធានី
+
+=== ROW 263 | express.shippingFee.selectCommune ===
+EN: Select Commune
+VI: Chọn Xã/Phường
+KH: ជ្រើសរើសឃុំ/សង្កាត់
+
+=== ROW 264 | express.shippingFee.selectDistrict ===
+EN: Select District
+VI: Chọn Quận/Huyện
+KH: ជ្រើសរើសស្រុក/ខណ្ឌ
+
+=== ROW 265 | express.shippingFee.selectProvince ===
+EN: Select Province
+VI: Chọn Tỉnh/Thành phố
+KH: ជ្រើសរើសខេត្ត/រាជធានី
+
+=== ROW 266 | express.shippingFee.sendTo ===
+EN: Come from
+VI: Nơi gửi
+KH: មកពី
+
+=== ROW 267 | express.shippingFee.sentFrom ===
+EN: Sent from
+VI: Gửi từ
+KH: ផ្ញើចេញពី
+
+=== ROW 268 | express.shippingFee.shippingRoute ===
+EN: Shipping Route
+VI: Tuyến vận chuyển
+KH: ផ្លូវដឹកជញ្ជូន
+
+=== ROW 269 | express.shippingFee.sizeLabel ===
+EN: Size (LxWxH) (cm)
+VI: Kích thước (Dài x Rộng x Cao) (cm)
+KH: ទំហំ (បណ្តោយxទទឹងxកម្ពស់) (ស.ម)
+
+=== ROW 270 | express.shippingFee.sizePlaceholder ===
+EN: cm
+VI: cm
+KH: ស.ម
+
+=== ROW 271 | express.shippingFee.title ===
+EN: Shipping Fee
+VI: Phí vận chuyển
+KH: ថ្លៃដឹកជញ្ជូន
+
+=== ROW 272 | express.shippingFee.weightGrams ===
+EN: Weight (g)
+VI: Khối lượng (g)
+KH: ទម្ងន់ (ក្រាម)
+
+=== ROW 273 | express.shippingFee.weightPlaceholder ===
+EN: Weight (g)
+VI: Khối lượng (g)
+KH: ទម្ងន់ (ក្រាម)
+
+=== ROW 274 | express.shippingResults.chargeableWeight ===
+EN: Chargeable weight : {weight}g {dimensions}
+VI: Khối lượng tính cước: {weight}g {dimensions}
+KH: ទម្ងន់គិតថ្លៃ៖ {weight}ក្រាម {dimensions}
+
+=== ROW 275 | express.shippingResults.contactTitle ===
+EN: Contact the nearest location for better rates
+VI: Liên hệ bưu cục gần nhất để nhận mức giá tốt hơn
+KH: ទាក់ទងទីតាំងដែលជិតបំផុតសម្រាប់តម្លៃសមរម្យ
+
+=== ROW 276 | express.shippingResults.day ===
+EN: day
+VI: ngày
+KH: ថ្ងៃ
+
+=== ROW 277 | express.shippingResults.days ===
+EN: days
+VI: ngày
+KH: ថ្ងៃ
+
+=== ROW 278 | express.shippingResults.destination ===
+EN: Destination
+VI: Điểm đến
+KH: គោលដៅ
+
+=== ROW 279 | express.shippingResults.distanceKm ===
+EN: {distance} km
+VI: {distance} km
+KH: គ.ម
+
+=== ROW 280 | express.shippingResults.estimatedDeliveryTime ===
+EN: Estimated delivery time: {days} {unit}
+VI: Thời gian giao hàng dự kiến: {days} {unit}
+KH: រយៈពេលដឹកជញ្ជូនប៉ាន់ស្មាន៖ {days} {unit}
+
+=== ROW 281 | express.shippingResults.findPostOffice ===
+EN: Find the nearest post office
+VI: Tìm bưu cục gần nhất
+KH: ស្វែងរកការិយាល័យប្រៃសណីយ៍ដែលជិតបំផុត
+
+=== ROW 282 | express.shippingResults.mainService ===
+EN: MAIN SERVICE
+VI: DỊCH VỤ CHÍNH
+KH: សេវាកម្មចម្បង
+
+=== ROW 283 | express.shippingResults.nearbyPostOffices ===
+EN: Nearby post offices
+VI: Các bưu cục gần đây
+KH: ការិយាល័យប្រៃសណីយ៍ជិតៗនេះ
+
+=== ROW 284 | express.shippingResults.noPostOffices ===
+EN: No post offices found.
+VI: Không tìm thấy bưu cục nào.
+KH: រកមិនឃើញការិយាល័យប្រៃសណីយ៍ទេ
+
+=== ROW 285 | express.shippingResults.noServices ===
+EN: No services available.
+VI: Không có dịch vụ khả dụng.
+KH: មិនមានសេវាកម្មទេ
+
+=== ROW 286 | express.shippingResults.origin ===
+EN: Origin
+VI: Điểm gửi
+KH: ប្រភពដើម
+
+=== ROW 287 | express.shippingResults.quoteTitle ===
+EN: Send {goods} - {route}
+VI: Gửi {goods} - {route}
+KH: ផ្ញើ {ទំនិញ} - {ផ្លូវ}
+
+=== ROW 288 | express.shippingResults.selectService ===
+EN: Select Service
+VI: Chọn dịch vụ
+KH: ជ្រើសរើសសេវាកម្ម
+
+=== ROW 289 | express.shippingResults.selectServiceTitle ===
+EN: Select service
+VI: Chọn dịch vụ
+KH: ជ្រើសរើសសេវាកម្ម
+
+=== ROW 290 | express.shippingResults.suitableService ===
+EN: Suitable service
+VI: Dịch vụ phù hợp
+KH: សេវាកម្មដែលសមស្រប
+
+=== ROW 291 | express.shippingResults.title ===
+EN: Shipping Results
+VI: Kết quả vận chuyển
+KH: លទ្ធផលនៃការដឹកជញ្ជូន
+
+=== ROW 292 | express.shippingResults.viewMap ===
+EN: View locations on map
+VI: Xem các địa điểm trên bản đồ
+KH: មើលទីតាំងលើផែនទី
+
+=== ROW 293 | express.stack.createOrderHint ===
+EN: The order form will be wired to {api} in a later iteration.
+VI: Biểu mẫu tạo đơn hàng sẽ được kết nối với {api} trong phiên bản sau.
+KH: ទម្រង់បង្កើតបុងបញ្ញើនឹងត្រូវភ្ជាប់ទៅ {api} ក្នុងកំណែក្រោយ។
+
+=== ROW 294 | express.stack.shippingFeeHint ===
+EN: The quote form will be wired to {api} in a later iteration.
+VI: Biểu mẫu báo giá sẽ được kết nối với {api} trong phiên bản sau.
+KH: ទម្រង់ប្រកាសតម្លៃនឹងត្រូវភ្ជាប់ទៅ {api} ក្នុងកំណែក្រោយ។
+
+=== ROW 295 | express.support.email ===
+EN: Email
+VI: Email
+KH: អ៊ីមែល
+
+=== ROW 296 | express.support.emailValue ===
+EN: express{'@'}metfone.com.kh
+VI: express{'@'}metfone.com.kh
+KH: express@metfone.com.kh
+
+=== ROW 297 | express.support.facebook ===
+EN: Facebook
+VI: Facebook
+KH: Facebook
+
+=== ROW 298 | express.support.facebookValue ===
+EN: Metfone Express
+VI: Metfone Express
+KH: Metfone Express
+
+=== ROW 299 | express.support.heroSubtitle ===
+EN: The Metfone Express team is available 24/7 to assist you.
+VI: Đội ngũ Metfone Express luôn sẵn sàng hỗ trợ bạn 24/7.
+KH: ក្រុមការងារ Metfone Express រង់ចាំជួយអ្នក ២៤/៧។
+
+=== ROW 300 | express.support.heroTitle ===
+EN: How can we help?
+VI: Chúng tôi có thể hỗ trợ gì cho bạn?
+KH: តើយើងអាចជួយអ្នកដោយរបៀបណា?
+
+=== ROW 301 | express.support.hotline ===
+EN: Hotline
+VI: Hotline
+KH: ខ្សែទូរស័ព្ទទាន់ហេតុការណ៍ (Hotline)
+
+=== ROW 302 | express.support.telegram ===
+EN: Telegram
+VI: Telegram
+KH: Telegram
+
+=== ROW 303 | express.support.telegramValue ===
+EN: {'@'}metfone_express
+VI: {'@'}metfone_express
+KH: @metfone_express
+
+=== ROW 304 | express.support.title ===
+EN: Support
+VI: Hỗ trợ
+KH: ជំនួយ
+
+=== ROW 305 | express.tabs.home ===
+EN: Home
+VI: Trang chủ
+KH: ទំព័រដើម
+
+=== ROW 306 | express.tabs.orders ===
+EN: Orders
+VI: Đơn hàng
+KH: បុងបញ្ញើ
+
+=== ROW 307 | express.tabs.profile ===
+EN: Profile
+VI: Tài khoản
+KH: គណនី
+
+=== ROW 308 | express.tabs.support ===
+EN: Support
+VI: Hỗ trợ
+KH: ជំនួយ
+
+=== ROW 309 | express.track.contactSupport ===
+EN: Contact Support
+VI: Liên hệ hỗ trợ
+KH: ទាក់ទងផ្នែកជំនួយ
+
+=== ROW 310 | express.track.empty ===
+EN: No tracking information.
+VI: Chưa có thông tin theo dõi.
+KH: មិនមានព័ត៌មានតាមដានទេ
+
+=== ROW 311 | express.track.estimatedDelivery ===
+EN: Estimated Delivery
+VI: Dự kiến giao hàng
+KH: ពេលវេលាដឹកជញ្ជូនប៉ាន់ស្មាន
+
+=== ROW 312 | express.track.loadError ===
+EN: Could not load tracking.
+VI: Không thể tải thông tin theo dõi.
+KH: មិនអាចទាញយកព័ត៌មានតាមដានបានទេ
+
+=== ROW 313 | express.track.loading ===
+EN: Loading tracking…
+VI: Đang tải thông tin theo dõi…
+KH: កំពុងផ្ទុកព័ត៌មានតាមដាន...
+
+=== ROW 314 | express.track.needHelp ===
+EN: Need Help?
+VI: Cần hỗ trợ?
+KH: ត្រូវការជំនួយឬ?
+
+=== ROW 315 | express.track.needHelpSubtitle ===
+EN: Our support team is available 24/7 to assist you.
+VI: Đội ngũ hỗ trợ của chúng tôi luôn sẵn sàng hỗ trợ bạn 24/7.
+KH: ក្រុមការងារផ្នែកជំនួយរបស់យើងរង់ចាំជួយអ្នក ២៤/៧
+
+=== ROW 316 | express.track.notFound ===
+EN: Tracking code not found.
+VI: Không tìm thấy mã vận đơn.
+KH: រកមិនឃើញលេខកូដតាមដានទេ
+
+=== ROW 317 | express.track.orderCode ===
+EN: Order Code
+VI: Mã đơn hàng
+KH: លេខកូដបុងបញ្ញើ
+
+=== ROW 318 | express.track.placeholder ===
+EN: Enter tracking code
+VI: Nhập mã vận đơn
+KH: បញ្ចូលលេខកូដតាមដាន
+
+=== ROW 319 | express.track.referenceCode ===
+EN: Reference Code
+VI: Mã tham chiếu
+KH: លេខកូដយោង
+
+=== ROW 320 | express.track.searchAction ===
+EN: Search
+VI: Tìm kiếm
+KH: ស្វែងរក
+
+=== ROW 321 | express.track.title ===
+EN: Track Order
+VI: Theo dõi đơn hàng
+KH: តាមដានបុងបញ្ញើ
+
+=== ROW 322 | onboarding.accept ===
+EN: Accept
+VI: Đồng ý
+KH: ព្រមទទួល
+
+=== ROW 323 | onboarding.address ===
+EN: Address
+VI: Địa chỉ
+KH: អាសយដ្ឋាន
+
+=== ROW 324 | onboarding.agreeLink ===
+EN: Terms and Conditions
+VI: Điều khoản và Điều kiện
+KH: លក្ខខណ្ឌ និងបទប្បញ្ញត្តិ
+
+=== ROW 325 | onboarding.agreePrefix ===
+EN: I agree to Metfone Express’s
+VI: Tôi đồng ý với
+KH: ខ្ញុំយល់ព្រមតាម Metfone Express
+
+=== ROW 326 | onboarding.connectionDetails ===
+EN: Connection details
+VI: Chi tiết liên kết
+KH: ព័ត៌មានលម្អិតអំពីការតភ្ជាប់
+
+=== ROW 327 | onboarding.continue ===
+EN: Continue
+VI: Tiếp tục
+KH: បន្ត
+
+=== ROW 328 | onboarding.createAccountPageSubtitle ===
+EN: Create Metfone Express Account
+VI: Tạo tài khoản Metfone Express
+KH: បង្កើតគណនី Metfone Express
+
+=== ROW 329 | onboarding.createAccountSubtitle ===
+EN: Share your information with Metfone Express to create your account?
+VI: Chia sẻ thông tin của bạn với Metfone Express để tạo tài khoản?
+KH: ចែករំលែកព័ត៌មានរបស់អ្នកជាមួយ Metfone Express ដើម្បីបង្កើតគណនីឬ?
+
+=== ROW 330 | onboarding.createAccountTitle ===
+EN: Create Account
+VI: Tạo tài khoản
+KH: បង្កើតគណនី
+
+=== ROW 331 | onboarding.decline ===
+EN: Decline
+VI: Từ chối
+KH: បដិសេធ
+
+=== ROW 332 | onboarding.emoneyWallet ===
+EN: eMoney Wallet
+VI: Ví eMoney
+KH: កាបូបប្រាក់ eMoney
+
+=== ROW 333 | onboarding.fullName ===
+EN: Full name
+VI: Họ và tên
+KH: ឈ្មោះពេញ
+
+=== ROW 334 | onboarding.goBack ===
+EN: Go Back
+VI: Quay lại
+KH: ត្រឡប់ក្រោយ
+
+=== ROW 335 | onboarding.heroSubtitle ===
+EN: Helps individuals and businesses create and manage shipments in one place.
+VI: Giúp cá nhân và doanh nghiệp tạo và quản lý các đơn hàng tại một nơi.
+KH: ជួយបុគ្គល និងអាជីវកម្មក្នុងការបង្កើត និងគ្រប់គ្រងការដឹកជញ្ជូននៅកន្លែងតែមួយ។
+
+=== ROW 336 | onboarding.heroTitle ===
+EN: Metfone Express
+VI: Metfone Express
+KH: Metfone Express
+
+=== ROW 337 | onboarding.infoTagline ===
+EN: Metfone Express helps manage shipments easily.
+VI: Metfone Express giúp bạn dễ dàng quản lý các đơn hàng.
+KH: Metfone Express ជួយគ្រប់គ្រងការដឹកជញ្ជូនយ៉ាងងាយស្រួល។
+
+=== ROW 338 | onboarding.linkAccountSubtitle ===
+EN: Metfone Express helps you create and manage shipments in one place.
+VI: Metfone Express giúp bạn tạo và quản lý các đơn hàng tại một nơi.
+KH: Metfone Express ជួយអ្នកបង្កើត និងគ្រប់គ្រងការដឹកជញ្ជូននៅកន្លែងតែមួយ។
+
+=== ROW 339 | onboarding.linkAccountTitle ===
+EN: Account created successfully
+VI: Tạo tài khoản thành công
+KH: បង្កើតគណនីជោគជ័យ
+
+=== ROW 340 | onboarding.linkFailedHint ===
+EN: Please check your account details and try again.
+VI: Vui lòng kiểm tra thông tin tài khoản và thử lại.
+KH: សូមពិនិត្យមើលព័ត៌មានលម្អិតគណនីរបស់អ្នក ហើយព្យាយាមម្តងទៀត។
+
+=== ROW 341 | onboarding.linkFailedSubtitle ===
+EN: Your eMoney wallet is failed to link to Metfone Express account.
+VI: Không thể liên kết ví eMoney của bạn với tài khoản Metfone Express.
+KH: ការភ្ជាប់កាបូបប្រាក់ eMoney ទៅកាន់គណនី Metfone Express បរាជ័យ។
+
+=== ROW 342 | onboarding.linkFailedTitle ===
+EN: Account linked failed
+VI: Liên kết tài khoản thất bại
+KH: ភ្ជាប់គណនីបរាជ័យ
+
+=== ROW 343 | onboarding.linkNow ===
+EN: LINK NOW
+VI: LIÊN KẾT NGAY
+KH: ភ្ជាប់ឥឡូវនេះ
+
+=== ROW 344 | onboarding.linkPendingHint ===
+EN: Please wait while we verify your account details. This may take a few minutes.
+VI: Vui lòng chờ trong khi chúng tôi xác minh thông tin tài khoản của bạn. Quá trình này có thể mất vài phút.
+KH: សូមរង់ចាំ កំឡុងពេលយើងផ្ទៀងផ្ទាត់ព័ត៌មានលម្អិតគណនីរបស់អ្នក។ វាអាចចំណាយពេលពីរបីនាទី
+
+=== ROW 345 | onboarding.linkPendingSubtitle ===
+EN: Your eMoney wallet link to Metfone Express account is being processed.
+VI: Yêu cầu liên kết ví eMoney với tài khoản Metfone Express của bạn đang được xử lý.
+KH: ការភ្ជាប់កាបូបប្រាក់ eMoney ទៅកាន់គណនី Metfone Express កំពុងត្រូវបានដំណើរការ។
+
+=== ROW 346 | onboarding.linkPendingTitle ===
+EN: Link account Pending
+VI: Đang xử lý liên kết tài khoản
+KH: ការភ្ជាប់គណនីកំពុងរង់ចាំ
+
+=== ROW 347 | onboarding.linkTryAgain ===
+EN: TRY AGAIN
+VI: THỬ LẠI
+KH: ព្យាយាមម្តងទៀត
+
+=== ROW 348 | onboarding.linkWalletBody ===
+EN: Metfone Express uses your eMoney wallet to pay for orders, so linking is required before you can start shipping.
+VI: Metfone Express sử dụng ví eMoney của bạn để thanh toán đơn hàng, vì vậy bạn cần liên kết ví trước khi bắt đầu gửi hàng.
+KH: Metfone Express ប្រើប្រាស់កាបូបប្រាក់ eMoney របស់អ្នកដើម្បីទូទាត់ប្រាក់សម្រាប់បុងបញ្ញើ ដូច្នេះការភ្ជាប់គណនីគឺតម្រូវឱ្យធ្វើមុនពេលអ្នកអាចចាប់ផ្តើមដឹកជញ្ជូន។
+
+=== ROW 349 | onboarding.linkWalletTitle ===
+EN: Link your eMoney wallet
+VI: Liên kết ví eMoney của bạn
+KH: កំពុងផ្ទុកខសន្យា...
+
+=== ROW 350 | onboarding.loadingTerms ===
+EN: Loading terms…
+VI: Đang tải điều khoản…
+KH: កំពុងដំណើរ
+
+=== ROW 351 | onboarding.loadTermsError ===
+EN: Could not load the terms.
+VI: Không thể tải điều khoản.
+KH: មិនអាចទាញយកខសន្យាបានទេ
+
+=== ROW 352 | onboarding.phoneNumber ===
+EN: Phone Number
+VI: Số điện thoại
+KH: លេខទូរស័ព្ទ
+
+=== ROW 353 | onboarding.popupFailed ===
+EN: Could not create the account. Please try again.
+VI: Không thể tạo tài khoản. Vui lòng thử lại.
+KH: មិនអាចបង្កើតគណនីបានទេ។ សូមព្យាយាមម្តងទៀត
+
+=== ROW 354 | onboarding.popupTimeout ===
+EN: The request timed out. Please try again.
+VI: Yêu cầu đã hết thời gian chờ. Vui lòng thử lại.
+KH: ការស្នើសុំបានផុតពេល (Timed out)។ សូមព្យាយាមម្តងទៀត
+
+=== ROW 355 | onboarding.start ===
+EN: Start
+VI: Bắt đầu
+KH: ចាប់ផ្តើម
+
+=== ROW 356 | onboarding.successSubtitle ===
+EN: Your account has been verified successfully
+VI: Tài khoản của bạn đã được xác minh thành công
+KH: គណនីរបស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ជោគជ័យ
+
+=== ROW 357 | onboarding.successTitle ===
+EN: Success!
+VI: Thành công!
+KH: ជោគជ័យ!
+
+=== ROW 358 | onboarding.termsHeading ===
+EN: Terms & Condition
+VI: Điều khoản & Điều kiện
+KH: លក្ខខណ្ឌ និងបទប្បញ្ញត្តិ
+
+=== ROW 359 | routes.checkAccount ===
+EN: Metfone Express
+VI: Metfone Express
+KH: Metfone Express
+
+=== ROW 360 | routes.expressAddAddress ===
+EN: Add New Address
+VI: Thêm địa chỉ mới
+KH: បន្ថែមអាសយដ្ឋានថ្មី
+
+=== ROW 361 | routes.expressAddressBook ===
+EN: Shipping Address
+VI: Địa chỉ giao hàng
+KH: អាសយដ្ឋានដឹកជញ្ជូន
+
+=== ROW 362 | routes.expressCreateOrder ===
+EN: Create Order
+VI: Tạo đơn hàng
+KH: បង្កើតបុងបញ្ញើ
+
+=== ROW 363 | routes.expressHome ===
+EN: Metfone Express
+VI: Metfone Express
+KH: ព័ត៌មានលម្អិតបុងបញ្ញើ
+
+=== ROW 364 | routes.expressOrderDetail ===
+EN: Order Detail
+VI: Chi tiết đơn hàng
+KH: ព័ត៌មានលម្អិតបុងបញ្ញើ
+
+=== ROW 365 | routes.expressOrderNotSuccessful ===
+EN: Order Not Successful
+VI: Tạo đơn hàng không thành công
+KH: បង្កើតបុងបញ្ញើមិនជោគជ័យ
+
+=== ROW 366 | routes.expressOrders ===
+EN: Orders
+VI: Đơn hàng
+KH: បុងបញ្ញើ
+
+=== ROW 367 | routes.expressOrderSuccess ===
+EN: Order Success
+VI: Tạo đơn hàng thành công
+KH: បង្កើតបុងបញ្ញើជោគជ័យ
+
+=== ROW 368 | routes.expressPaymentFailed ===
+EN: Payment Failed
+VI: Thanh toán thất bại
+KH: ការទូទាត់បរាជ័យ
+
+=== ROW 369 | routes.expressProfile ===
+EN: Profile
+VI: Hồ sơ
+KH: គណនី
+
+=== ROW 370 | routes.expressShippingFee ===
+EN: Shipping Fee
+VI: Phí vận chuyển
+KH: ថ្លៃដឹកជញ្ជូន
+
+=== ROW 371 | routes.expressShippingResults ===
+EN: Shipping Results
+VI: Kết quả vận chuyển
+KH: លទ្ធផលនៃការដឹកជញ្ជូន
+
+=== ROW 372 | routes.expressSupport ===
+EN: Support
+VI: Hỗ trợ
+KH: ជំនួយ
+
+=== ROW 373 | routes.expressTrackOrder ===
+EN: Track Order
+VI: Theo dõi đơn hàng
+KH: តាមដានបុងបញ្ញើ
+
+=== ROW 374 | routes.onboardingAccountSuccess ===
+EN: Metfone Express
+VI: Metfone Express
+KH: Metfone Express
+
+=== ROW 375 | routes.onboardingCreateAccount ===
+EN: Metfone Express
+VI: Metfone Express
+KH: Metfone Express
+
+=== ROW 376 | routes.onboardingLinkAccount ===
+EN: Metfone Express
+VI: Metfone Express
+KH: Metfone Express
+
+=== ROW 377 | routes.onboardingLinkAccountFailed ===
+EN: Metfone Express
+VI: Metfone Express
+KH: Metfone Express
+
+=== ROW 378 | routes.onboardingLinkAccountPending ===
+EN: Metfone Express
+VI: Metfone Express
+KH: Metfone Express
+
+=== ROW 379 | routes.onboardingTerms ===
+EN: Terms & Condition
+VI: Điều khoản & Điều kiện
+KH: លក្ខខណ្ឌ និងបទប្បញ្ញត្តិ
+
+=== ROW 380 | routes.splash ===
+EN: Authenticating Identity
+VI: Đang xác thực danh tính
+KH: កំពុងផ្ទៀងផ្ទាត់អត្តសញ្ញាណ
+
+=== ROW 381 | splash.authenticating ===
+EN: Authenticating...
+VI: Đang xác thực...
+KH: កំពុងផ្ទៀងផ្ទាត់់...
+
+=== ROW 382 | splash.pageLabel ===
+EN: Authenticating Identity
+VI: Đang xác thực danh tính
+KH: កំពុងផ្ទៀងផ្ទាត់អត្តសញ្ញាណ
+
+=== ROW 383 | splash.verifying ===
+EN: Verifying your identity
+VI: Đang xác minh danh tính của bạn
+KH: កំពុងផ្ទៀងផ្ទាត់អត្តសញ្ញាណរបស់អ្នក
+
+=== ROW 384 | terms.sections.emoney.body ===
+EN: eMoney stands for E-MONEY PAYMENT SOLUTIONS PLC, is one of the leading mobile finance service providers. We are providing services: Transfer money, Bill Payments, Phone Topup. Customers can use service by eMoney application or through network of over 8,000 agents nationwide.
+VI: eMoney là E-MONEY PAYMENT SOLUTIONS PLC, một trong những nhà cung cấp dịch vụ tài chính di động hàng đầu. Chúng tôi cung cấp các dịch vụ: Chuyển tiền, Thanh toán hóa đơn, Nạp tiền điện thoại. Khách hàng có thể sử dụng dịch vụ qua ứng dụng eMoney hoặc thông qua mạng lưới hơn 8.000 đại lý trên toàn quốc.
+KH: nan
+
+=== ROW 385 | terms.sections.emoney.title ===
+EN: What is eMoney?
+VI: eMoney là gì?
+KH: តើ eMoney ជាអ្វី?
+
+=== ROW 386 | terms.sections.express.body ===
+EN: To become a leading Digital Banking, providing financial services faster, easier and safer to every Cambodian.
+VI: Trở thành ngân hàng số hàng đầu, cung cấp dịch vụ tài chính nhanh hơn, dễ dàng hơn và an toàn hơn cho mọi người dân Campuchia.
+KH: nan
+
+=== ROW 387 | terms.sections.express.title ===
+EN: What is Metfone Express?
+VI: Metfone Express là gì?
+KH: តើ Metfone Express ជាអ្វី?
+
+=== ROW 388 | terms.sections.privacy.body ===
+EN: Your personal information is processed only to deliver the requested service and is stored according to the regulations of the National Bank of Cambodia.
+VI: Thông tin cá nhân của bạn chỉ được xử lý để cung cấp dịch vụ theo yêu cầu và được lưu trữ theo quy định của Ngân hàng Quốc gia Campuchia.
+KH: nan
+
+=== ROW 389 | terms.sections.privacy.title ===
+EN: How is my data protected?
+VI: Dữ liệu của tôi được bảo vệ như thế nào?
+KH: តើទិន្នន័យរបស់ខ្ញុំត្រូវបានការពារយ៉ាងដូចម្តេច?
+
+=== ROW 390 | terms.sections.who.body ===
+EN: eMoney's customers, eMoney provides services for both individual and Corporate customer.
+VI: Khách hàng của eMoney. eMoney cung cấp dịch vụ cho cả khách hàng cá nhân và doanh nghiệp.
+KH: អតិថិជនរបស់ eMoney ដោយ eMoney ផ្តល់សេវាកម្មជូនទាំងអតិថិជនរូបវន្តបុគ្គល និងអតិថិជនសាជីវកម្ម/ក្រុមហ៊ុន។
+
+=== ROW 391 | terms.sections.who.title ===
+EN: Who can use Metfone Express?
+VI: Ai có thể sử dụng Metfone Express?
+KH: តើនរណាខ្លះអាចប្រើប្រាស់ Metfone Express បាន?
+

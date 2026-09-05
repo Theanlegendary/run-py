@@ -125,7 +125,7 @@
     "x_client_id": "TMS_ANDROID",
     "branch_code": "MEGA,MEGA1,DVCMEGA1,PRE,PNP,SVA,KAN,KAM,KOH,SIH,SPE,TAK,BAN,BAT,CHH,PUR,SIE,PRH,ODD,THO,CHA,KRA,TBK,ROT,MON,STU",
     "date_range_days": 30,
-    "cache_minutes": 30
+    "cache_minutes": 5
   },
   "pivot": {
     "title": "PENDING BILL CHECK",

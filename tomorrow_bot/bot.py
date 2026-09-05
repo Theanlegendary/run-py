@@ -1417,7 +1417,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @pm_required_handler
 async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Generates exact SHIPMENTS TOMORROW REPORT (Báo cáo hàng đến) matching official template."""
+    """Generates exact SHIPMENTS INCOMING REPORT (Báo cáo hàng đến) matching official template."""
     await delete_group_command(update, context)
     cfg = load_config()
 
@@ -1425,7 +1425,7 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_label = " ".join(args) if args else "Zone 1"
 
 
-    msg = await send_requester_text(update, context, f"Generating SHIPMENTS TOMORROW REPORT ({target_label})...")
+    msg = await send_requester_text(update, context, f"Generating SHIPMENTS INCOMING REPORT ({target_label})...")
     tmpdir = tempfile.mkdtemp(prefix="tomorrow_")
     track_report_dir(tmpdir)
     stamp = datetime.now().strftime("%d.%m_%HH%M")
@@ -1434,7 +1434,7 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         downloader.download_detail(cfg["api"], src, force_refresh=True)
         import shipments_tomorrow
-        out_xlsx = os.path.join(tmpdir, f"SHIPMENTS_TOMORROW_REPORT_{stamp}_{target_label.replace(' ', '_')}.xlsx")
+        out_xlsx = os.path.join(tmpdir, f"SHIPMENTS_INCOMING_REPORT_{stamp}_{target_label.replace(' ', '_')}.xlsx")
         bills, weight = shipments_tomorrow.build_shipments_tomorrow_report(src, out_xlsx, target_label=target_label)
 
         # Generate clean Executive Summary cropped image matching user template
@@ -1446,7 +1446,7 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             log.warning("Could not render executive summary image: %s", e_img)
 
 
-        caption = f"🚚 *SHIPMENTS TOMORROW REPORT ({target_label})*\n📦 Total Bills: `{bills}`\n⚖️ Total Weight: `{weight/1000:,.2f} kg`"
+        caption = f"🚚 *SHIPMENTS INCOMING REPORT ({target_label})*\n📦 Total Bills: `{bills}`\n⚖️ Total Weight: `{weight/1000:,.2f} kg`"
         await send_requester_document(update, context, out_xlsx, filename=os.path.basename(out_xlsx), caption=caption)
 
 
@@ -1466,11 +1466,11 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Exclude Phnom Penh (PNPP001..PNPP014) and Kandal (KANP001)
                 if br_code.startswith("PNP") or br_code.startswith("KAN"):
                     continue
-                br_xlsx = os.path.join(tmpdir, f"SHIPMENTS_TOMORROW_REPORT_{stamp}_{br_code}.xlsx")
+                br_xlsx = os.path.join(tmpdir, f"SHIPMENTS_INCOMING_REPORT_{stamp}_{br_code}.xlsx")
                 try:
                     b_bills, b_weight = shipments_tomorrow.build_shipments_tomorrow_report(src, br_xlsx, target_label=br_code)
                     if b_bills > 0:
-                        b_caption = f"🚚 *SHIPMENTS TOMORROW REPORT ({br_code})*\n📦 Total Bills: `{b_bills}`\n⚖️ Total Weight: `{b_weight/1000:,.2f} kg`"
+                        b_caption = f"🚚 *SHIPMENTS INCOMING REPORT ({br_code})*\n📦 Total Bills: `{b_bills}`\n⚖️ Total Weight: `{b_weight/1000:,.2f} kg`"
                         try:
                             b_img = shipments_tomorrow.render_executive_summary_image(br_xlsx)
                             b_img.name = f"EXECUTIVE_SUMMARY_{br_code}.png"
@@ -1490,7 +1490,7 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e_br:
                     log.warning("Failed building/forwarding tomorrow report for branch %s: %s", br_code, e_br)
 
-            await edit_or_send_requester_text(msg, update, context, f"✅ Done! Forwarded SHIPMENTS TOMORROW REPORTS to {total_sent_branches} Provincial Branch Groups (excluding PNP/KAN).")
+            await edit_or_send_requester_text(msg, update, context, f"✅ Done! Forwarded SHIPMENTS INCOMING REPORTS to {total_sent_branches} Provincial Branch Groups (excluding PNP/KAN).")
             return
 
         if tgt_upper in ("ALL", "MEGA"):
@@ -1500,9 +1500,9 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for z_idx in range(1, 6):
                 z_name = f"Zone {z_idx}"
                 z_clean = f"zone{z_idx}"
-                z_xlsx = os.path.join(tmpdir, f"SHIPMENTS_TOMORROW_REPORT_{stamp}_{z_name.replace(' ', '_')}.xlsx")
+                z_xlsx = os.path.join(tmpdir, f"SHIPMENTS_INCOMING_REPORT_{stamp}_{z_name.replace(' ', '_')}.xlsx")
                 z_bills, z_weight = shipments_tomorrow.build_shipments_tomorrow_report(src, z_xlsx, target_label=z_name)
-                z_caption = f"🚚 *SHIPMENTS TOMORROW REPORT ({z_name})*\n📦 Total Bills: `{z_bills}`\n⚖️ Total Weight: `{z_weight/1000:,.2f} kg`"
+                z_caption = f"🚚 *SHIPMENTS INCOMING REPORT ({z_name})*\n📦 Total Bills: `{z_bills}`\n⚖️ Total Weight: `{z_weight/1000:,.2f} kg`"
 
                 for gid, zkey in zone_fwd_map.items():
                     if zkey.lower() == z_clean:
@@ -1535,11 +1535,11 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 br_code = handles[0].upper()
                 if br_code.startswith("PNP") or br_code.startswith("KAN"):
                     continue
-                br_xlsx = os.path.join(tmpdir, f"SHIPMENTS_TOMORROW_REPORT_{stamp}_{br_code}.xlsx")
+                br_xlsx = os.path.join(tmpdir, f"SHIPMENTS_INCOMING_REPORT_{stamp}_{br_code}.xlsx")
                 try:
                     b_bills, b_weight = shipments_tomorrow.build_shipments_tomorrow_report(src, br_xlsx, target_label=br_code)
                     if b_bills > 0:
-                        b_caption = f"🚚 *SHIPMENTS TOMORROW REPORT ({br_code})*\n📦 Total Bills: `{b_bills}`\n⚖️ Total Weight: `{b_weight/1000:,.2f} kg`"
+                        b_caption = f"🚚 *SHIPMENTS INCOMING REPORT ({br_code})*\n📦 Total Bills: `{b_bills}`\n⚖️ Total Weight: `{b_weight/1000:,.2f} kg`"
                         try:
                             b_img = shipments_tomorrow.render_executive_summary_image(br_xlsx)
                             b_img.name = f"EXECUTIVE_SUMMARY_{br_code}.png"
@@ -1559,7 +1559,7 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e_br:
                     log.warning("Failed building/forwarding tomorrow report for branch %s: %s", br_code, e_br)
 
-            await edit_or_send_requester_text(msg, update, context, f"✅ Done! Forwarded SHIPMENTS TOMORROW REPORTS to {total_sent_zones} Zone Groups and {total_sent_branches} Provincial Branch Groups (excluding PNP/KAN).")
+            await edit_or_send_requester_text(msg, update, context, f"✅ Done! Forwarded SHIPMENTS INCOMING REPORTS to {total_sent_zones} Zone Groups and {total_sent_branches} Provincial Branch Groups (excluding PNP/KAN).")
             return
 
         # Single target forwarding (Zone or Branch)
@@ -1597,7 +1597,7 @@ async def cmd_tomorrow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e_fwd:
                 log.warning("Failed forwarding /tomorrow document to group %s: %s", cid, e_fwd)
 
-        await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent & forwarded SHIPMENTS TOMORROW REPORT ({target_label}) with {bills} bills ({weight/1000:,.2f} kg).")
+        await edit_or_send_requester_text(msg, update, context, f"✅ Done! Sent & forwarded SHIPMENTS INCOMING REPORT ({target_label}) with {bills} bills ({weight/1000:,.2f} kg).")
 
 
 

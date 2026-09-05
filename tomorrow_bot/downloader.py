@@ -194,6 +194,9 @@ def download_revenue_detail(api_cfg, out_path, from_date=None, to_date=None, for
     raise RuntimeError(f"Failed to fetch Revenue Excel: {data}")
 
 
+# Alias for backward compatibility
+download_pickup_revenue = download_revenue_detail
+
 
 def download_post_offices(api_cfg, branch_code, limit=200):
     """

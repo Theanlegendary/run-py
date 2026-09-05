@@ -71,6 +71,99 @@ def parse_date(val):
     return t.date() if t else None
 
 
+_tracking_trips_cache = {}
+
+def get_tracking_trips(order_id, cfg=None):
+    if not order_id:
+        return []
+    order_id_str = str(order_id).strip()
+    if order_id_str in _tracking_trips_cache:
+        return _tracking_trips_cache[order_id_str]
+
+    token = None
+    if cfg and isinstance(cfg, dict):
+        token = cfg.get("api", {}).get("bearer_token")
+    if not token:
+        base_dirs = [
+            os.path.dirname(os.path.abspath(__file__)),
+            os.getcwd(),
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ]
+        for d in base_dirs:
+            cfg_p = os.path.join(d, "config.json")
+            if os.path.exists(cfg_p):
+                try:
+                    import json
+                    with open(cfg_p, "r", encoding="utf-8") as f:
+                        c = json.load(f)
+                    token = c.get("api", {}).get("bearer_token")
+                    if token:
+                        break
+                except Exception:
+                    pass
+
+    if not token:
+        _tracking_trips_cache[order_id_str] = []
+        return []
+
+    try:
+        import requests
+        url = "https://gw-express.metfone.com.kh/tms-tracking/api/v1/order-tracking"
+        headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+        r = requests.get(url, params={"order_id": order_id_str}, headers=headers, timeout=6)
+        if r.status_code == 200:
+            trips = r.json().get("trackingTrips", [])
+            _tracking_trips_cache[order_id_str] = trips
+            return trips
+    except Exception:
+        pass
+
+    _tracking_trips_cache[order_id_str] = []
+    return []
+
+
+def find_po_arrival_time_from_trips(trips, po, action_user, deliv_time):
+    """
+    Find earliest arrival/processing scan (306, 309, 311, 400, 401, 402) at target branch 'po'
+    or by 'action_user' prior to delivery time on the delivery date.
+    """
+    if not trips or not deliv_time:
+        return None
+    deliv_date = deliv_time.date()
+    cand_times = []
+    user_clean = str(action_user or '').split('(')[0].split('-')[-1].strip().lower()
+
+    for t in trips:
+        st = str(t.get('status', ''))
+        if st in ('S306', 'S309', 'S311', 'S400', 'S401', 'S402', '306', '309', '311', '400', '401', '402'):
+            ts_str = t.get('updatedAt')
+            if not ts_str:
+                continue
+            try:
+                ts_clean = ts_str.replace('Z', '+00:00')
+                dt = datetime.fromisoformat(ts_clean).replace(tzinfo=None)
+            except Exception:
+                dt = parse_time(ts_str)
+            if not dt or dt > deliv_time:
+                continue
+
+            t_po = (t.get('postOffice') or {}).get('postOfficeCode') or t.get('postOfficeCode') or (t.get('currentPostOffice') or {}).get('postOfficeCode') or ''
+            t_user = (t.get('updatedBy') or {}).get('name') or t.get('shipperName') or ''
+            t_user_clean = str(t_user).split('(')[0].split('-')[-1].strip().lower()
+
+            matches_po = bool(po and str(t_po).strip().upper() == po.upper())
+            matches_user = bool(user_clean and (user_clean in t_user_clean or t_user_clean in user_clean))
+
+            if dt.date() == deliv_date and (matches_po or matches_user):
+                cand_times.append(dt)
+            elif matches_po:
+                cand_times.append(dt)
+
+    if cand_times:
+        return min(cand_times)
+    return None
+
+
 def load_speed_context(src_xlsx, revenue_path=None):
     """
     Reads src_xlsx and revenue_path once into memory.
@@ -104,6 +197,105 @@ def load_speed_context(src_xlsx, revenue_path=None):
     return df, vas_mapping
 
 
+import re
+
+def load_test_bills(cfg=None):
+    """Load ignored/test bill IDs from test_bills.txt, delayed_bills.json, and test_receipts Excel file."""
+    test_ids = set()
+    base_dirs = [
+        os.getcwd(),
+        os.path.dirname(os.path.abspath(__file__)),
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    ]
+    for d in base_dirs:
+        txt_path = os.path.join(d, "test_bills.txt")
+        if os.path.exists(txt_path):
+            try:
+                with open(txt_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        val = line.strip()
+                        if val and not val.startswith("#"):
+                            clean_val = str(val).strip().upper()
+                            clean_val = re.sub(r'\.0$', '', clean_val)
+                            if clean_val:
+                                test_ids.add(clean_val)
+            except Exception:
+                pass
+
+    for d in base_dirs:
+        delay_path = os.path.join(d, "delayed_bills.json")
+        if os.path.exists(delay_path):
+            try:
+                import json
+                with open(delay_path, "r", encoding="utf-8") as f:
+                    delayed = json.load(f)
+                today_d = datetime.now().date()
+                for bill_id, exp_date_str in delayed.items():
+                    try:
+                        exp_date = datetime.strptime(exp_date_str, "%Y-%m-%d").date()
+                        if today_d < exp_date:
+                            clean_val = str(bill_id).strip().upper()
+                            clean_val = re.sub(r'\.0$', '', clean_val)
+                            if clean_val:
+                                test_ids.add(clean_val)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+    excel_paths = []
+    if cfg and isinstance(cfg, dict):
+        tr_cfg = cfg.get("test_receipts", {})
+        if tr_cfg.get("enabled") and tr_cfg.get("path"):
+            excel_paths.append(tr_cfg.get("path"))
+    else:
+        for d in base_dirs:
+            cfg_path = os.path.join(d, "config.json")
+            if os.path.exists(cfg_path):
+                try:
+                    import json
+                    with open(cfg_path, "r", encoding="utf-8") as f:
+                        c = json.load(f)
+                    tr_cfg = c.get("test_receipts", {})
+                    if tr_cfg.get("enabled") and tr_cfg.get("path"):
+                        excel_paths.append(tr_cfg.get("path"))
+                        break
+                except Exception:
+                    pass
+
+    for d in base_dirs:
+        tx_path = os.path.join(d, "test.xlsx")
+        if os.path.exists(tx_path) and tx_path not in excel_paths:
+            excel_paths.append(tx_path)
+
+    for ep in excel_paths:
+        if os.path.exists(ep):
+            try:
+                import pandas as pd
+                if ep.lower().endswith((".xlsx", ".xls")):
+                    df_test = pd.read_excel(ep, dtype=str)
+                else:
+                    df_test = pd.read_csv(ep, dtype=str, keep_default_na=False)
+                df_test = df_test.fillna("")
+                if not df_test.empty:
+                    order_col = next(
+                        (
+                            c for c in df_test.columns
+                            if any(k in str(c).lower() for k in ("order", "code", "bill", "phi", "shipment"))
+                        ),
+                        df_test.columns[0]
+                    )
+                    for val in df_test[order_col].tolist():
+                        clean_val = str(val).strip().upper()
+                        clean_val = re.sub(r'\.0$', '', clean_val)
+                        if clean_val and clean_val != "NAN":
+                            test_ids.add(clean_val)
+            except Exception:
+                pass
+
+    return test_ids
+
+
 def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None, revenue_path=None, preloaded_df=None, preloaded_vas_map=None):
     os.makedirs(os.path.dirname(os.path.abspath(out_xlsx)), exist_ok=True)
 
@@ -112,6 +304,33 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     else:
         df = pd.read_excel(src_xlsx)
         df.columns = [str(c).strip() for c in df.columns]
+
+    col_order = next((c for c in df.columns if 'ORDER ID' in c or 'ORDER' in c), 'ORDER ID')
+
+    # Exclude all testing bills from test_bills.txt and delayed_bills.json
+    test_bills = load_test_bills()
+    if test_bills and col_order in df.columns:
+        order_series = df[col_order].astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True)
+        df = df[~order_series.isin(test_bills)].copy()
+
+    # Exclude orders with test keywords in Order ID, Sender, Receiver, Remark, Note, or Description
+    test_keywords = ['test', 'kiểm thử', 'kiem thu', 'demo', 'trial', 'sample', 'dummy', 'thử nghiệm', 'thu nghiem']
+    test_mask = pd.Series(False, index=df.index)
+
+    if col_order in df.columns:
+        ord_lower = df[col_order].astype(str).str.lower()
+        for kw in test_keywords:
+            test_mask |= ord_lower.str.contains(kw, na=False)
+
+    check_cols = [c for c in df.columns if any(k in str(c).upper() for k in ('SENDER', 'RECEIVER', 'NOTE', 'REMARK', 'GOODS', 'DESC', 'COMMODITY', 'ITEM', 'CUSTOMER'))]
+    for c in check_cols:
+        if c in df.columns:
+            s_lower = df[c].astype(str).str.lower()
+            for kw in test_keywords:
+                test_mask |= s_lower.str.contains(kw, na=False)
+
+    if test_mask.any():
+        df = df[~test_mask].copy()
 
     if preloaded_vas_map is not None:
         vas_mapping = preloaded_vas_map
@@ -191,7 +410,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     # 1. Need Deliver Count (Pending VTT delivery bills)
     pending_statuses = ('306', '309', '311', '400', '401', '402', '420', '430', '471', '472', '480')
     need_deliv_df = df[df['status_code_clean'].isin(pending_statuses)]
-    for idx, row in need_deliv_df.iterrows():
+    for row in need_deliv_df.to_dict('records'):
         order_id = str(row.get(col_order, '')).strip()
         svc_val = str(row.get(col_service, '') or '').strip().upper()
         combined_notes = ' '.join(str(row.get(col, '') or '') for col in note_cols).upper()
@@ -213,7 +432,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     base_rows = []
     r_idx = 1
 
-    for idx, row in delivered_df.iterrows():
+    for row in delivered_df.to_dict('records'):
         deliv_po = str(row.get('deliv_po_clean', '')).strip()
         curr_po = str(row.get('curr_po_clean', '')).strip()
         raw_po = deliv_po if deliv_po and deliv_po != 'NAN' else curr_po
@@ -251,18 +470,36 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
         # 2. If parcel was redirected/forwarded from another branch (change address), use arrival at THIS branch (po)
         elif col_306_store_last and pd.notna(row.get(col_306_store_last)) and (not po_306_last or po_306_last == po):
             t_start = parse_time(row.get(col_306_store_last))
-        elif col_306_store_last and pd.notna(row.get(col_306_store_last)):
-            t_start = parse_time(row.get(col_306_store_last))
-        elif col_306_store_hub and pd.notna(row.get(col_306_store_hub)):
-            t_start = parse_time(row.get(col_306_store_hub))
-        elif col_306_store_any and pd.notna(row.get(col_306_store_any)):
-            t_start = parse_time(row.get(col_306_store_any))
-        elif col_400_time and pd.notna(row.get(col_400_time)):
-            t_start = parse_time(row.get(col_400_time))
-        elif col_210_time and pd.notna(row.get(col_210_time)):
-            t_start = parse_time(row.get(col_210_time))
+
+        # 3. If arrival at THIS branch is not in the export columns (e.g. inter-branch transfer or po_306_first is from origin branch):
+        # Query live tracking trips API to find the physical arrival/processing scan (306/309/311/402) at 'po' by the courier:
+        if not t_start or (po_306_first and po_306_first != po):
+            trips = get_tracking_trips(order_id)
+            if trips:
+                t_trip = find_po_arrival_time_from_trips(trips, po, action_user_val, t410)
+                if t_trip:
+                    t_start = t_trip
+
+        # 4. Fallback checks: Only use other 306 columns if they actually belong to THIS delivering branch (po)
         if not t_start:
-            t_start = parse_time(row.get(col_created))
+            if col_306_store_last and pd.notna(row.get(col_306_store_last)) and (not po_306_last or po_306_last == po):
+                t_start = parse_time(row.get(col_306_store_last))
+            elif col_306_store_hub and pd.notna(row.get(col_306_store_hub)) and (not po_306_first or po_306_first == po):
+                t_start = parse_time(row.get(col_306_store_hub))
+            elif col_306_store_any and pd.notna(row.get(col_306_store_any)) and (not po_306_first or po_306_first == po):
+                t_start = parse_time(row.get(col_306_store_any))
+            elif col_400_time and pd.notna(row.get(col_400_time)):
+                t_start = parse_time(row.get(col_400_time))
+            elif col_210_time and pd.notna(row.get(col_210_time)):
+                t_start = parse_time(row.get(col_210_time))
+
+        if not t_start:
+            # If the parcel came from another branch and no local arrival scan exists,
+            # use delivery time minus 1.5h standard rather than penalizing for inter-branch transit:
+            if po_306_first and po_306_first != po and t410:
+                t_start = max(t410 - timedelta(hours=1.5), datetime(t410.year, t410.month, t410.day, 8, 0, 0))
+            else:
+                t_start = parse_time(row.get(col_created))
 
         if t410 and t_start and t410 >= t_start:
             duration_hours = (t410 - t_start).total_seconds() / 3600.0
@@ -366,49 +603,199 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     date_str = today.strftime('%d/%m/%Y')
     label_upper = target_label.upper().strip()
 
-    # 1. Left Title Banner (Cols A-I)
-    ws1.merge_cells("A1:I1")
-    ws1.cell(1, 1, f"METFONE EXPRESS — DAILY DELIVERY SPEED DETAIL — {date_str} (ព័ត៌មានលម្អិតល្បឿនដឹក)").font = font_title
-    ws1.cell(1, 1).alignment = Alignment(horizontal="left", vertical="center")
-    for c in range(1, 10):
-        ws1.cell(1, c).fill = _TITLE_LEFT
+    # 1. Executive Summary Title Banner (Cols A-K: 1-11)
+    ws1.merge_cells("A1:K1")
+    ws1.cell(1, 1, f"SPEED & COMMISSION — {label_upper} • {date_str}").font = font_title
+    ws1.cell(1, 1).alignment = Alignment(horizontal="center", vertical="center")
+    for c in range(1, 12):
+        ws1.cell(1, c).fill = _TITLE_FILL
     ws1.row_dimensions[1].height = 36.0
 
-    # 2. Right Title Banner (Cols K-U)
-    ws1.merge_cells("K1:U1")
-    ws1.cell(1, 11, f"DELIVERY SPEED & COMMISSION REPORT ({label_upper}) — {date_str} (របាយការណ៍ល្បឿនដឹក & កម្រៃជើងសារ)").font = font_title
-    ws1.cell(1, 11).alignment = Alignment(horizontal="center", vertical="center")
-    for c in range(11, 22):
-        ws1.cell(1, c).fill = _TITLE_FILL
+    # 2. Detail Title Banner (Cols M-U: 13-21)
+    ws1.merge_cells("M1:U1")
+    ws1.cell(1, 13, f"METFONE EXPRESS — DAILY DELIVERY SPEED DETAIL — {date_str} (ព័ត៌មានលម្អិតល្បឿនដឹក)").font = font_title
+    ws1.cell(1, 13).alignment = Alignment(horizontal="left", vertical="center")
+    for c in range(13, 22):
+        ws1.cell(1, c).fill = _TITLE_LEFT
 
-    # Row 2: Headers
-    headers_left = [
+    # Row 2: Headers (Option C: Concise, clean, executive headers)
+    headers_summary = [
+        "NO", "BRANCH", "PENDING", "DELIVERED", "< 2h (+50%)",
+        "2-4h (+25%)", "4-8h (Normal)", "> 8h (-25%)",
+        "% < 8h", "% > 8h", "COMMISSION"
+    ]
+    headers_detail = [
         "No\n(ល.រ)", "Order Number\n(លេខប័ណ្ណ)", "Customer\n(អតិថិជន)", "VAS Service\n(ប្រភេទសេវា)", "Post Office\n(សាខា)",
         "Duration\n(រយៈពេល)", "Hours\n(ម៉ោង)", "Speed Tier\n(កម្រិតល្បឿន)", "Commission\n(កម្រៃ $)"
     ]
-    headers_right = [
-        "NO", "POST OFFICE", "NEED DELIVER", "DELIVERED (410)", "< 2 HOURS (+50%)",
-        "2 - 4 HOURS (+25%)", "4 - 8 HOURS (NORMAL)", "> 8 HOURS (-25%)",
-        "% < 8 HOUR", "% > 8 HOUR", "COMMISSION ($)"
-    ]
 
     ws1.row_dimensions[2].height = 34.0
-    for ci, h in enumerate(headers_left, 1):
+    _HDR_UNIFIED = PatternFill("solid", fgColor="0F172A") # Single Executive Dark Navy Header
+
+    # Executive Summary Headers (Cols A to K: 1 to 11) - One single unified professional header
+    for ci, h in enumerate(headers_summary, 1):
         cell = ws1.cell(2, ci, h)
         cell.font = font_hdr
-        cell.fill = _HDR_LEFT
+        cell.fill = _HDR_UNIFIED
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = _BORDER
 
-    _HDR_RIGHT_NAVY = PatternFill("solid", fgColor="0B192C") # Dark Navy Header matching reference image
-    for ci, h in enumerate(headers_right, 11):
+    # Detail Headers (Cols M to U: 13 to 21)
+    for ci, h in enumerate(headers_detail, 13):
         cell = ws1.cell(2, ci, h)
         cell.font = font_hdr
-        cell.fill = _HDR_RIGHT_NAVY
+        cell.fill = _HDR_UNIFIED
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = _BORDER
 
-    # Populate Left Detail Rows
+    # Populate Executive Summary Rows (Cols A to K: 1 to 11)
+    r_sum = 3
+    n_idx = 1
+
+    def calc_speed_sort_key(stats):
+        tot_b = stats["total_delivered"]
+        has_delivery = 1 if tot_b > 0 else 0
+        need_cnt = stats.get("need_deliver", 0)
+        total_orders = need_cnt + tot_b
+        
+        # Fixed percentage calculation: include pending orders in denominator
+        on_time_delivered = stats["under_2h"] + stats["between_2_4h"] + stats["between_4_8h"]
+        pct_within_8h = (on_time_delivered / total_orders * 100.0) if total_orders > 0 else 0.0
+        return (-has_delivery, -pct_within_8h, -tot_b, stats["po"])
+
+    sorted_branches = sorted(summary_data.values(), key=calc_speed_sort_key)
+
+    # Vivid text fonts & highlights matching reference image
+    font_po        = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")    # Post office (dark blue bold)
+    font_delivered = Font(name="Segoe UI", size=8.5, bold=True, color="2563EB")    # Delivered (410) (vivid blue)
+    font_u2h       = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")    # < 2 Hours (+50%) (emerald green)
+    font_2_4h      = Font(name="Segoe UI", size=8.5, bold=True, color="0284C7")    # 2-4 Hours (+25%) (sky blue / cyan)
+    font_4_8h      = Font(name="Segoe UI", size=8.5, bold=False, color="64748B")   # 4-8 Hours (Normal) (slate gray)
+    font_o8h       = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626")    # > 8 Hours (-25%) (vivid red)
+    font_pct_good  = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")    # % < 8h (emerald green)
+    font_pct_bad   = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626")    # % > 8h (vivid red)
+    font_comm      = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")    # Commission ($) (emerald green)
+
+    for stats in sorted_branches:
+        ws1.row_dimensions[r_sum].height = 19.0
+        need_cnt = stats.get("need_deliver", 0)
+        tot_b = stats["total_delivered"]
+        total_orders = need_cnt + tot_b
+
+        # Fixed percentage calculation: include pending orders in denominator
+        on_time_delivered = stats["under_2h"] + stats["between_2_4h"] + stats["between_4_8h"]
+        slow_delivered = stats["over_8h"]
+        
+        # For correct KPI: % <8h = delivered_fast / (pending + delivered)
+        # % >8h = (delivered_slow + pending_orders) / (pending + delivered)  
+        # Note: All pending orders are considered "slow" since they haven't been completed yet
+        pct_under_8h = (on_time_delivered / total_orders * 100.0) if total_orders > 0 else 0.0
+        pct_over_8h = ((slow_delivered + need_cnt) / total_orders * 100.0) if total_orders > 0 else 0.0
+
+        str_pct_u8 = f"{pct_under_8h:.1f}%"
+        str_pct_o8 = f"{pct_over_8h:.1f}%"
+
+        s_vals = [
+            n_idx,
+            stats["po"],
+            need_cnt,
+            stats["total_delivered"],
+            stats["under_2h"],
+            stats["between_2_4h"],
+            stats["between_4_8h"],
+            stats["over_8h"],
+            str_pct_u8,
+            str_pct_o8,
+            f"${stats['total_commission']:.2f}"
+        ]
+
+        row_bg = PatternFill("solid", fgColor="F8FAFC" if (n_idx % 2 == 0) else "FFFFFF")
+
+        for ci, val in enumerate(s_vals, 1):
+            cell = ws1.cell(r_sum, ci, val)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = _BORDER
+            cell.fill = row_bg
+
+            if ci == 1:          # NO
+                cell.font = font_data
+            elif ci == 2:        # POST OFFICE
+                cell.font = font_po
+            elif ci == 3:        # NEED DELIVER
+                cell.font = font_data
+            elif ci == 4:        # DELIVERED (410)
+                cell.font = font_delivered
+            elif ci == 5:        # < 2 HOURS (+50%)
+                cell.font = font_u2h if isinstance(val, (int, float)) and val > 0 else font_data
+            elif ci == 6:        # 2-4 HOURS (+25%)
+                cell.font = font_2_4h if isinstance(val, (int, float)) and val > 0 else font_data
+            elif ci == 7:        # 4-8 HOURS (NORMAL)
+                cell.font = font_4_8h
+            elif ci == 8:        # > 8 HOURS (-25%)
+                cell.font = font_o8h
+            elif ci == 9:        # % < 8 HOUR
+                if tot_b > 0 and pct_under_8h >= 85.0:
+                    cell.font = font_pct_good
+                elif tot_b > 0 and pct_under_8h < 85.0:
+                    cell.font = font_pct_bad
+                else:
+                    cell.font = font_data
+            elif ci == 10:       # % > 8 HOUR
+                if tot_b > 0 and stats["over_8h"] > 0:
+                    cell.font = font_pct_bad
+                else:
+                    cell.font = font_data
+            elif ci == 11:       # COMMISSION ($)
+                if stats["total_commission"] > 0:
+                    cell.font = font_comm
+                else:
+                    cell.font = font_data
+
+        r_sum += 1
+        n_idx += 1
+
+    # Executive Summary Grand Total (Cols A to K) - Clean Unified Accounting Finish
+    _TOT_SUM_FILL = PatternFill("solid", fgColor="E2E8F0") # Soft slate accounting row
+    ws1.row_dimensions[r_sum].height = 24.0
+    ws1.merge_cells(start_row=r_sum, start_column=1, end_row=r_sum, end_column=2)
+    tot_lbl_r = ws1.cell(r_sum, 1, "Grand Total")
+    tot_lbl_r.font = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
+    tot_lbl_r.alignment = Alignment(horizontal="center", vertical="center")
+    ws1.cell(r_sum, 1).fill = _TOT_SUM_FILL
+    ws1.cell(r_sum, 1).border = _DOUBLE_BOT
+    ws1.cell(r_sum, 2).fill = _TOT_SUM_FILL
+    ws1.cell(r_sum, 2).border = _DOUBLE_BOT
+
+    tot_total_orders = tot_need + tot_del
+    on_time_tot = tot_u2 + tot_24 + tot_48
+    
+    # Fixed Grand Total percentage calculation
+    tot_pct_u8_num = (on_time_tot / tot_total_orders * 100.0) if tot_total_orders > 0 else 0.0
+    tot_pct_u8 = f"{tot_pct_u8_num:.1f}%"
+    # Include pending orders in >8h percentage (all pending are considered "slow")
+    tot_pct_o8_num = ((tot_o8 + tot_need) / tot_total_orders * 100.0) if tot_total_orders > 0 else 0.0
+    tot_pct_o8 = f"{tot_pct_o8_num:.1f}%"
+
+    t_vals = [
+        tot_need, tot_del, tot_u2, tot_24, tot_48, tot_o8,
+        tot_pct_u8, tot_pct_o8, f"${tot_pay:.2f}"
+    ]
+    for ci, val in enumerate(t_vals, 3):
+        cell = ws1.cell(r_sum, ci, val)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.fill = _TOT_SUM_FILL
+        cell.border = _DOUBLE_BOT
+
+        if ci == 4:   # DELIVERED
+            cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="2563EB")
+        elif ci == 8: # > 8 HOURS
+            cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626" if tot_o8 > 0 else "0F172A")
+        elif ci == 11:# COMMISSION
+            cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="166534")
+        else:
+            cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
+
+    # Populate Detail Rows (Cols M to U: 13 to 21)
     r_curr = 3
     tot_pay_left = 0.0
 
@@ -426,191 +813,67 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
             item["tier"],
             f"${item['rate_usd']:.2f}"
         ]
-        for ci, val in enumerate(row_vals, 1):
+        for ci, val in enumerate(row_vals, 13):
             cell = ws1.cell(r_curr, ci, val)
             cell.border = _BORDER
-            if ci in (1, 2, 4, 5, 6, 7):
+            if ci in (13, 14, 16, 17, 18, 19):
                 cell.alignment = Alignment(horizontal="center", vertical="center")
-            elif ci == 3:
+            elif ci == 15:
                 cell.alignment = Alignment(horizontal="left", vertical="center")
             else:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
-            if ci == 2:
+            if ci == 14:
                 cell.font = font_bold
-            elif ci == 4:
+            elif ci == 16:
                 cell.font = font_vtt
-            elif ci in (8, 9):
+            elif ci in (20, 21):
                 cell.font = font_green if item["tag_color"] == "GREEN" else (font_red if item["tag_color"] == "RED" else font_data)
             else:
                 cell.font = font_data
         r_curr += 1
 
-    # Left Grand Total
+    # Detail Grand Total
     if base_rows:
         ws1.row_dimensions[r_curr].height = 22.0
-        ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=8)
-        tot_lbl = ws1.cell(r_curr, 1, "Grand Total")
+        ws1.merge_cells(start_row=r_curr, start_column=13, end_row=r_curr, end_column=20)
+        tot_lbl = ws1.cell(r_curr, 13, "Grand Total")
         tot_lbl.font = font_tot
         tot_lbl.alignment = Alignment(horizontal="left", vertical="center")
-        for ci in range(1, 9):
+        for ci in range(13, 21):
             ws1.cell(r_curr, ci).fill = _TOT_FILL
             ws1.cell(r_curr, ci).border = _DOUBLE_BOT
 
-        tot_val = ws1.cell(r_curr, 9, f"${tot_pay_left:.2f}")
+        tot_val = ws1.cell(r_curr, 21, f"${tot_pay_left:.2f}")
         tot_val.font = font_tot_comm
         tot_val.fill = _TOT_FILL
         tot_val.border = _DOUBLE_BOT
         tot_val.alignment = Alignment(horizontal="center", vertical="center")
         r_curr += 1
 
-    # Populate Right Executive Summary Rows
-    r_sum = 3
-    n_idx = 1
-
-    def calc_speed_sort_key(stats):
-        tot_b = stats["total_delivered"]
-        on_time_b = stats["under_2h"] + stats["between_2_4h"] + stats["between_4_8h"]
-        pct_within_8h = (on_time_b / tot_b * 100.0) if tot_b > 0 else 0.0
-        return (pct_within_8h, -stats["over_8h"], stats["po"])
-
-    sorted_branches = sorted(summary_data.values(), key=calc_speed_sort_key)
-
-    # Vivid text fonts matching reference image
-    font_po        = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")    # Post office (dark blue bold)
-    font_delivered = Font(name="Segoe UI", size=8.5, bold=True, color="2563EB")    # Delivered (410) (vivid blue)
-    font_u2h       = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")    # < 2 Hours (+50%) (emerald green)
-    font_2_4h      = Font(name="Segoe UI", size=8.5, bold=True, color="0284C7")    # 2-4 Hours (+25%) (sky blue / cyan)
-    font_4_8h      = Font(name="Segoe UI", size=8.5, bold=False, color="64748B")   # 4-8 Hours (Normal) (slate gray)
-    font_o8h       = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626")    # > 8 Hours (-25%) (vivid red)
-    font_pct_good  = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")    # % < 8h (emerald green)
-    font_pct_bad   = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626")    # % > 8h (vivid red)
-    font_comm      = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")    # Commission ($) (emerald green)
-
-    for stats in sorted_branches:
-        ws1.row_dimensions[r_sum].height = 19.0
-        need_cnt = stats.get("need_deliver", 0)
-        tot_b = stats["total_delivered"]
-
-        on_time_b = stats["under_2h"] + stats["between_2_4h"] + stats["between_4_8h"]
-        pct_under_8h = (on_time_b / tot_b * 100.0) if tot_b > 0 else 0.0
-        pct_over_8h = (stats["over_8h"] / tot_b * 100.0) if tot_b > 0 else 0.0
-
-        str_pct_u8 = f"{pct_under_8h:.1f}%" if tot_b > 0 else "N/A"
-        str_pct_o8 = f"{pct_over_8h:.1f}%" if tot_b > 0 else "N/A"
-        
-        s_vals = [
-            n_idx,
-            stats["po"],
-            need_cnt,
-            stats["total_delivered"],
-            stats["under_2h"],
-            stats["between_2_4h"],
-            stats["between_4_8h"],
-            stats["over_8h"],
-            str_pct_u8,
-            str_pct_o8,
-            f"${stats['total_commission']:.2f}"
-        ]
-
-        row_bg = PatternFill("solid", fgColor="FFFFFF")
-
-        for ci, val in enumerate(s_vals, 11):
-            cell = ws1.cell(r_sum, ci, val)
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            cell.border = _BORDER
-            cell.fill = row_bg
-
-            if ci == 11:         # NO
-                cell.font = font_data
-            elif ci == 12:       # POST OFFICE
-                cell.font = font_po
-            elif ci == 13:       # NEED DELIVER
-                cell.font = font_data
-            elif ci == 14:       # DELIVERED (410)
-                cell.font = font_delivered
-            elif ci == 15:       # < 2 HOURS (+50%)
-                cell.font = font_u2h if isinstance(val, (int, float)) and val > 0 else font_data
-            elif ci == 16:       # 2-4 HOURS (+25%)
-                cell.font = font_2_4h if isinstance(val, (int, float)) and val > 0 else font_data
-            elif ci == 17:       # 4-8 HOURS (NORMAL)
-                cell.font = font_4_8h
-            elif ci == 18:       # > 8 HOURS (-25%)
-                cell.font = font_o8h
-            elif ci == 19:       # % < 8 HOUR
-                cell.font = font_pct_good if (tot_b > 0 and pct_under_8h >= 85.0) else (font_pct_bad if tot_b > 0 else font_data)
-            elif ci == 20:       # % > 8 HOUR
-                cell.font = font_pct_bad if stats["over_8h"] > 0 else font_pct_bad
-            elif ci == 21:       # COMMISSION ($)
-                cell.font = font_comm
-
-        r_sum += 1
-        n_idx += 1
-
-    # Right Grand Total
-    ws1.row_dimensions[r_sum].height = 24.0
-    ws1.merge_cells(start_row=r_sum, start_column=11, end_row=r_sum, end_column=12)
-    tot_lbl_r = ws1.cell(r_sum, 11, "Grand Total")
-    tot_lbl_r.font = font_tot
-    tot_lbl_r.alignment = Alignment(horizontal="center", vertical="center")
-    ws1.cell(r_sum, 11).fill = _TOT_FILL
-    ws1.cell(r_sum, 11).border = _DOUBLE_BOT
-    ws1.cell(r_sum, 12).fill = _TOT_FILL
-    ws1.cell(r_sum, 12).border = _DOUBLE_BOT
-
-    on_time_tot = tot_u2 + tot_24 + tot_48
-    tot_pct_u8_num = (on_time_tot / tot_del * 100.0) if tot_del > 0 else 0.0
-    tot_pct_u8 = f"{tot_pct_u8_num:.1f}%" if tot_del > 0 else "N/A"
-    tot_pct_o8 = f"{(tot_o8 / tot_del * 100.0):.1f}%" if tot_del > 0 else "N/A"
-
-    t_vals = [
-        tot_need, tot_del, tot_u2, tot_24, tot_48, tot_o8,
-        tot_pct_u8, tot_pct_o8, f"${tot_pay:.2f}"
-    ]
-    for ci, val in enumerate(t_vals, 13):
-        cell = ws1.cell(r_sum, ci, val)
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.fill = _TOT_FILL
-        cell.border = _DOUBLE_BOT
-
-        if ci == 21:
-            cell.fill = fill_green_soft
-            cell.font = font_tot_comm
-        elif ci == 19:
-            if tot_del > 0 and tot_pct_u8_num >= 85.0:
-                cell.fill = fill_green_soft
-                cell.font = font_green_bold
-            else:
-                cell.font = font_tot
-        elif ci == 20 and tot_o8 > 0:
-            cell.fill = fill_red_soft
-            cell.font = font_red_bold
-        else:
-            cell.font = font_tot
-
     # Auto-Fit Column Widths for Sheet 1
     col_widths_s1 = {
-        1: 6,   # No
-        2: 15,  # Order Number
-        3: 25,  # Customer
-        4: 14,  # VAS Service (VTT)
-        5: 14,  # Post Office
-        6: 12,  # Duration
-        7: 10,  # Hours
-        8: 24,  # Speed Tier
-        9: 15,  # Commission ($)
-        10: 4,  # Spacer Gap
-        11: 6,  # No
-        12: 14, # Post Office
-        13: 13, # Need Deliver
-        14: 12, # Delivered
-        15: 12, # < 2 Hrs
-        16: 12, # 2-4 Hrs
-        17: 12, # 4-8 Hrs
-        18: 12, # > 8 Hrs
-        19: 14, # % Within 8h
-        20: 14, # % Over 8h
-        21: 17  # Commission ($)
+        1: 5,   # Summary: NO
+        2: 13,  # Summary: BRANCH
+        3: 12,  # Summary: PENDING
+        4: 13,  # Summary: DELIVERED
+        5: 14,  # Summary: < 2h (+50%)
+        6: 14,  # Summary: 2-4h (+25%)
+        7: 14,  # Summary: 4-8h (Normal)
+        8: 13,  # Summary: > 8h (-25%)
+        9: 11,  # Summary: % < 8h
+        10: 11, # Summary: % > 8h
+        11: 15, # Summary: COMMISSION
+        12: 4,  # Spacer Gap
+        13: 6,  # Detail: No
+        14: 16, # Detail: Order Number
+        15: 25, # Detail: Customer
+        16: 14, # Detail: VAS Service
+        17: 14, # Detail: Post Office
+        18: 12, # Detail: Duration
+        19: 10, # Detail: Hours
+        20: 24, # Detail: Speed Tier
+        21: 15  # Detail: Commission ($)
     }
     for c, w in col_widths_s1.items():
         ws1.column_dimensions[get_column_letter(c)].width = w
@@ -687,14 +950,14 @@ def render_speed_summary_image(out_xlsx):
 
     max_r = 1
     for r in range(1, ws.max_row + 1):
-        if ws.cell(r, 11).value is not None or ws.cell(r, 21).value is not None:
+        if ws.cell(r, 1).value is not None or ws.cell(r, 11).value is not None:
             max_r = r
 
     for r in range(1, max_r + 1):
         if ws.row_dimensions[r].height:
             ws_sum.row_dimensions[r].height = ws.row_dimensions[r].height
         for c_idx in range(11):
-            orig_c = 11 + c_idx
+            orig_c = 1 + c_idx
             tgt_c = 1 + c_idx
             cell_orig = ws.cell(r, orig_c)
             cell_tgt = ws_sum.cell(r, tgt_c, cell_orig.value)
@@ -704,7 +967,7 @@ def render_speed_summary_image(out_xlsx):
                 cell_tgt.border = copy.copy(cell_orig.border)
                 cell_tgt.alignment = copy.copy(cell_orig.alignment)
 
-    col_widths = {1: 6, 2: 15, 3: 15, 4: 15, 5: 16, 6: 16, 7: 18, 8: 16, 9: 15, 10: 15, 11: 18}
+    col_widths = {1: 5, 2: 13, 3: 12, 4: 13, 5: 14, 6: 14, 7: 14, 8: 13, 9: 11, 10: 11, 11: 15}
     for c, w in col_widths.items():
         ws_sum.column_dimensions[get_column_letter(c)].width = w
 

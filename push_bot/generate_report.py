@@ -315,9 +315,7 @@ def load_test_order_ids(cfg):
     order_col = next(
         (
             c for c in df_test.columns
-            if "order" in str(c).lower()
-            or "phi" in str(c).lower()
-            or "shipment" in str(c).lower()
+            if any(k in str(c).lower() for k in ("order", "code", "bill", "phi", "shipment"))
         ),
         df_test.columns[0] if len(df_test.columns) else None,
     )
@@ -1399,6 +1397,49 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
             df_t['10H KPI'] = [r[1] for r in kpi_res]
         type_data[rn] = df_t
 
+    today_d = datetime.now().date()
+    for rn in ALL_TABS:
+        df_t = type_data[rn]
+        if df_t.empty:
+            continue
+
+        if '_scan_date' not in df_t.columns or df_t['_scan_date'].isna().all():
+            if date_col and date_col in df_t.columns:
+                df_t['_scan_date'] = pd.to_datetime(df_t[date_col], dayfirst=True, format='mixed', errors='coerce').dt.date
+            else:
+                df_t['_scan_date'] = None
+
+        c_col = next((c for c in ['CREATED DATE', 'CURRENT TIME'] if c in df_t.columns), None)
+        if c_col:
+            parsed_cd = pd.to_datetime(df_t[c_col], dayfirst=True, format='mixed', errors='coerce')
+            days_old = (pd.Timestamp(today_d) - parsed_cd.dt.normalize()).dt.days
+            df_t['_days_old'] = days_old
+            df_t['_is_overdue'] = (days_old >= 2).fillna(False)
+            df_t['_is_overdue_7days'] = (days_old >= 7).fillna(False)
+        else:
+            df_t['_days_old'] = np.nan
+            df_t['_is_overdue'] = False
+            df_t['_is_overdue_7days'] = False
+
+        ts_cols = [c for c in [
+            'CURRENT TIME',
+            'STATUS 306 AT STORE / AGENT FROM HUB (FIRST TIME)',
+            'STATUS 306 AT STORE / AGENT (LAST TIME)',
+            'STATUS 302/310 AT RECEIVING STORE / RECEIVING AGENT (FIRST TIME)',
+            'CREATED DATE'
+        ] if c in df_t.columns]
+
+        if ts_cols:
+            ts_series = pd.Series(0.0, index=df_t.index)
+            for tc in ts_cols:
+                parsed_tc = pd.to_datetime(df_t[tc], dayfirst=True, format='mixed', errors='coerce')
+                valid_mask = (ts_series == 0.0) & parsed_tc.notna()
+                if valid_mask.any():
+                    ts_series.loc[valid_mask] = (parsed_tc.loc[valid_mask].astype('datetime64[ns]').astype('int64') // 10**9).astype(float)
+            df_t['_row_ts'] = ts_series
+        else:
+            df_t['_row_ts'] = 0.0
+
     # Gather all handles — ONLY Main Post Offices (excluding showrooms 'A' and agents 'S')
     all_handles = set()
     for rn in ALL_TABS:
@@ -1468,78 +1509,15 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
                     handle_cod += pd.to_numeric(df_h[cod_c], errors='coerce').fillna(0).sum()
 
             # Date calculation: match build_section_rows exactly
-            if '_scan_date' in df_h.columns and df_h['_scan_date'].notna().any():
-                s_dates = df_h['_scan_date']
-            elif date_col and date_col in df_h.columns:
-                parsed_sc = pd.to_datetime(df_h[date_col], dayfirst=True, format='mixed', errors='coerce')
-                s_dates = parsed_sc.dt.date
-            else:
-                s_dates = pd.Series([None] * len(df_h))
-
+            s_dates = df_h['_scan_date'] if '_scan_date' in df_h.columns else pd.Series([None] * len(df_h))
             for sd in s_dates.dropna():
                 handle_day_dates[sd] = handle_day_dates.get(sd, 0) + 1
 
             # Urgent based on CREATED DATE
-            today_d = datetime.now().date()
-            for _, r_u in df_h.iterrows():
-                c_val = r_u.get('CREATED DATE') or r_u.get('CURRENT TIME')
-                if pd.notna(c_val) and str(c_val).strip() and str(c_val).strip().lower() != 'nan':
-                    parsed_cd = pd.to_datetime(c_val, dayfirst=True, format='mixed', errors='coerce')
-                    if pd.notna(parsed_cd):
-                        c_date = parsed_cd.date()
-                        d_old = (today_d - c_date).days
-                        if d_old > 1:
-                            handle_urgent_1day += 1
-                        if d_old >= 3:
-                            handle_urgent_3days += 1
-                
-            # Calculate overdue flags for row highlighting based on CREATED DATE (calendar days, not age hours)
-            # Red row = Bill created 3+ days ago (Aug 3 or earlier when today is Aug 5)
-            # Age column is for KPI only (10h threshold), not for row highlighting
-            def calc_overdue(row):
-                today_d = datetime.now().date()
-                
-                # Try to get CREATED DATE
-                for col in ['CREATED DATE', 'CURRENT TIME']:
-                    val = row.get(col)
-                    if pd.notna(val) and str(val).strip() and str(val).strip().lower() != 'nan':
-                        parsed_dt = pd.to_datetime(val, dayfirst=True, format='mixed', errors='coerce')
-                        if pd.notna(parsed_dt):
-                            created_date = parsed_dt.date()
-                            days_old = (today_d - created_date).days
-                            
-                            # Red if 2+ days old (48h+ overdue, created 2+ days ago)
-                            is_overdue = days_old >= 2
-                            # 7+ days old
-                            is_overdue_7days = days_old >= 7
-                            
-                            return (is_overdue, is_overdue_7days)
-                
-                return (False, False)
+            if '_days_old' in df_h.columns:
+                handle_urgent_1day += int((df_h['_days_old'] > 1).sum())
+                handle_urgent_3days += int((df_h['_days_old'] >= 3).sum())
 
-            res_ov = df_h.apply(calc_overdue, axis=1)
-            df_h['_is_overdue'] = [r[0] for r in res_ov]
-            df_h['_is_overdue_7days'] = [r[1] for r in res_ov]
-
-            # Sort rows by latest timestamp first (newest date at top) across ALL tabs
-            def get_row_ts(row):
-                for col in [
-                    'CURRENT TIME',
-                    'STATUS 306 AT STORE / AGENT FROM HUB (FIRST TIME)',
-                    'STATUS 306 AT STORE / AGENT (LAST TIME)',
-                    'STATUS 302/310 AT RECEIVING STORE / RECEIVING AGENT (FIRST TIME)',
-                    'CREATED DATE'
-                ]:
-                    val = row.get(col)
-                    if pd.notna(val) and str(val).strip() and str(val).strip().lower() != 'nan':
-                        parsed_dt = pd.to_datetime(val, dayfirst=True, format='mixed', errors='coerce')
-                        if pd.notna(parsed_dt):
-                            return parsed_dt.timestamp()
-                return 0.0
-
-            df_h = df_h.copy()
-            df_h['_row_ts'] = df_h.apply(get_row_ts, axis=1)
-            
             sort_cols = []
             ascending = []
             if 'ZONE' in df_h.columns:

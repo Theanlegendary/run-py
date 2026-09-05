@@ -2,6 +2,7 @@ import os
 import sys
 import copy
 import tempfile
+import re
 from datetime import datetime, date
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -26,7 +27,9 @@ ZONE_BRANCHES_MAP = {
 }
 
 STATUS_NAME_EN = {
-    '110': 'Not Received',
+    '110': 'Order Created (Not Collected)',
+    '120': 'Assigned to Pickup Staff',
+    '200': 'Pending Pickup / Collecting',
     '210': 'Pickup Collected',
     '230': 'Pickup Failed',
     '300': 'Assigned to Bag / Transit',
@@ -47,6 +50,8 @@ STATUS_NAME_EN = {
     '472': 'Resolving Delivery Issue',
     '480': 'Confirming New Address',
     '500': 'Out for Return to Sender',
+    '510': 'Return Received at Post',
+    '511': 'Return in Transit',
     '512': 'Return Dispatch Confirmed',
     '520': 'Returned to Hub',
     '540': 'Return Completed to Merchant',
@@ -78,6 +83,102 @@ def parse_time(val):
             continue
     return None
 
+def load_test_bills(cfg=None):
+    """Load ignored/test bill IDs from test_bills.txt, delayed_bills.json, and test_receipts Excel file."""
+    test_ids = set()
+    base_dirs = [
+        os.getcwd(),
+        os.path.dirname(os.path.abspath(__file__)),
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    ]
+    for d in base_dirs:
+        txt_path = os.path.join(d, "test_bills.txt")
+        if os.path.exists(txt_path):
+            try:
+                with open(txt_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        val = line.strip()
+                        if val and not val.startswith("#"):
+                            clean_val = str(val).strip().upper()
+                            clean_val = re.sub(r'\.0$', '', clean_val)
+                            if clean_val:
+                                test_ids.add(clean_val)
+            except Exception:
+                pass
+
+    for d in base_dirs:
+        delay_path = os.path.join(d, "delayed_bills.json")
+        if os.path.exists(delay_path):
+            try:
+                import json
+                with open(delay_path, "r", encoding="utf-8") as f:
+                    delayed = json.load(f)
+                today_d = datetime.now().date()
+                for bill_id, exp_date_str in delayed.items():
+                    try:
+                        exp_date = datetime.strptime(exp_date_str, "%Y-%m-%d").date()
+                        if today_d < exp_date:
+                            clean_val = str(bill_id).strip().upper()
+                            clean_val = re.sub(r'\.0$', '', clean_val)
+                            if clean_val:
+                                test_ids.add(clean_val)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+    excel_paths = []
+    if cfg and isinstance(cfg, dict):
+        tr_cfg = cfg.get("test_receipts", {})
+        if tr_cfg.get("enabled") and tr_cfg.get("path"):
+            excel_paths.append(tr_cfg.get("path"))
+    else:
+        for d in base_dirs:
+            cfg_path = os.path.join(d, "config.json")
+            if os.path.exists(cfg_path):
+                try:
+                    import json
+                    with open(cfg_path, "r", encoding="utf-8") as f:
+                        c = json.load(f)
+                    tr_cfg = c.get("test_receipts", {})
+                    if tr_cfg.get("enabled") and tr_cfg.get("path"):
+                        excel_paths.append(tr_cfg.get("path"))
+                        break
+                except Exception:
+                    pass
+
+    for d in base_dirs:
+        tx_path = os.path.join(d, "test.xlsx")
+        if os.path.exists(tx_path) and tx_path not in excel_paths:
+            excel_paths.append(tx_path)
+
+    for ep in excel_paths:
+        if os.path.exists(ep):
+            try:
+                import pandas as pd
+                if ep.lower().endswith((".xlsx", ".xls")):
+                    df_test = pd.read_excel(ep, dtype=str)
+                else:
+                    df_test = pd.read_csv(ep, dtype=str, keep_default_na=False)
+                df_test = df_test.fillna("")
+                if not df_test.empty:
+                    order_col = next(
+                        (
+                            c for c in df_test.columns
+                            if any(k in str(c).lower() for k in ("order", "code", "bill", "phi", "shipment"))
+                        ),
+                        df_test.columns[0]
+                    )
+                    for val in df_test[order_col].tolist():
+                        clean_val = str(val).strip().upper()
+                        clean_val = re.sub(r'\.0$', '', clean_val)
+                        if clean_val and clean_val != "NAN":
+                            test_ids.add(clean_val)
+            except Exception:
+                pass
+
+    return test_ids
+
 def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None):
     """
     CEO Executive Penalty Dashboard:
@@ -102,46 +203,160 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     col_receiver = next((c for c in df.columns if 'RECEIVER' in c), 'RECEIVER')
     col_action_time = next((c for c in df.columns if 'ACTION TIME' in c or 'CURRENT TIME' in c), 'CURRENT TIME')
 
+    # Exclude all testing bills from test_bills.txt and delayed_bills.json
+    test_bills = load_test_bills()
+    if test_bills and col_order in df.columns:
+        order_series = df[col_order].astype(str).str.strip().str.upper().str.replace(r'\.0$', '', regex=True)
+        df = df[~order_series.isin(test_bills)].copy()
+
+    # Exclude orders with test keywords in Order ID, Sender, Receiver, Remark, Note, or Description
+    test_keywords = ['test', 'kiểm thử', 'kiem thu', 'demo', 'trial', 'sample', 'dummy', 'thử nghiệm', 'thu nghiem']
+    test_mask = pd.Series(False, index=df.index)
+
+    if col_order in df.columns:
+        ord_lower = df[col_order].astype(str).str.lower()
+        for kw in test_keywords:
+            test_mask |= ord_lower.str.contains(kw, na=False)
+
+    check_cols = [c for c in df.columns if any(k in str(c).upper() for k in ('SENDER', 'RECEIVER', 'NOTE', 'REMARK', 'GOODS', 'DESC', 'COMMODITY', 'ITEM', 'CUSTOMER'))]
+    for c in check_cols:
+        if c in df.columns:
+            s_lower = df[c].astype(str).str.lower()
+            for kw in test_keywords:
+                test_mask |= s_lower.str.contains(kw, na=False)
+
+    if test_mask.any():
+        df = df[~test_mask].copy()
+
     today = report_date or datetime.now().date()
     tgt = "".join(c for c in str(target_label).upper() if c.isalnum() or c in ("-", "_")).strip()
     if not tgt:
         tgt = "ALL"
 
     df['sc'] = df[col_status].astype(str).str.extract(r'^(\d{3})')[0]
-    df['curr_po_clean'] = df[col_orig_po].astype(str).str.strip().str.upper()
+
+    def get_actual_handover_po(r):
+        sc_val = str(r.get('sc', ''))
+        # Return statuses (500, 510, 511, 512, 540) -> last post office that scanned it (CURRENT POST OFFICE / latest action PO)
+        if sc_val in ('500', '510', '511', '512', '540'):
+            for col in ['ACTION POST OFFICE.4', 'ACTION POST OFFICE.3', 'ACTION POST OFFICE.2', 'ACTION POST OFFICE.1', 'ACTION POST OFFICE', col_orig_po]:
+                act_po = str(r.get(col, '') or '').strip().upper()
+                if act_po and act_po not in ('NAN', 'MEGA1', 'DVCMEGA1') and 'HUB' not in act_po:
+                    return act_po
+            return str(r.get(col_orig_po, '') or '').strip().upper()
+        # 1. If status is 110, 120, 200, check RECEIVE POST OFFICE or ORIGIN_POST
+        if sc_val in ('110', '120', '200'):
+            for col in ['RECEIVE POST OFFICE', 'ORIGIN_POST', col_orig_po]:
+                act_po = str(r.get(col, '') or '').strip().upper()
+                if act_po and act_po not in ('NAN', 'MEGA1', 'DVCMEGA1') and 'HUB' not in act_po:
+                    return act_po
+        # 2. If status is 210, check ACTION POST OFFICE (under STATUS 210 TIME)
+        elif sc_val == '210':
+            act_po = str(r.get('ACTION POST OFFICE', '') or '').strip().upper()
+            if act_po and act_po != 'NAN':
+                return act_po
+        # 3. If status is 302 or 310, check ACTION POST OFFICE.1 then ACTION POST OFFICE
+        elif sc_val in ('302', '310'):
+            for col in ['ACTION POST OFFICE.1', 'ACTION POST OFFICE']:
+                act_po = str(r.get(col, '') or '').strip().upper()
+                if act_po and act_po != 'NAN':
+                    return act_po
+        # 4. If status is 306 or 311, check ACTION POST OFFICE.2, .1, etc.
+        elif sc_val in ('306', '311'):
+            for col in ['ACTION POST OFFICE.2', 'ACTION POST OFFICE.1', 'ACTION POST OFFICE']:
+                act_po = str(r.get(col, '') or '').strip().upper()
+                if act_po and act_po != 'NAN':
+                    return act_po
+        # Fallback to CURRENT POST OFFICE
+        cur = str(r.get(col_orig_po, '') or '').strip().upper()
+        if cur in ('MEGA1', 'DVCMEGA1') or 'HUB' in cur:
+            for col in ['RECEIVE POST OFFICE', 'ORIGIN_POST']:
+                cand = str(r.get(col, '') or '').strip().upper()
+                if cand and cand not in ('NAN', 'MEGA1', 'DVCMEGA1') and 'HUB' not in cand:
+                    return cand
+        return cur
+
+    def get_action_user(r):
+        sc_val = str(r.get('sc', ''))
+        if sc_val in ('500', '510', '511', '512', '540'):
+            for col in ['ACTION USER.4', 'ACTION USER.3', 'ACTION USER.2', 'ACTION USER.1', 'ACTION USER']:
+                u = str(r.get(col, '') or '').strip()
+                if u and u.lower() != 'nan':
+                    return u
+        # 1. If status is 210, check ACTION USER.1
+        if sc_val == '210':
+            for col in ['ACTION USER.1', 'ACTION USER']:
+                u = str(r.get(col, '') or '').strip()
+                if u and u.lower() != 'nan':
+                    return u
+        # 2. If status is 302 or 310, check ACTION USER.2
+        elif sc_val in ('302', '310'):
+            for col in ['ACTION USER.2', 'ACTION USER.1', 'ACTION USER']:
+                u = str(r.get(col, '') or '').strip()
+                if u and u.lower() != 'nan':
+                    return u
+        # 3. If status is 306 or 311, check ACTION USER.3, .2, .1
+        elif sc_val in ('306', '311'):
+            for col in ['ACTION USER.3', 'ACTION USER.2', 'ACTION USER.1', 'ACTION USER']:
+                u = str(r.get(col, '') or '').strip()
+                if u and u.lower() != 'nan':
+                    return u
+        # Default / Delivery: ACTION USER
+        u = str(r.get('ACTION USER', '') or '').strip()
+        return u if u.lower() != 'nan' else ""
+
+    df['curr_po_clean'] = df.apply(get_actual_handover_po, axis=1)
     df['deliv_po_clean'] = df[col_dest_po].astype(str).str.strip().str.upper()
 
-    handover_statuses = {'210', '230', '300', '302', '306', '309', '310', '311'}
-    delivery_statuses = {'400', '401', '402', '420', '430', '460', '470', '471', '472', '480', '500', '510', '511', '512'}
-    excused_statuses = {'420', '472'}
+    # Load Post Office Handle mapping (to group agents under their 36 main branches)
+    here = os.path.dirname(os.path.abspath(__file__))
+    lookup_path = os.path.join(here, "post_office_lookup.csv")
+    po_handle_map = {}
+    if os.path.exists(lookup_path):
+        import csv
+        try:
+            with open(lookup_path, encoding="utf-8", errors="ignore") as f:
+                for r_csv in csv.reader(f):
+                    if len(r_csv) >= 2 and r_csv[0].strip() and r_csv[1].strip():
+                        po_handle_map[r_csv[0].strip().upper()] = r_csv[1].strip().upper()
+        except Exception:
+            pass
 
-    active_df = df[df['sc'].isin(handover_statuses | delivery_statuses)].copy()
+    def map_po_to_main(raw_code):
+        c = str(raw_code).strip().upper()
+        if not c or c == 'NAN':
+            return None
+        if c in MAIN_36_BRANCHES:
+            return c
+        mapped = po_handle_map.get(c)
+        if mapped and mapped in MAIN_36_BRANCHES:
+            return mapped
+        if len(c) >= 3:
+            prov = f"{c[:3]}P001"
+            if prov in MAIN_36_BRANCHES:
+                return prov
+            if c.startswith("PNP"):
+                return mapped or "PNPP001"
+            if c.startswith("PAI"):
+                return "BATP001"
+            if c.startswith("KEP"):
+                return "KAMP001"
+            if c.startswith("TBK"):
+                return "CHAP001"
+        return mapped or c
 
-    if tgt not in ("ALL", "TOTAL"):
-        if tgt.startswith("ZONE"):
-            zone_by_prefix = {
-                "KAN": "ZONE1", "PNP": "ZONE1", "PRE": "ZONE1", "SVA": "ZONE1",
-                "KAM": "ZONE2", "KOH": "ZONE2", "SIH": "ZONE2", "SPE": "ZONE2", "TAK": "ZONE2", "KEP": "ZONE2",
-                "BAN": "ZONE3", "BAT": "ZONE3", "CHH": "ZONE3", "PUR": "ZONE3", "PAI": "ZONE3",
-                "ODD": "ZONE4", "PRH": "ZONE4", "SIE": "ZONE4", "THO": "ZONE4",
-                "CHA": "ZONE5", "KRA": "ZONE5", "TBK": "ZONE5", "ROT": "ZONE5", "MON": "ZONE5", "STU": "ZONE5"
-            }
-            active_df['zone_h'] = active_df['curr_po_clean'].str[:3].map(zone_by_prefix).fillna("ZONE1")
-            active_df['zone_d'] = active_df['deliv_po_clean'].str[:3].map(zone_by_prefix).fillna("ZONE1")
-            active_df = active_df[
-                ((active_df['sc'].isin(handover_statuses)) & (active_df['zone_h'] == tgt)) |
-                ((active_df['sc'].isin(delivery_statuses)) & (active_df['zone_d'] == tgt))
-            ].copy()
-        elif len(tgt) == 3:
-            active_df = active_df[
-                ((active_df['sc'].isin(handover_statuses)) & (active_df['curr_po_clean'].str.startswith(tgt))) |
-                ((active_df['sc'].isin(delivery_statuses)) & (active_df['deliv_po_clean'].str.startswith(tgt)))
-            ].copy()
-        else:
-            active_df = active_df[
-                ((active_df['sc'].isin(handover_statuses)) & (active_df['curr_po_clean'] == tgt)) |
-                ((active_df['sc'].isin(delivery_statuses)) & (active_df['deliv_po_clean'] == tgt))
-            ].copy()
+    # EXCLUDE ONLY TERMINAL / COMPLETED / CANCELLED STATUSES (matching old report)
+    excluded_statuses = {'410', '520', '201', '99', '100', '-99'}
+    active_df = df[~df['sc'].isin(excluded_statuses)].copy()
+
+    # Also exclude delivered / returned keywords in status text
+    if col_status in active_df.columns:
+        for kw in ['GIAO THÀNH CÔNG', 'DELIVERED', 'COMPLETED', 'ĐÃ GIAO', 'DA GIAO', 'RETURN COMPLETED']:
+            active_df = active_df[~active_df[col_status].astype(str).str.upper().str.contains(kw, na=False)].copy()
+
+    customer_delay_statuses = {'420', '471', '472', '480'}
+    return_statuses = {'500', '510', '511', '512', '540'}
+    excused_statuses = customer_delay_statuses
 
     summary_data = {}
     if tgt in ("ALL", "TOTAL"):
@@ -175,36 +390,51 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         curr_po = str(row.get('curr_po_clean', '')).strip()
         deliv_po = str(row.get('deliv_po_clean', '')).strip()
 
-        is_handover = sc in handover_statuses
-        is_delivery = sc in delivery_statuses
+        is_return = sc in return_statuses
+        is_delivery = sc.startswith('4') and not is_return
+        is_handover = not (is_delivery or is_return)
 
-        if is_handover:
+        if is_return:
+            # Return penalty MUST NOT go to sender! It goes to the last guy who scan (curr_po / CURRENT POST OFFICE)
             raw_po = curr_po
+            if not raw_po or raw_po in ('MEGA1', 'DVCMEGA1') or 'HUB' in raw_po:
+                for col in ['ACTION POST OFFICE.4', 'ACTION POST OFFICE.3', 'ACTION POST OFFICE.2', 'ACTION POST OFFICE.1', 'ACTION POST OFFICE']:
+                    cand = str(row.get(col, '') or '').strip().upper()
+                    if cand and cand not in ('NAN', 'MEGA1', 'DVCMEGA1') and 'HUB' not in cand:
+                        raw_po = cand
+                        break
         elif is_delivery:
             raw_po = deliv_po
         else:
-            continue
+            raw_po = curr_po
+            if raw_po in ('MEGA1', 'DVCMEGA1') or 'HUB' in raw_po:
+                for col in ['RECEIVE POST OFFICE', 'ORIGIN_POST', 'ACTION POST OFFICE']:
+                    cand = str(row.get(col, '') or '').strip().upper()
+                    if cand and cand not in ('NAN', 'MEGA1', 'DVCMEGA1') and 'HUB' not in cand:
+                        raw_po = cand
+                        break
 
         if not raw_po or raw_po == 'NAN':
             continue
 
-        # STRICT FILTER: 36 Main Post Offices only (Exclude agents & showrooms)
+        po = map_po_to_main(raw_po)
+        if not po or po == 'NAN':
+            continue
+
+        # Target filtering
         if tgt in ("ALL", "TOTAL"):
-            if raw_po not in MAIN_36_BRANCHES:
+            if po not in MAIN_36_BRANCHES:
                 continue
-            po = raw_po
         elif tgt.startswith("ZONE") and tgt in ZONE_BRANCHES_MAP:
-            if raw_po not in ZONE_BRANCHES_MAP[tgt]:
+            if po not in ZONE_BRANCHES_MAP[tgt]:
                 continue
-            po = raw_po
         elif len(tgt) >= 7:
+            if po != tgt and raw_po != tgt:
+                continue
             po = tgt
-            if raw_po != tgt:
+        elif len(tgt) == 3:
+            if not (po.startswith(tgt) or raw_po.startswith(tgt)):
                 continue
-        else:
-            if raw_po not in MAIN_36_BRANCHES:
-                continue
-            po = raw_po
 
         if po not in summary_data:
             summary_data[po] = {
@@ -220,7 +450,32 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         order_id = str(row.get(col_order, '')).strip()
         status_raw = str(row.get(col_status, '')).strip()
 
-        act_val = row.get(col_action_time) if pd.notna(row.get(col_action_time)) else row.get(col_created)
+        # Smarter SLA Timing:
+        # For delivery: measure age from physical arrival at delivery branch / dispatch
+        # For handover: measure age from physical pickup scan time
+        if is_delivery or is_return:
+            arr_val = None
+            for cand_col in [
+                'STATUS 306 AT STORE / AGENT FROM HUB (FIRST TIME)',
+                'STATUS 306 AT STORE / AGENT (LAST TIME)',
+                col_action_time
+            ]:
+                if cand_col in row and pd.notna(row.get(cand_col)):
+                    v = str(row.get(cand_col)).strip()
+                    if v and v.lower() != 'nan':
+                        arr_val = v
+                        break
+            act_val = arr_val or row.get(col_action_time) or row.get(col_created)
+        else:
+            p_val = None
+            if sc in ('110', '120', '200'):
+                p_val = row.get(col_created)
+            elif sc == '210' and 'STATUS 210 TIME' in row and pd.notna(row.get('STATUS 210 TIME')):
+                v = str(row.get('STATUS 210 TIME')).strip()
+                if v and v.lower() != 'nan':
+                    p_val = v
+            act_val = p_val or row.get(col_action_time) or row.get(col_created)
+
         act_date = parse_date(act_val) or parse_date(row.get(col_created))
         age_days = (today - act_date).days if act_date else 0
 
@@ -241,11 +496,11 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             else:
                 risk_level = "Safe (< 1 day)"
 
-        elif is_delivery:
+        elif is_delivery or is_return:
             summary_data[po]["total_delivery"] += 1
-            if sc in excused_statuses:
+            if sc in customer_delay_statuses:
                 is_excused = True
-                risk_level = f"Excused ({sc})"
+                risk_level = f"Customer Delay ({sc})"
                 summary_data[po]["excused_count"] += 1
                 fine = 0.0
             else:
@@ -262,6 +517,12 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
 
         summary_data[po]["total_fine"] += fine
 
+        action_user = get_action_user(row)
+        staff_display = action_user
+        if " - " in staff_display:
+            staff_display = staff_display.split(" - ", 1)[1].strip()
+        display_branch = f"{po} ({staff_display})" if staff_display else po
+
         base_rows.append({
             "no": r_idx,
             "order_number": order_id,
@@ -271,6 +532,8 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             "destination_branch": str(row.get(col_dest_prov, '')),
             "destination_post": deliv_po,
             "assigned_branch": po,
+            "display_branch": display_branch,
+            "staff_user": action_user,
             "created_at": str(row.get(col_created, '')),
             "last_action_time": str(act_val or ""),
             "status_code": sc,
@@ -372,7 +635,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
 
     # Row 3: Headers
     headers_left = [
-        "No", "Order Number", "Customer", "Post Office",
+        "No", "Order Number", "Customer", "Post Office (Staff)",
         "Status", "Type", "Age (Days)", "Penalty Fine ($)"
     ]
     headers_right = [
@@ -395,37 +658,50 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = border_clean
 
-    # Populate Left Detail Order Rows
+    # Populate Left Detail Order Rows (Only overdue / penalized bills)
     r_curr = 4
     tot_fine_left = 0.0
 
-    for idx, item in enumerate(base_rows, 1):
-        ws1.row_dimensions[r_curr].height = 18.0
-        fine_text = f"-${item['penalty_fine']:.2f}" if item['penalty_fine'] > 0 else "$0.00"
-        row_vals = [
-            idx,
-            item["order_number"],
-            item["customer"],
-            item["assigned_branch"],
-            item["status_code"],
-            item["type"],
-            item["age_days"],
-            fine_text
-        ]
-        for col_idx, val in enumerate(row_vals, 1):
-            c = ws1.cell(row=r_curr, column=col_idx, value=val)
-            c.font = font_data
-            c.alignment = Alignment(horizontal="center", vertical="center")
-            c.border = border_clean
-            c.fill = fill_row_white
+    overdue_rows = [item for item in base_rows if item["penalty_fine"] > 0]
 
-        tot_fine_left += item["penalty_fine"]
+    if overdue_rows:
+        for idx, item in enumerate(overdue_rows, 1):
+            ws1.row_dimensions[r_curr].height = 18.0
+            fine_text = f"-${item['penalty_fine']:.2f}"
+            row_vals = [
+                idx,
+                item["order_number"],
+                item["customer"],
+                item.get("display_branch", item["assigned_branch"]),
+                item["status_code"],
+                item["type"],
+                item["age_days"],
+                fine_text
+            ]
+            for col_idx, val in enumerate(row_vals, 1):
+                c = ws1.cell(row=r_curr, column=col_idx, value=val)
+                c.font = font_data
+                c.alignment = Alignment(horizontal="center", vertical="center")
+                c.border = border_clean
+                c.fill = fill_row_white
+
+            tot_fine_left += item["penalty_fine"]
+            r_curr += 1
+    else:
+        ws1.row_dimensions[r_curr].height = 22.0
+        ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=8)
+        no_pen_cell = ws1.cell(r_curr, 1, "✓ No overdue or penalized bills")
+        no_pen_cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="16A34A")
+        no_pen_cell.alignment = Alignment(horizontal="center", vertical="center")
+        for c in range(1, 9):
+            ws1.cell(r_curr, c).fill = fill_row_white
+            ws1.cell(r_curr, c).border = border_clean
         r_curr += 1
 
     # Left Grand Total
     ws1.row_dimensions[r_curr].height = 24.0
     ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=2)
-    gt_left = ws1.cell(r_curr, 1, f"Total Orders: {len(base_rows)}")
+    gt_left = ws1.cell(r_curr, 1, f"Total Overdue: {len(overdue_rows)}")
     gt_left.font = font_tot
     gt_left.alignment = Alignment(horizontal="left", vertical="center")
 
@@ -583,7 +859,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
 
     # Generous Column Widths
     col_widths = {
-        1: 5, 2: 15, 3: 20, 4: 12, 5: 18, 6: 10, 7: 12, 8: 15,
+        1: 5, 2: 15, 3: 20, 4: 22, 5: 18, 6: 10, 7: 12, 8: 15,
         9: 4,
         10: 5, 11: 14, 12: 15, 13: 15, 14: 15, 15: 15, 16: 16, 17: 16, 18: 16
     }
@@ -596,7 +872,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
 
     base_headers = [
         "No", "Order Number", "Customer", "Origin Branch", "Origin Post",
-        "Destination Branch", "Destination Post", "Assigned Branch", "Created At",
+        "Destination Branch", "Destination Post", "Assigned Branch", "Staff / User", "Created At",
         "Last Action Time", "Status Code", "Status Name", "Type", "Age (Days)",
         "Penalty Fine ($)", "Risk Level", "Is Excused"
     ]
@@ -622,6 +898,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             item["destination_branch"],
             item["destination_post"],
             item["assigned_branch"],
+            item.get("staff_user", ""),
             item["created_at"],
             item["last_action_time"],
             item["status_code"],

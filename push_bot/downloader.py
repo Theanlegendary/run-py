@@ -164,7 +164,7 @@ def download_detail(api_cfg, out_path, from_date=None, to_date=None, branch_code
 
     # Cache logic: Only cache when downloading the default date range
     is_default_range = (from_date is None and to_date is None)
-    cache_minutes = api_cfg.get("cache_minutes", 0)
+    cache_minutes = min(api_cfg.get("cache_minutes", 5), 5)
 
     # Cache file stored locally in a 'cache' folder under this script's directory
     cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
@@ -284,7 +284,7 @@ def download_revenue_detail(api_cfg, out_path, from_date=None, to_date=None, for
 
     # Cache logic
     is_default_range = (from_date is None and to_date is None)
-    cache_minutes = api_cfg.get("cache_minutes", 0)
+    cache_minutes = min(api_cfg.get("cache_minutes", 5), 5)
     cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
     cache_file = os.path.join(cache_dir, "latest_revenue.xlsx")
 
@@ -355,6 +355,9 @@ def download_revenue_detail(api_cfg, out_path, from_date=None, to_date=None, for
 
     raise RuntimeError(f"Failed to fetch Revenue Excel: {data}")
 
+
+# Alias for backward compatibility
+download_pickup_revenue = download_revenue_detail
 
 
 def download_post_offices(api_cfg, branch_code, limit=200):
