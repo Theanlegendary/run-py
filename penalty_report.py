@@ -483,37 +483,59 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         risk_level = "Normal"
         is_excused = False
 
+        # Check if bill has ever had customer problem statuses (472 or 420) in its history
+        customer_problem_statuses = {'472', '420'}  # Resolving Delivery Issue, Rescheduled by Customer
+        has_customer_problem = False
+        
+        # Check current status and all historical status columns
+        status_columns_to_check = [
+            col_status,  # Current status
+            'STATUS CODE.1', 'STATUS CODE.2', 'STATUS CODE.3', 'STATUS CODE.4', 'STATUS CODE.5',
+            'sc.1', 'sc.2', 'sc.3', 'sc.4', 'sc.5'  # Alternative status column names
+        ]
+        
+        for status_col in status_columns_to_check:
+            if status_col in row:
+                hist_status = str(row.get(status_col, '')).strip()
+                if hist_status in customer_problem_statuses:
+                    has_customer_problem = True
+                    is_excused = True
+                    risk_level = f"Excluded - Customer Problem History ({hist_status})"
+                    break
+
         if is_handover:
             summary_data[po]["total_handover"] += 1
-            if age_days >= 3:
+            if has_customer_problem:
+                # Exclude from penalty but count as excused
+                summary_data[po]["excused_count"] += 1
+                fine = 0.0
+            elif age_days >= 3:
                 fine = 0.40
-                risk_level = "Urgent (> 3 days)"
+                risk_level = "Urgent (≥ 3 days)"
                 summary_data[po]["penalty_handover"] += 1
-            elif age_days >= 1:
+            elif age_days > 1:
                 fine = 0.10
-                risk_level = "Backlog (1-2 days)"
+                risk_level = "Backlog (> 1 day)"
                 summary_data[po]["penalty_handover"] += 1
             else:
-                risk_level = "Safe (< 1 day)"
+                risk_level = "Safe (≤ 1 day)"
 
         elif is_delivery or is_return:
             summary_data[po]["total_delivery"] += 1
-            if sc in customer_delay_statuses:
-                is_excused = True
-                risk_level = f"Customer Delay ({sc})"
+            if has_customer_problem:
+                # Exclude from penalty but count as excused
                 summary_data[po]["excused_count"] += 1
                 fine = 0.0
+            elif age_days >= 3:
+                fine = 0.40
+                risk_level = "Critical (≥ 3 days)"
+                summary_data[po]["penalty_delivery"] += 1
+            elif age_days > 1:
+                fine = 0.10
+                risk_level = "Stagnant (> 1 day)"
+                summary_data[po]["penalty_delivery"] += 1
             else:
-                if age_days >= 3:
-                    fine = 0.40
-                    risk_level = "Critical (> 3 days)"
-                    summary_data[po]["penalty_delivery"] += 1
-                elif age_days >= 1:
-                    fine = 0.10
-                    risk_level = "Stagnant (1-2 days)"
-                    summary_data[po]["penalty_delivery"] += 1
-                else:
-                    risk_level = "Safe (< 1 day)"
+                risk_level = "Safe (≤ 1 day)"
 
         summary_data[po]["total_fine"] += fine
 
@@ -523,28 +545,30 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             staff_display = staff_display.split(" - ", 1)[1].strip()
         display_branch = f"{po} ({staff_display})" if staff_display else po
 
-        base_rows.append({
-            "no": r_idx,
-            "order_number": order_id,
-            "customer": str(row.get(col_receiver, ''))[:28],
-            "origin_branch": str(row.get(col_orig_br, '')),
-            "origin_post": curr_po,
-            "destination_branch": str(row.get(col_dest_prov, '')),
-            "destination_post": deliv_po,
-            "assigned_branch": po,
-            "display_branch": display_branch,
-            "staff_user": action_user,
-            "created_at": str(row.get(col_created, '')),
-            "last_action_time": str(act_val or ""),
-            "status_code": sc,
-            "status_name": STATUS_NAME_EN.get(sc, "Processing"),
-            "type": "Handover" if is_handover else "Delivery",
-            "age_days": age_days,
-            "penalty_fine": fine,
-            "risk_level": risk_level,
-            "is_excused": is_excused
-        })
-        r_idx += 1
+        # Include bills in report (exclude customer problem bills entirely)
+        if not has_customer_problem and (age_days >= 1 or fine > 0):
+            base_rows.append({
+                "no": r_idx,
+                "order_number": order_id,
+                "customer": str(row.get(col_receiver, ''))[:28],
+                "origin_branch": str(row.get(col_orig_br, '')),
+                "origin_post": curr_po,
+                "destination_branch": str(row.get(col_dest_prov, '')),
+                "destination_post": deliv_po,
+                "assigned_branch": po,
+                "display_branch": display_branch,
+                "staff_user": action_user,
+                "created_at": str(row.get(col_created, '')),
+                "last_action_time": str(act_val or ""),
+                "status_code": sc,
+                "status_name": STATUS_NAME_EN.get(sc, "Processing"),
+                "type": "Handover" if is_handover else "Delivery",
+                "age_days": age_days,
+                "penalty_fine": fine,
+                "risk_level": risk_level,
+                "is_excused": is_excused
+            })
+            r_idx += 1
 
     if tgt not in ("ALL", "TOTAL") and tgt not in summary_data:
         summary_data[tgt] = {
@@ -591,6 +615,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     font_data = Font(name="Segoe UI", size=8.5, color="0F172A")
     font_bold_data = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")
     font_tot = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
+    font_pen_red = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # Bold Red
 
     # High-contrast bold font colors for % on-time metrics
     font_pct_green = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A") # >= 90%
@@ -627,7 +652,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         ws1.cell(1, c).fill = fill_title_right
 
     ws1.merge_cells("J2:R2")
-    ws1.cell(2, 10, "SLA Penalty: 1-2 Days (-$0.10) | ≥ 3 Days (-$0.40) • Excused 420/472 ($0.00)").font = font_sub
+    ws1.cell(2, 10, "SLA Penalty: > 1 Day (-$0.10) | ≥ 3 Days (-$0.40) • Excludes Bills with 420/472 History").font = font_sub
     ws1.cell(2, 10).alignment = Alignment(horizontal="center", vertical="center")
     for c in range(10, 19):
         ws1.cell(2, c).fill = fill_sub_right
@@ -658,16 +683,17 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = border_clean
 
-    # Populate Left Detail Order Rows (Only overdue / penalized bills)
+    # Populate Left Detail Order Rows (Bills >= 1 day showing, with fine or $0.00)
     r_curr = 4
     tot_fine_left = 0.0
 
-    overdue_rows = [item for item in base_rows if item["penalty_fine"] > 0]
+    overdue_rows = [item for item in base_rows if item["penalty_fine"] > 0 or item["age_days"] >= 1]
+    overdue_rows.sort(key=lambda x: (-x["penalty_fine"], -x["age_days"]))
 
     if overdue_rows:
         for idx, item in enumerate(overdue_rows, 1):
             ws1.row_dimensions[r_curr].height = 18.0
-            fine_text = f"-${item['penalty_fine']:.2f}"
+            fine_text = f"-${item['penalty_fine']:.2f}" if item['penalty_fine'] > 0 else "$0.00"
             row_vals = [
                 idx,
                 item["order_number"],
@@ -684,13 +710,19 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
                 c.alignment = Alignment(horizontal="center", vertical="center")
                 c.border = border_clean
                 c.fill = fill_row_white
+                if col_idx == 8:
+                    if item['penalty_fine'] > 0:
+                        c.font = font_pen_red
+                        c.fill = fill_penalty_pink
+                    else:
+                        c.font = font_data
 
             tot_fine_left += item["penalty_fine"]
             r_curr += 1
     else:
         ws1.row_dimensions[r_curr].height = 22.0
         ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=8)
-        no_pen_cell = ws1.cell(r_curr, 1, "✓ No overdue or penalized bills")
+        no_pen_cell = ws1.cell(r_curr, 1, "✓ No pending or penalized bills")
         no_pen_cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="16A34A")
         no_pen_cell.alignment = Alignment(horizontal="center", vertical="center")
         for c in range(1, 9):
@@ -701,7 +733,8 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     # Left Grand Total
     ws1.row_dimensions[r_curr].height = 24.0
     ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=2)
-    gt_left = ws1.cell(r_curr, 1, f"Total Overdue: {len(overdue_rows)}")
+    pen_count = sum(1 for item in overdue_rows if item["penalty_fine"] > 0)
+    gt_left = ws1.cell(r_curr, 1, f"Total Listed: {len(overdue_rows)} (Penalized: {pen_count})")
     gt_left.font = font_tot
     gt_left.alignment = Alignment(horizontal="left", vertical="center")
 
