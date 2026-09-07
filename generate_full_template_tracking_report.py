@@ -5,6 +5,7 @@ Full Standard Template for Tracking Status Logs (All Status Codes 110-600) with:
   1. All TMS status codes included as dedicated columns (LOG | UNIT | TIME)
   2. VAS column (e.g. VTT, VBP, NTN)
   3. Filtered for all August Done Delivered (410) bills
+  4. Includes all shipped bills (no test_bills.txt exclusion)
 """
 
 import os
@@ -20,9 +21,9 @@ from openpyxl.utils import get_column_letter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(HERE, "config.json")
-TEST_BILLS_PATH = os.path.join(HERE, "test_bills.txt")
 
-EXCLUDE_KEYWORDS = {"TRAINER", "GLOBAL", "TEST", "DEMO", "EXTERNAL"}
+# Exclude only obvious internal test/demo accounts if explicitly marked
+EXCLUDE_KEYWORDS = {"TRAINER", "GLOBAL", "DEMO", "EXTERNAL"}
 
 # Complete Full Standard Template of all TMS status codes 110-600 in operational order
 FULL_STATUS_CODES_TEMPLATE = [
@@ -45,18 +46,10 @@ FULL_STATUS_CODES_TEMPLATE = [
     "99"
 ]
 
-def load_test_ids():
-    test_ids = set()
-    if os.path.exists(TEST_BILLS_PATH):
-        with open(TEST_BILLS_PATH, "r", encoding="utf-8") as f:
-            test_ids = set(line.strip() for line in f if line.strip() and not line.strip().startswith("/"))
-    return test_ids
-
 def run_full_template_export(detail_xlsx_path, out_paths, max_workers=70):
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         cfg = json.load(f)
 
-    test_ids = load_test_ids()
     print(f"[INFO] Reading detail file: {detail_xlsx_path}...")
     df = pd.read_excel(detail_xlsx_path)
     df.columns = [str(c).strip().upper() for c in df.columns]
@@ -107,7 +100,7 @@ def run_full_template_export(detail_xlsx_path, out_paths, max_workers=70):
 
     def fetch_bill(oid):
         oid_str = str(oid).strip()
-        if not oid_str or oid_str.lower() == "nan" or oid_str in test_ids:
+        if not oid_str or oid_str.lower() == "nan":
             return None
 
         try:
@@ -123,13 +116,6 @@ def run_full_template_export(detail_xlsx_path, out_paths, max_workers=70):
             trips = data_tr.get("trackingTrips", [])
             if not trips:
                 return None
-
-            for t in trips:
-                upd = str(t.get("updatedBy", {}).get("name", "") or "").upper()
-                desc = str(t.get("desc", "") or "").upper()
-                po = str(t.get("postcode", "") or t.get("postOffice", {}).get("code", "") or "").upper()
-                if any(kw in upd or kw in desc or kw in po for kw in EXCLUDE_KEYWORDS):
-                    return None
 
             vas_val = ""
             try:
@@ -209,7 +195,7 @@ def run_full_template_export(detail_xlsx_path, out_paths, max_workers=70):
             return None
 
     unique_oids = df_del["ORDER ID"].dropna().unique()
-    print(f"[INFO] Fetching full tracking trips & VAS for {len(unique_oids)} bills with {max_workers} threads...")
+    print(f"[INFO] Fetching full tracking trips & VAS for all {len(unique_oids)} shipped bills with {max_workers} threads...")
     results = []
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
