@@ -326,24 +326,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         c = str(raw_code).strip().upper()
         if not c or c == 'NAN':
             return None
-        if c in MAIN_36_BRANCHES:
-            return c
-        mapped = po_handle_map.get(c)
-        if mapped and mapped in MAIN_36_BRANCHES:
-            return mapped
-        if len(c) >= 3:
-            prov = f"{c[:3]}P001"
-            if prov in MAIN_36_BRANCHES:
-                return prov
-            if c.startswith("PNP"):
-                return mapped or "PNPP001"
-            if c.startswith("PAI"):
-                return "BATP001"
-            if c.startswith("KEP"):
-                return "KAMP001"
-            if c.startswith("TBK"):
-                return "CHAP001"
-        return mapped or c
+        return c
 
     # EXCLUDE ONLY TERMINAL / COMPLETED / CANCELLED STATUSES (matching old report)
     excluded_statuses = {'410', '520', '201', '99', '100', '-99'}
@@ -353,6 +336,9 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     if col_status in active_df.columns:
         for kw in ['GIAO THÀNH CÔNG', 'DELIVERED', 'COMPLETED', 'ĐÃ GIAO', 'DA GIAO', 'RETURN COMPLETED']:
             active_df = active_df[~active_df[col_status].astype(str).str.upper().str.contains(kw, na=False)].copy()
+
+    print(f"DEBUG: Excluded {len(df) - len(active_df)} delivered/completed orders (status 410, 520, etc.)")
+    print(f"DEBUG: Active orders for penalty analysis: {len(active_df)}")
 
     customer_delay_statuses = {'420', '471', '472', '480'}
     return_statuses = {'500', '510', '511', '512', '540'}
@@ -487,20 +473,22 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         customer_problem_statuses = {'472', '420'}  # Resolving Delivery Issue, Rescheduled by Customer
         has_customer_problem = False
         
-        # Check current status and all historical status columns
-        status_columns_to_check = [
-            col_status,  # Current status
-            'STATUS CODE.1', 'STATUS CODE.2', 'STATUS CODE.3', 'STATUS CODE.4', 'STATUS CODE.5',
-            'sc.1', 'sc.2', 'sc.3', 'sc.4', 'sc.5'  # Alternative status column names
-        ]
-        
-        for status_col in status_columns_to_check:
-            if status_col in row:
-                hist_status = str(row.get(status_col, '')).strip()
-                if hist_status in customer_problem_statuses:
-                    has_customer_problem = True
-                    is_excused = True
-                    risk_level = f"Excluded - Customer Problem History ({hist_status})"
+        # Check current status and ALL historical status columns (comprehensive search)
+        for col_name in row.index:
+            col_name_upper = str(col_name).upper()
+            # Check any column that might contain status codes
+            if any(keyword in col_name_upper for keyword in ['STATUS', 'SC', 'CODE']):
+                hist_status_raw = str(row.get(col_name, '')).strip()
+                # Extract numeric status code from various formats
+                import re
+                status_matches = re.findall(r'\b(\d{3})\b', hist_status_raw)
+                for status_code in status_matches:
+                    if status_code in customer_problem_statuses:
+                        has_customer_problem = True
+                        is_excused = True
+                        risk_level = f"Excluded - Customer Problem History ({status_code})"
+                        break
+                if has_customer_problem:
                     break
 
         if is_handover:
@@ -609,22 +597,22 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         top=Side(style="thin", color="94A3B8"), bottom=Side(style="double", color="0B132B")
     )
 
-    font_banner = Font(name="Segoe UI", size=10.5, bold=True, color="FFFFFF")
-    font_sub = Font(name="Segoe UI", size=8.0, italic=True, color="93C5FD")
-    font_hdr = Font(name="Segoe UI", size=8.5, bold=True, color="FFFFFF")
-    font_data = Font(name="Segoe UI", size=8.5, color="0F172A")
-    font_bold_data = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")
-    font_tot = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
-    font_pen_red = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # Bold Red
+    font_banner = Font(name="Arial", size=12, bold=True, color="FFFFFF")
+    font_sub = Font(name="Arial", size=9, italic=True, color="93C5FD")
+    font_hdr = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+    font_data = Font(name="Arial", size=10, color="0F172A")              # Larger regular text
+    font_bold_data = Font(name="Arial", size=10, bold=False, color="0F172A")  # Larger regular
+    font_tot = Font(name="Arial", size=11, bold=True, color="0F172A")
+    font_pen_red = Font(name="Arial", size=10, bold=False, color="DC2626")     # Larger regular red
 
-    # High-contrast bold font colors for % on-time metrics
-    font_pct_green = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A") # >= 90%
-    font_pct_amber = Font(name="Segoe UI", size=8.5, bold=True, color="D97706") # 75% - 89.9%
-    font_pct_red   = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # < 75%
+    # High-contrast font colors for % on-time metrics (larger, regular weight)
+    font_pct_green = Font(name="Arial", size=10, bold=False, color="16A34A")   # Larger regular green
+    font_pct_amber = Font(name="Arial", size=10, bold=False, color="D97706")   # Larger regular amber
+    font_pct_red   = Font(name="Arial", size=10, bold=False, color="DC2626")   # Larger regular red
 
-    font_tot_pct_green = Font(name="Segoe UI", size=9.5, bold=True, color="16A34A")
-    font_tot_pct_amber = Font(name="Segoe UI", size=9.5, bold=True, color="D97706")
-    font_tot_pct_red   = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626")
+    font_tot_pct_green = Font(name="Arial", size=11, bold=True, color="16A34A")  # Larger totals
+    font_tot_pct_amber = Font(name="Arial", size=11, bold=True, color="D97706")  # Larger totals
+    font_tot_pct_red   = Font(name="Arial", size=11, bold=True, color="DC2626")  # Larger totals
 
     def get_pct_font(pct_val, is_tot=False):
         if pct_val >= 90.0:
@@ -825,7 +813,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
                 else:
                     cell.font = font_bold_data
             elif ci == 11:
-                cell.font = font_bold_data
+                cell.font = font_data  # Change from font_bold_data to font_data (regular)
             else:
                 cell.font = font_data
 
@@ -910,7 +898,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         "Penalty Fine ($)", "Risk Level", "Is Excused"
     ]
 
-    ws2.row_dimensions[1].height = 22
+    ws2.row_dimensions[1].height = 26  # Increased header height
     for col_idx, h in enumerate(base_headers, 1):
         c = ws2.cell(row=1, column=col_idx, value=h)
         c.font = font_hdr
@@ -920,7 +908,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
 
     for idx, item in enumerate(base_rows, 1):
         r_num = idx + 1
-        ws2.row_dimensions[r_num].height = 18
+        ws2.row_dimensions[r_num].height = 22  # Increased data row height
         fine_text = f"-${item['penalty_fine']:.2f}" if item['penalty_fine'] > 0 else "$0.00"
         row_data = [
             idx,
