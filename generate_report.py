@@ -532,7 +532,7 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
         for row_idx in (r, r + 1):
             cell = ws.cell(row_idx, col_idx)
             cell.fill = _fill(h_bg)
-            cell.font = _font(fn, h_fg, bold=True)
+            cell.font = _font(fn, h_fg, bold=False)
             cell.alignment = _align('center')
             cell.border = bdr
 

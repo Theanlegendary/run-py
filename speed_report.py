@@ -45,6 +45,61 @@ ZONE_BRANCHES = {
     "ZONE5": ["CHAP001", "KRAP001", "TBKP001", "ROTP001", "MONP001", "STUP001"]
 }
 
+_pickup_lookup_map = None
+
+def load_pickup_lookup():
+    global _pickup_lookup_map
+    if _pickup_lookup_map is not None:
+        return _pickup_lookup_map
+    
+    _pickup_lookup_map = {}
+    base_dirs = [
+        os.path.dirname(os.path.abspath(__file__)),
+        os.getcwd(),
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ]
+    lookup_file = None
+    for d in base_dirs:
+        p = os.path.join(d, "pickup_branch_lookup.csv")
+        if os.path.exists(p):
+            lookup_file = p
+            break
+            
+    if lookup_file:
+        try:
+            df_l = pd.read_csv(lookup_file, dtype=str)
+            for _, row in df_l.iterrows():
+                pk = str(row.get('Pickup Branch', '') or '').strip().upper()
+                bc = str(row.get('Branch Code', '') or '').strip().upper()
+                if pk and bc:
+                    _pickup_lookup_map[pk] = bc
+        except Exception:
+            pass
+    return _pickup_lookup_map
+
+
+def resolve_parent_po(raw_po, valid_targets=None):
+    if not raw_po or str(raw_po).strip().upper() == 'NAN':
+        return raw_po
+    po_str = str(raw_po).strip().upper()
+    if valid_targets and po_str in valid_targets:
+        return po_str
+    if po_str in MAIN_36_BRANCHES:
+        return po_str
+    
+    lk_map = load_pickup_lookup()
+    mapped = lk_map.get(po_str)
+    if mapped and mapped in MAIN_36_BRANCHES:
+        return mapped
+    
+    prefix = po_str[:3]
+    for b in MAIN_36_BRANCHES:
+        if b.startswith(prefix):
+            return b
+            
+    return po_str
+
+
 
 def parse_time(val):
     if val is None or pd.isna(val):
@@ -181,16 +236,32 @@ def load_speed_context(src_xlsx, revenue_path=None):
 
     if revenue_path and os.path.exists(revenue_path):
         try:
-            for skiprows in range(5):
-                rev_df = pd.read_excel(revenue_path, skiprows=skiprows)
-                rev_order_col = next((c for c in rev_df.columns if str(c).strip().upper() in ['ORDER ID', 'ORDER_NUMBER', 'MÃ ĐƠN HÀNG', 'BILL', 'MÃ ĐƠN']), None)
-                if rev_order_col and 'VAS_SERVICE' in rev_df.columns:
-                    for _, row in rev_df.dropna(subset=[rev_order_col]).iterrows():
-                        oid = str(row[rev_order_col]).strip()
-                        vas = str(row['VAS_SERVICE']).strip()
-                        if vas.lower() not in ['nan', 'none', '']:
-                            vas_mapping[oid] = vas
+            # 1. Detect header row in case TMS export has title/metadata rows at top
+            rev_preview = pd.read_excel(revenue_path, header=None, nrows=15)
+            hdr_idx = 0
+            for idx, row in rev_preview.iterrows():
+                row_strs = [str(x).strip().upper() for x in row if pd.notna(x)]
+                if any(k in row_strs for k in ['ORDER_NUMBER', 'ORDER ID', 'ORDER NUMBER', 'MÃ ĐƠN HÀNG', 'MÃ ĐƠN', 'BILL']):
+                    hdr_idx = idx
                     break
+
+            rev_df = pd.read_excel(revenue_path, header=hdr_idx)
+            rev_df.columns = [str(c).strip().upper() for c in rev_df.columns]
+            rev_order_col = next((c for c in rev_df.columns if c in ['ORDER ID', 'ORDER_NUMBER', 'ORDER NUMBER', 'MÃ ĐƠN HÀNG', 'BILL', 'MÃ ĐƠN']), None)
+            # Specifically match VAS_SERVICE column, ignoring fee/money columns
+            vas_col = next((c for c in rev_df.columns if 'VAS_SERVICE' in c or 'VAS SERVICE' in c), None)
+            if not vas_col:
+                vas_col = next((c for c in rev_df.columns if 'VAS' in c and not any(k in c for k in ('FEE', 'TIỀN', 'AMOUNT', 'USD'))), None)
+            if not vas_col:
+                vas_col = next((c for c in rev_df.columns if 'VAS' in c), None)
+
+            if rev_order_col and vas_col:
+                valid_rev = rev_df.dropna(subset=[rev_order_col, vas_col])
+                oids = valid_rev[rev_order_col].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+                vass = valid_rev[vas_col].astype(str).str.strip()
+                for o, v in zip(oids, vass):
+                    if v.lower() not in ('nan', 'none', ''):
+                        vas_mapping[o] = v
         except Exception as e:
             print(f"Failed to load revenue data in speed report: {e}")
 
@@ -387,12 +458,27 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     elif tgt in MAIN_36_BRANCHES:
         target_branches = [tgt]
     else:
-        target_branches = [tgt]
+        # Handle partial branch names (e.g., "SIE" should match "SIEP001", "SIEA006", etc.)
+        if len(tgt) <= 3:  # Short codes like "SIE", "PNP", "BAN"
+            # Find all branches that start with this prefix
+            matching_branches = [b for b in MAIN_36_BRANCHES if b.startswith(tgt)]
+            if matching_branches:
+                target_branches = matching_branches
+            else:
+                target_branches = [tgt]  # Keep original if no matches
+        else:
+            target_branches = [tgt]
 
     df['status_code_clean'] = df[col_status].astype(str).str.extract(r'^(\d{3})')[0]
     df['curr_po_clean'] = df[col_orig_po].astype(str).str.strip().str.upper()
     df['deliv_po_clean'] = df[col_dest_po].astype(str).str.strip().str.upper()
     df['deliv_date'] = df[col_action_time].apply(parse_date)
+
+    df['raw_po_clean'] = df['deliv_po_clean'].where(
+        (df['deliv_po_clean'].notna()) & (df['deliv_po_clean'] != 'NAN') & (df['deliv_po_clean'] != ''),
+        df['curr_po_clean']
+    )
+    df['resolved_po'] = df['raw_po_clean'].apply(lambda x: resolve_parent_po(x, valid_targets=target_branches))
 
     summary_data = {}
     for b in target_branches:
@@ -411,23 +497,48 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     pending_statuses = ('306', '309', '311', '400', '401', '402', '420', '430', '471', '472', '480')
     need_deliv_df = df[df['status_code_clean'].isin(pending_statuses)]
     for row in need_deliv_df.to_dict('records'):
-        order_id = str(row.get(col_order, '')).strip()
+        order_id = re.sub(r'\.0$', '', str(row.get(col_order, '')).strip().upper())
         svc_val = str(row.get(col_service, '') or '').strip().upper()
         combined_notes = ' '.join(str(row.get(col, '') or '') for col in note_cols).upper()
         vas_mapped = str(vas_mapping.get(order_id, '')).upper()
 
-        is_vtt = ('VTT' in vas_mapped) or ('VTT' in combined_notes) or ('VTT' in svc_val)
+        is_vtt = bool(('VTT' in vas_mapped) or ('VTT' in combined_notes) or ('VTT' in svc_val))
         if not is_vtt:
             continue
 
-        deliv_po = str(row.get('deliv_po_clean', '')).strip()
-        curr_po = str(row.get('curr_po_clean', '')).strip()
-        po = deliv_po if deliv_po and deliv_po != 'NAN' else curr_po
+        raw_po = str(row.get('raw_po_clean', '') or '').strip()
+        po = str(row.get('resolved_po', '') or '').strip() or resolve_parent_po(raw_po, valid_targets=target_branches)
         if po in summary_data:
             summary_data[po]["need_deliver"] += 1
 
-    # 2. Delivered Today (Status 410)
+    # 2. Delivered Today (Status 410) with enhanced filtering
+    # Filter for delivered orders from today
     delivered_df = df[(df['status_code_clean'] == '410') & (df['deliv_date'] == today)]
+    if delivered_df.empty:
+        # Fallback to latest available delivery date in export if today has 0 records
+        latest_date = df[df['status_code_clean'] == '410']['deliv_date'].max()
+        if latest_date and not report_date:
+            today = latest_date
+            delivered_df = df[(df['status_code_clean'] == '410') & (df['deliv_date'] == today)]
+
+    # Additional filtering for target branches only
+    if target_branches and target_branches != ["ALL"] and set(target_branches) != set(MAIN_36_BRANCHES):
+        print(f"DEBUG: Filtering for target branches: {target_branches}")
+        
+        # Handle partial matching for short branch codes (e.g., "SIE" should match SIEP001, SIEA001, etc.)
+        if len(target_branches) == 1 and len(target_branches[0]) <= 3:
+            prefix = target_branches[0]
+            delivered_df = delivered_df[
+                delivered_df['resolved_po'].str.startswith(prefix, na=False) |
+                delivered_df['raw_po_clean'].str.startswith(prefix, na=False)
+            ]
+        else:
+            delivered_df = delivered_df[
+                delivered_df['resolved_po'].isin(target_branches) |
+                delivered_df['raw_po_clean'].isin(target_branches)
+            ]
+            
+        print(f"DEBUG: After branch filtering: {len(delivered_df)} orders")
 
     base_rows = []
     r_idx = 1
@@ -435,28 +546,29 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     for row in delivered_df.to_dict('records'):
         deliv_po = str(row.get('deliv_po_clean', '')).strip()
         curr_po = str(row.get('curr_po_clean', '')).strip()
-        raw_po = deliv_po if deliv_po and deliv_po != 'NAN' else curr_po
+        raw_po = str(row.get('raw_po_clean', '') or '').strip() or (deliv_po if deliv_po and deliv_po != 'NAN' else curr_po)
 
         if not raw_po or raw_po == 'NAN':
             continue
 
-        if raw_po not in summary_data:
-            continue
-        po = raw_po
+        po = str(row.get('resolved_po', '') or '').strip() or resolve_parent_po(raw_po, valid_targets=target_branches)
 
-        order_id = str(row.get(col_order, '')).strip()
+        if po not in summary_data:
+            continue
+
+
+        order_id = re.sub(r'\.0$', '', str(row.get(col_order, '')).strip().upper())
         svc_val = str(row.get(col_service, '') or '').strip().upper()
         if svc_val == 'NAN':
             svc_val = ''
         action_user_val = str(row.get(col_user, '') or '').strip()
 
-        # Strict VTT Check: Verify order has VTT at Status 110/120/210 or in Revenue VAS export
         combined_notes = ' '.join(str(row.get(col, '') or '') for col in note_cols).upper()
         vas_mapped = str(vas_mapping.get(order_id, '')).upper()
 
-        is_vtt = ('VTT' in vas_mapped) or ('VTT' in combined_notes) or ('VTT' in svc_val)
+        is_vtt = bool(('VTT' in vas_mapped) or ('VTT' in combined_notes) or ('VTT' in svc_val))
         if not is_vtt:
-            continue  # Strictly VTT bills only
+            continue
 
         t410 = parse_time(row.get(col_action_time)) or parse_time(row.get(col_created))
         
@@ -576,29 +688,44 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     ws1.views.sheetView[0].showGridLines = True
 
     # Styling Palette
-    _TITLE_LEFT = PatternFill("solid", fgColor="0F172A") # Midnight Navy
-    _TITLE_FILL = PatternFill("solid", fgColor="0B132B") # Deep Midnight
-    _HDR_LEFT   = PatternFill("solid", fgColor="1E293B") # Slate Header
-    _HDR_FILL   = PatternFill("solid", fgColor="1C3D82") # Royal Sapphire Blue
-    _TOT_FILL   = PatternFill("solid", fgColor="E2E8F0") # Slate Total
-    _BORDER     = Border(
-        left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
-        top=Side(style="thin", color="CBD5E1"), bottom=Side(style="thin", color="CBD5E1")
+    # PROFESSIONAL CEO-FRIENDLY STYLING PALETTE - Much Better Design
+    _TITLE_FILL = PatternFill("solid", fgColor="2E8B8B")   # Professional Teal Header (like CEO table)
+    _HDR_FILL   = PatternFill("solid", fgColor="3B82A6")   # Refined Blue Header  
+    _HDR_SUB    = PatternFill("solid", fgColor="E0F2F1")   # Light Mint Sub-header
+    _TOT_FILL   = PatternFill("solid", fgColor="B8E6E6")   # Light Teal Total Row
+    _ROW_WHITE  = PatternFill("solid", fgColor="FFFFFF")   # Clean White
+    _ROW_ALT    = PatternFill("solid", fgColor="F8FFFE")   # Very Light Teal Alternate
+    
+    _BORDER = Border(
+        left=Side(style="thin", color="90A4AE"), 
+        right=Side(style="thin", color="90A4AE"),
+        top=Side(style="thin", color="90A4AE"), 
+        bottom=Side(style="thin", color="90A4AE")
     )
+    
     _DOUBLE_BOT = Border(
-        left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
-        top=Side(style="thin", color="94A3B8"), bottom=Side(style="double", color="0B132B")
+        left=Side(style="thin", color="90A4AE"), 
+        right=Side(style="thin", color="90A4AE"),
+        top=Side(style="thin", color="78909C"), 
+        bottom=Side(style="double", color="37474F")
     )
+    
+    # PROFESSIONAL TYPOGRAPHY - Arial instead of Segoe UI
+    font_title = Font(name="Arial", size=12, bold=True, color="FFFFFF")   # Clean white title
+    font_hdr   = Font(name="Arial", size=10, bold=True, color="FFFFFF")   # Clean white header
+    font_sub   = Font(name="Arial", size=9, bold=True, color="37474F")    # Elegant dark gray
+    font_data  = Font(name="Arial", size=9, color="263238")               # Professional dark
+    font_bold  = Font(name="Arial", size=9, bold=True, color="263238")    # Professional bold
+    font_tot   = Font(name="Arial", size=10, bold=True, color="1B5E20")   # Professional green total
+    
+    # PERFORMANCE COLOR CODING - More Elegant and Professional
+    font_excellent = Font(name="Arial", size=9, bold=True, color="2E7D32")  # Forest Green (<2h)
+    font_good      = Font(name="Arial", size=9, bold=True, color="1976D2")  # Professional Blue (2-4h)  
+    font_normal    = Font(name="Arial", size=9, color="546E7A")             # Elegant Gray (4-8h)
+    font_poor      = Font(name="Arial", size=9, bold=True, color="D32F2F")  # Professional Red (>8h)
+    font_commission = Font(name="Arial", size=9, bold=True, color="2E7D32") # Success Green
+    font_vtt        = Font(name="Arial", size=9, bold=True, color="1565C0") # VTT tag blue
 
-    font_title = Font(name="Segoe UI", size=11, bold=True, color="FFFFFF")
-    font_hdr   = Font(name="Segoe UI", size=8.5, bold=True, color="FFFFFF")
-    font_data  = Font(name="Segoe UI", size=8.5, color="0F172A")
-    font_bold  = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")
-    font_tot   = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
-    font_vtt   = Font(name="Segoe UI", size=8.5, bold=True, color="059669") # Emerald Green for VTT
-    font_green = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")
-    font_red   = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626")
-    font_tot_comm = Font(name="Segoe UI", size=9.5, bold=True, color="047857")
 
     date_str = today.strftime('%d/%m/%Y')
     label_upper = target_label.upper().strip()
@@ -616,7 +743,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     ws1.cell(1, 13, f"METFONE EXPRESS — DAILY DELIVERY SPEED DETAIL — {date_str} (ព័ត៌មានលម្អិតល្បឿនដឹក)").font = font_title
     ws1.cell(1, 13).alignment = Alignment(horizontal="left", vertical="center")
     for c in range(13, 22):
-        ws1.cell(1, c).fill = _TITLE_LEFT
+        ws1.cell(1, c).fill = _TITLE_FILL
 
     # Row 2: Headers (Option C: Concise, clean, executive headers)
     headers_summary = [
@@ -630,7 +757,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     ]
 
     ws1.row_dimensions[2].height = 34.0
-    _HDR_UNIFIED = PatternFill("solid", fgColor="0F172A") # Single Executive Dark Navy Header
+    _HDR_UNIFIED = _HDR_FILL  # Use the new professional blue header
 
     # Executive Summary Headers (Cols A to K: 1 to 11) - One single unified professional header
     for ci, h in enumerate(headers_summary, 1):
@@ -665,16 +792,16 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
 
     sorted_branches = sorted(summary_data.values(), key=calc_speed_sort_key)
 
-    # Vivid text fonts & highlights matching reference image
-    font_po        = Font(name="Segoe UI", size=8.5, bold=True, color="0F172A")    # Post office (dark blue bold)
-    font_delivered = Font(name="Segoe UI", size=8.5, bold=True, color="2563EB")    # Delivered (410) (vivid blue)
-    font_u2h       = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")    # < 2 Hours (+50%) (emerald green)
-    font_2_4h      = Font(name="Segoe UI", size=8.5, bold=True, color="0284C7")    # 2-4 Hours (+25%) (sky blue / cyan)
-    font_4_8h      = Font(name="Segoe UI", size=8.5, bold=False, color="64748B")   # 4-8 Hours (Normal) (slate gray)
-    font_o8h       = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626")    # > 8 Hours (-25%) (vivid red)
-    font_pct_good  = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")    # % < 8h (emerald green)
-    font_pct_bad   = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626")    # % > 8h (vivid red)
-    font_comm      = Font(name="Segoe UI", size=8.5, bold=True, color="16A34A")    # Commission ($) (emerald green)
+    # PROFESSIONAL PERFORMANCE FONTS - Updated
+    font_po        = font_bold                             # Post office  
+    font_delivered = Font(name="Arial", size=9, bold=True, color="1976D2")    # Delivered (blue)
+    font_u2h       = font_excellent                        # < 2 Hours (forest green)
+    font_2_4h      = font_good                            # 2-4 Hours (professional blue)
+    font_4_8h      = font_normal                          # 4-8 Hours (elegant gray)
+    font_o8h       = font_poor                            # > 8 Hours (professional red)
+    font_pct_good  = font_excellent                       # % < 8h (forest green)
+    font_pct_bad   = font_poor                            # % > 8h (professional red)
+    font_comm      = font_commission                      # Commission ($) (success green)
 
     for stats in sorted_branches:
         ws1.row_dimensions[r_sum].height = 19.0
@@ -682,15 +809,12 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
         tot_b = stats["total_delivered"]
         total_orders = need_cnt + tot_b
 
-        # Fixed percentage calculation: include pending orders in denominator
+        # KPI calculation: percentage based on completed delivered orders (or total orders)
         on_time_delivered = stats["under_2h"] + stats["between_2_4h"] + stats["between_4_8h"]
         slow_delivered = stats["over_8h"]
-        
-        # For correct KPI: % <8h = delivered_fast / (pending + delivered)
-        # % >8h = (delivered_slow + pending_orders) / (pending + delivered)  
-        # Note: All pending orders are considered "slow" since they haven't been completed yet
-        pct_under_8h = (on_time_delivered / total_orders * 100.0) if total_orders > 0 else 0.0
-        pct_over_8h = ((slow_delivered + need_cnt) / total_orders * 100.0) if total_orders > 0 else 0.0
+
+        pct_under_8h = (on_time_delivered / tot_b * 100.0) if tot_b > 0 else 0.0
+        pct_over_8h = (slow_delivered / tot_b * 100.0) if tot_b > 0 else 0.0
 
         str_pct_u8 = f"{pct_under_8h:.1f}%"
         str_pct_o8 = f"{pct_over_8h:.1f}%"
@@ -709,7 +833,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
             f"${stats['total_commission']:.2f}"
         ]
 
-        row_bg = PatternFill("solid", fgColor="F8FAFC" if (n_idx % 2 == 0) else "FFFFFF")
+        row_bg = _ROW_ALT if (n_idx % 2 == 0) else _ROW_WHITE
 
         for ci, val in enumerate(s_vals, 1):
             cell = ws1.cell(r_sum, ci, val)
@@ -755,11 +879,11 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
         n_idx += 1
 
     # Executive Summary Grand Total (Cols A to K) - Clean Unified Accounting Finish
-    _TOT_SUM_FILL = PatternFill("solid", fgColor="E2E8F0") # Soft slate accounting row
+    _TOT_SUM_FILL = _TOT_FILL  # Use the new light teal total row
     ws1.row_dimensions[r_sum].height = 24.0
     ws1.merge_cells(start_row=r_sum, start_column=1, end_row=r_sum, end_column=2)
     tot_lbl_r = ws1.cell(r_sum, 1, "Grand Total")
-    tot_lbl_r.font = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
+    tot_lbl_r.font = font_tot
     tot_lbl_r.alignment = Alignment(horizontal="center", vertical="center")
     ws1.cell(r_sum, 1).fill = _TOT_SUM_FILL
     ws1.cell(r_sum, 1).border = _DOUBLE_BOT
@@ -769,12 +893,12 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     tot_total_orders = tot_need + tot_del
     on_time_tot = tot_u2 + tot_24 + tot_48
     
-    # Fixed Grand Total percentage calculation
-    tot_pct_u8_num = (on_time_tot / tot_total_orders * 100.0) if tot_total_orders > 0 else 0.0
+    # Grand Total percentage calculation consistent with branch rows (on delivered orders)
+    tot_pct_u8_num = (on_time_tot / tot_del * 100.0) if tot_del > 0 else 0.0
     tot_pct_u8 = f"{tot_pct_u8_num:.1f}%"
-    # Include pending orders in >8h percentage (all pending are considered "slow")
-    tot_pct_o8_num = ((tot_o8 + tot_need) / tot_total_orders * 100.0) if tot_total_orders > 0 else 0.0
+    tot_pct_o8_num = (tot_o8 / tot_del * 100.0) if tot_del > 0 else 0.0
     tot_pct_o8 = f"{tot_pct_o8_num:.1f}%"
+
 
     t_vals = [
         tot_need, tot_del, tot_u2, tot_24, tot_48, tot_o8,
@@ -787,13 +911,13 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
         cell.border = _DOUBLE_BOT
 
         if ci == 4:   # DELIVERED
-            cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="2563EB")
+            cell.font = Font(name="Arial", size=10, bold=True, color="1976D2")
         elif ci == 8: # > 8 HOURS
-            cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626" if tot_o8 > 0 else "0F172A")
+            cell.font = Font(name="Arial", size=10, bold=True, color="D32F2F" if tot_o8 > 0 else "263238")
         elif ci == 11:# COMMISSION
-            cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="166534")
+            cell.font = Font(name="Arial", size=10, bold=True, color="2E7D32")
         else:
-            cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="0F172A")
+            cell.font = font_tot
 
     # Populate Detail Rows (Cols M to U: 13 to 21)
     r_curr = 3
@@ -828,7 +952,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
             elif ci == 16:
                 cell.font = font_vtt
             elif ci in (20, 21):
-                cell.font = font_green if item["tag_color"] == "GREEN" else (font_red if item["tag_color"] == "RED" else font_data)
+                cell.font = font_excellent if item["tag_color"] == "GREEN" else (font_poor if item["tag_color"] == "RED" else font_data)
             else:
                 cell.font = font_data
         r_curr += 1
@@ -845,7 +969,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
             ws1.cell(r_curr, ci).border = _DOUBLE_BOT
 
         tot_val = ws1.cell(r_curr, 21, f"${tot_pay_left:.2f}")
-        tot_val.font = font_tot_comm
+        tot_val.font = font_commission
         tot_val.fill = _TOT_FILL
         tot_val.border = _DOUBLE_BOT
         tot_val.alignment = Alignment(horizontal="center", vertical="center")
@@ -853,17 +977,17 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
 
     # Auto-Fit Column Widths for Sheet 1
     col_widths_s1 = {
-        1: 5,   # Summary: NO
-        2: 13,  # Summary: BRANCH
-        3: 12,  # Summary: PENDING
-        4: 13,  # Summary: DELIVERED
-        5: 14,  # Summary: < 2h (+50%)
-        6: 14,  # Summary: 2-4h (+25%)
-        7: 14,  # Summary: 4-8h (Normal)
-        8: 13,  # Summary: > 8h (-25%)
-        9: 11,  # Summary: % < 8h
-        10: 11, # Summary: % > 8h
-        11: 15, # Summary: COMMISSION
+        1: 6,   # Summary: NO
+        2: 15,  # Summary: BRANCH
+        3: 16,  # Summary: PENDING
+        4: 15,  # Summary: DELIVERED
+        5: 16,  # Summary: < 2h (+50%)
+        6: 16,  # Summary: 2-4h (+25%)
+        7: 16,  # Summary: 4-8h (Normal)
+        8: 15,  # Summary: > 8h (-25%)
+        9: 13,  # Summary: % < 8h
+        10: 13, # Summary: % > 8h
+        11: 17, # Summary: COMMISSION
         12: 4,  # Spacer Gap
         13: 6,  # Detail: No
         14: 16, # Detail: Order Number
@@ -894,7 +1018,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     for col_idx, h in enumerate(base_headers, 1):
         c = ws2.cell(row=1, column=col_idx, value=h)
         c.font = font_hdr
-        c.fill = _HDR_LEFT
+        c.fill = _HDR_FILL
         c.alignment = Alignment(horizontal="center", vertical="center")
         c.border = _BORDER
 
@@ -967,7 +1091,10 @@ def render_speed_summary_image(out_xlsx):
                 cell_tgt.border = copy.copy(cell_orig.border)
                 cell_tgt.alignment = copy.copy(cell_orig.alignment)
 
-    col_widths = {1: 5, 2: 13, 3: 12, 4: 13, 5: 14, 6: 14, 7: 14, 8: 13, 9: 11, 10: 11, 11: 15}
+    col_widths = {1: 6, 2: 15, 3: 16, 4: 15, 5: 16, 6: 16, 7: 16, 8: 15, 9: 13, 10: 13, 11: 17}
+    for c, w in col_widths.items():
+        ws_sum.column_dimensions[get_column_letter(c)].width = w
+
     for c, w in col_widths.items():
         ws_sum.column_dimensions[get_column_letter(c)].width = w
 

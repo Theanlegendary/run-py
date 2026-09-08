@@ -176,10 +176,95 @@ def load_test_bills(cfg=None):
                             test_ids.add(clean_val)
             except Exception:
                 pass
-
+    
     return test_ids
 
+_penalty_lookup_map = None
+
+def load_penalty_lookup():
+    global _penalty_lookup_map
+    if _penalty_lookup_map is not None:
+        return _penalty_lookup_map
+    _penalty_lookup_map = {}
+    base_dirs = [
+        os.path.dirname(os.path.abspath(__file__)),
+        os.getcwd(),
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ]
+    lookup_file = None
+    for d in base_dirs:
+        p = os.path.join(d, "pickup_branch_lookup.csv")
+        if os.path.exists(p):
+            lookup_file = p
+            break
+    if lookup_file:
+        try:
+            df_l = pd.read_csv(lookup_file, dtype=str)
+            for _, row in df_l.iterrows():
+                pk = str(row.get('Pickup Branch', '') or '').strip().upper()
+                bc = str(row.get('Branch Code', '') or '').strip().upper()
+                category = str(row.get('Category', '') or '').strip()
+                post_level = str(row.get('Post office level', '') or '').strip()
+                
+                # BUSINESS RULE: Only penalize actual Post Offices, NOT agents or showrooms
+                if category in ('Agent', 'Showroom') or post_level in ('Agent', 'Showroom'):
+                    # Skip agents and showrooms - they should not be penalized
+                    continue
+                    
+                if pk and bc:
+                    _penalty_lookup_map[pk] = bc
+        except Exception:
+            pass
+    return _penalty_lookup_map
+
+
+def map_po_to_main(raw_code):
+    if not raw_code or str(raw_code).strip().upper() in ('', 'NAN'):
+        return None
+    c = str(raw_code).strip().upper()
+    if c in MAIN_36_BRANCHES:
+        return c
+    lk = load_penalty_lookup()
+    mapped = lk.get(c)
+    if mapped and mapped in MAIN_36_BRANCHES:
+        return mapped
+    
+    # If no mapping found, it might be an agent/showroom - check the category
+    try:
+        import pandas as pd
+        base_dirs = [
+            os.path.dirname(os.path.abspath(__file__)),
+            os.getcwd(),
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ]
+        lookup_file = None
+        for d in base_dirs:
+            p = os.path.join(d, "pickup_branch_lookup.csv")
+            if os.path.exists(p):
+                lookup_file = p
+                break
+        if lookup_file:
+            df = pd.read_csv(lookup_file, dtype=str)
+            row = df[df['Pickup Branch'].str.upper() == c]
+            if len(row) > 0:
+                category = str(row['Category'].iloc[0]).strip()
+                post_level = str(row['Post office level'].iloc[0]).strip()
+                if category in ('Agent', 'Showroom') or post_level in ('Agent', 'Showroom'):
+                    # This is an agent/showroom - should not be penalized
+                    return None
+    except:
+        pass
+    
+    # Fallback to prefix matching only for actual post offices
+    prefix = c[:3]
+    for b in MAIN_36_BRANCHES:
+        if b.startswith(prefix):
+            return b
+    return c
+
+
 def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None):
+
     """
     CEO Executive Penalty Dashboard:
       - Sorted: From WORST performing branch (% On-Time) to BEST
@@ -250,10 +335,16 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
                 act_po = str(r.get(col, '') or '').strip().upper()
                 if act_po and act_po not in ('NAN', 'MEGA1', 'DVCMEGA1') and 'HUB' not in act_po:
                     return act_po
-        # 2. If status is 210, check ACTION POST OFFICE (under STATUS 210 TIME)
+        # 2. If status is 210, check CURRENT POST OFFICE first, then ACTION POST OFFICE
         elif sc_val == '210':
+            # For status 210, the current post office is responsible for the delay
+            curr_po = str(r.get(col_orig_po, '') or '').strip().upper()
+            if curr_po and curr_po not in ('NAN', 'MEGA1', 'DVCMEGA1') and 'HUB' not in curr_po:
+                return curr_po
+            
+            # Fallback to ACTION POST OFFICE
             act_po = str(r.get('ACTION POST OFFICE', '') or '').strip().upper()
-            if act_po and act_po != 'NAN':
+            if act_po and act_po not in ('NAN', 'MEGA1', 'DVCMEGA1') and 'HUB' not in act_po:
                 return act_po
         # 3. If status is 302 or 310, check ACTION POST OFFICE.1 then ACTION POST OFFICE
         elif sc_val in ('302', '310'):
@@ -322,14 +413,8 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         except Exception:
             pass
 
-    def map_po_to_main(raw_code):
-        c = str(raw_code).strip().upper()
-        if not c or c == 'NAN':
-            return None
-        return c
-
     # EXCLUDE ONLY TERMINAL / COMPLETED / CANCELLED STATUSES (matching old report)
-    excluded_statuses = {'410', '520', '201', '99', '100', '-99'}
+    excluded_statuses = {'410', '520', '201', '99', '100', '-99', '999', '-1', '000'}  # Added deletion patterns
     active_df = df[~df['sc'].isin(excluded_statuses)].copy()
 
     # Also exclude delivered / returned keywords in status text
@@ -337,7 +422,99 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         for kw in ['GIAO THÀNH CÔNG', 'DELIVERED', 'COMPLETED', 'ĐÃ GIAO', 'DA GIAO', 'RETURN COMPLETED']:
             active_df = active_df[~active_df[col_status].astype(str).str.upper().str.contains(kw, na=False)].copy()
 
-    print(f"DEBUG: Excluded {len(df) - len(active_df)} delivered/completed orders (status 410, 520, etc.)")
+    # EXCLUDE TEST BILLS - ULTRA COMPREHENSIVE FILTERING TO PREVENT ANY ISSUES
+    test_keywords = [
+        'TEST', 'DEMO', 'SAMPLE', 'DEBUG', 'CUSTOMER',  # Basic test keywords
+        'TESTING', 'TRY', 'TRIAL', 'DUMMY', 'FAKE',     # Additional test patterns
+        'EXPERIMENT', 'CHECK', 'VALIDATE', 'VERIFY'     # Validation keywords
+    ]
+    
+    initial_count = len(active_df)
+    
+    # 1. EXCLUDE BY BILL NUMBER PATTERNS (3K bills, test patterns)
+    if 'ORDER ID' in active_df.columns:
+        # Filter out 3K bills (bills starting with 3K, 3000K, etc.)
+        active_df = active_df[~active_df['ORDER ID'].astype(str).str.upper().str.contains(r'^3K|^3000K|^30K', na=False, regex=True)].copy()
+        
+        # Filter out other test bill patterns
+        test_bill_patterns = [r'TEST\d+', r'DEMO\d+', r'TRY\d+', r'DEBUG\d+']
+        for pattern in test_bill_patterns:
+            active_df = active_df[~active_df['ORDER ID'].astype(str).str.upper().str.contains(pattern, na=False, regex=True)].copy()
+    
+    # 2. EXCLUDE BY RECEIVER NAMES - ENHANCED PATTERN DETECTION
+    if 'RECEIVER' in active_df.columns:
+        for kw in test_keywords:
+            active_df = active_df[~active_df['RECEIVER'].astype(str).str.upper().str.contains(kw, na=False)].copy()
+        
+        # CRITICAL: Exclude the specific test receiver patterns found in data
+        problematic_receiver_patterns = [
+            r'\bCUSTOMER\b',                    # Generic "Customer"
+            r'^\d{9} - CUSTOMER$',              # Pattern: 069444475 - Customer
+            r'^\d{9} - CUSTOMER\s*$',           # Pattern: 066609658 - Customer (with trailing space)
+            r'^\d{9}\s*-\s*CUSTOMER\s*$',       # Flexible spacing around hyphen
+            r'^\d{8,10}\s*-\s*CUSTOMER\s*$',   # Any 8-10 digit number + Customer
+            r'\bTEST.*USER\b',                  # Test user patterns
+            r'\bDUMMY.*USER\b',                 # Dummy user patterns
+            r'^\d{10} - [A-Z]$',                # Single letter names (likely truncated/test)
+            r'^[A-Z]\s*$',                      # Just single letters
+            r'^\d+\s*-\s*[A-Z]\s*$',          # Number - Single Letter
+        ]
+        
+        for pattern in problematic_receiver_patterns:
+            before_count = len(active_df)
+            active_df = active_df[~active_df['RECEIVER'].astype(str).str.upper().str.contains(pattern, na=False, regex=True)].copy()
+            excluded = before_count - len(active_df)
+            if excluded > 0:
+                print(f"DEBUG: Excluded {excluded} bills with receiver pattern: {pattern}")
+    
+    # 3. EXCLUDE BY SENDER NAMES
+    if 'SENDER' in active_df.columns:
+        for kw in test_keywords:
+            active_df = active_df[~active_df['SENDER'].astype(str).str.upper().str.contains(kw, na=False)].copy()
+    
+    # 4. EXCLUDE BY CONTENT/DESCRIPTION
+    desc_cols = ['DESCRIPTION', 'CONTENT', 'ITEM_DESC', 'GOODS_DESC', 'NOTE']
+    for desc_col in desc_cols:
+        if desc_col in active_df.columns:
+            for kw in test_keywords:
+                active_df = active_df[~active_df[desc_col].astype(str).str.upper().str.contains(kw, na=False)].copy()
+    
+    # 5. EXCLUDE BILLS WITH SUSPICIOUS AMOUNTS (likely test data)
+    if 'TOTAL FEE (USD) (4)=(1)+(2)-(3)' in active_df.columns:
+        # Filter out bills with exactly $1.00, $0.01, $999.99 etc (common test amounts)
+        test_amounts = [1.0, 0.01, 999.99, 1234.56, 0.1, 10.0]
+        for amt in test_amounts:
+            active_df = active_df[active_df['TOTAL FEE (USD) (4)=(1)+(2)-(3)'] != amt].copy()
+    
+    # 6. EXCLUDE BY STATUS DESCRIPTION KEYWORDS (deletion/cancellation indicators)
+    if col_status in active_df.columns:
+        deletion_keywords = [
+            'XÓA', 'DELETE', 'DELETED', 'HỦY', 'CANCEL', 'CANCELLED',
+            'REMOVE', 'REMOVED', 'VOID', 'INVALID', 'TEST', 'DEMO'
+        ]
+        for kw in deletion_keywords:
+            before_count = len(active_df)
+            active_df = active_df[~active_df[col_status].astype(str).str.upper().str.contains(kw, na=False)].copy()
+            excluded = before_count - len(active_df)
+            if excluded > 0:
+                print(f"DEBUG: Excluded {excluded} bills with status keyword: {kw}")
+    
+    # 7. EXCLUDE BILLS WITH EXTREMELY SHORT RECEIVER NAMES (likely test data)
+    if 'RECEIVER' in active_df.columns:
+        before_count = len(active_df)
+        # Exclude receivers with 2 or fewer characters (excluding spaces)
+        active_df = active_df[active_df['RECEIVER'].astype(str).str.replace(' ', '').str.len() > 2].copy()
+        excluded = before_count - len(active_df)
+        if excluded > 0:
+            print(f"DEBUG: Excluded {excluded} bills with extremely short receiver names")
+    
+    test_excluded = initial_count - len(active_df)
+    if test_excluded > 0:
+        print(f"DEBUG: Total excluded test/demo/deleted orders: {test_excluded} (ultra-comprehensive filtering)")
+    else:
+        print(f"DEBUG: No test bills found to exclude")
+
+    print(f"DEBUG: Excluded {len(df) - len(active_df)} delivered/completed/test orders (status 410, 520, etc.)")
     print(f"DEBUG: Active orders for penalty analysis: {len(active_df)}")
 
     customer_delay_statuses = {'420', '471', '472', '480'}
@@ -381,7 +558,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         is_handover = not (is_delivery or is_return)
 
         if is_return:
-            # Return penalty MUST NOT go to sender! It goes to the last guy who scan (curr_po / CURRENT POST OFFICE)
+            # Return penalty goes to current Post Office (who has the package)
             raw_po = curr_po
             if not raw_po or raw_po in ('MEGA1', 'DVCMEGA1') or 'HUB' in raw_po:
                 for col in ['ACTION POST OFFICE.4', 'ACTION POST OFFICE.3', 'ACTION POST OFFICE.2', 'ACTION POST OFFICE.1', 'ACTION POST OFFICE']:
@@ -390,17 +567,34 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
                         raw_po = cand
                         break
         elif is_delivery:
+            # Delivery penalty goes to delivery Post Office
             raw_po = deliv_po
         else:
+            # FIXED: Handover penalty should go to CURRENT Post Office (not sender!)
+            # The Post Office who currently has the package is responsible for handover delays
             raw_po = curr_po
-            if raw_po in ('MEGA1', 'DVCMEGA1') or 'HUB' in raw_po:
-                for col in ['RECEIVE POST OFFICE', 'ORIGIN_POST', 'ACTION POST OFFICE']:
+            if not raw_po or raw_po in ('MEGA1', 'DVCMEGA1') or 'HUB' in raw_po:
+                # If current PO is HUB/MEGA, find the last actual Post Office
+                for col in ['ACTION POST OFFICE.4', 'ACTION POST OFFICE.3', 'ACTION POST OFFICE.2', 'ACTION POST OFFICE.1', 'ACTION POST OFFICE']:
                     cand = str(row.get(col, '') or '').strip().upper()
                     if cand and cand not in ('NAN', 'MEGA1', 'DVCMEGA1') and 'HUB' not in cand:
                         raw_po = cand
                         break
 
         if not raw_po or raw_po == 'NAN':
+            continue
+
+        # EXCLUDE HUB/MEGA FACILITIES FROM PENALTIES - These are company infrastructure, not individual Post Offices
+        if any(hub_pattern in raw_po.upper() for hub_pattern in ['MEGA1', 'DVCMEGA', 'HUB', 'DVCZ']):
+            if order_id in ('3204556387', '3304599288'):
+                print(f"  ⚠️ SKIPPING penalty - {raw_po} is a HUB/MEGA facility (infrastructure, not Post Office)")
+            continue
+
+        # ALSO EXCLUDE when bill is CURRENTLY AT hub but trying to penalty previous Post Office
+        curr_po_clean = str(row.get('curr_po_clean', '')).strip().upper()
+        if any(hub_pattern in curr_po_clean for hub_pattern in ['MEGA1', 'DVCMEGA', 'HUB', 'DVCZ']):
+            if order_id in ('3204556387', '3304599288'):
+                print(f"  ⚠️ SKIPPING penalty - Bill currently at HUB {curr_po_clean} (company infrastructure issue)")
             continue
 
         po = map_po_to_main(raw_po)
@@ -487,6 +681,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
                         has_customer_problem = True
                         is_excused = True
                         risk_level = f"Excluded - Customer Problem History ({status_code})"
+                        print(f"DEBUG: Excluding order {order_id} - found status {status_code} in column {col_name}")
                         break
                 if has_customer_problem:
                     break
@@ -577,16 +772,16 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     ws1.title = "INVENTORY PENALTY REPORT"
     ws1.views.sheetView[0].showGridLines = True
 
-    # ── CEO MIDNIGHT & ROYAL SAPPHIRE BLUE PALETTE ──
-    fill_title_left   = PatternFill("solid", fgColor="0F172A") # Midnight Navy
-    fill_hdr_left     = PatternFill("solid", fgColor="1E293B") # Midnight Slate
-    fill_title_right  = PatternFill("solid", fgColor="0B132B") # Deepest Midnight Navy
-    fill_sub_right    = PatternFill("solid", fgColor="1C2541") # Subtitle Midnight Slate
-    fill_hdr_right    = PatternFill("solid", fgColor="1C3D82") # Royal Sapphire Blue Header
-    fill_row_white    = PatternFill("solid", fgColor="FFFFFF") # 100% Pure White (No 2 alternating colors)
-    fill_left_tot     = PatternFill("solid", fgColor="E2E8F0") # Soft Slate Total
-    fill_sum_tot      = PatternFill("solid", fgColor="E2E8F0") # Executive Accounting Total
-    fill_penalty_pink = PatternFill("solid", fgColor="FFEAEA") # Light Pink / Soft Red for penalty cells
+    # ── CLEAN & PROFESSIONAL PALETTE (Better Readability) ──
+    fill_title_left   = PatternFill("solid", fgColor="2563EB") # Clean Blue
+    fill_hdr_left     = PatternFill("solid", fgColor="475569") # Professional Gray
+    fill_title_right  = PatternFill("solid", fgColor="1D4ED8") # Darker Blue
+    fill_sub_right    = PatternFill("solid", fgColor="3B82F6") # Medium Blue
+    fill_hdr_right    = PatternFill("solid", fgColor="64748B") # Light Gray
+    fill_row_white    = PatternFill("solid", fgColor="FFFFFF") # Pure White
+    fill_left_tot     = PatternFill("solid", fgColor="E2E8F0") # Soft Gray Total
+    fill_sum_tot      = PatternFill("solid", fgColor="E2E8F0") # Executive Total
+    fill_penalty_pink = PatternFill("solid", fgColor="FEF2F2") # Very Light Red for penalties
 
     border_clean = Border(
         left=Side(style="thin", color="CBD5E1"), right=Side(style="thin", color="CBD5E1"),
@@ -630,7 +825,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     ws1.cell(1, 1).alignment = Alignment(horizontal="left", vertical="center")
     for c in range(1, 9):
         ws1.cell(1, c).fill = fill_title_left
-    ws1.row_dimensions[1].height = 26.0
+    ws1.row_dimensions[1].height = 30.0
 
     # 2. Right Title Banner (Cols J to R)
     ws1.merge_cells("J1:R1")
@@ -640,13 +835,13 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         ws1.cell(1, c).fill = fill_title_right
 
     ws1.merge_cells("J2:R2")
-    ws1.cell(2, 10, "SLA Penalty: > 1 Day (-$0.10) | ≥ 3 Days (-$0.40) • Excludes Bills with 420/472 History").font = font_sub
+    ws1.cell(2, 10, "SLA Penalty: > 1 Day ($0.10) | ≥ 3 Days ($0.40) • Excludes Bills with 420/472 History").font = font_sub
     ws1.cell(2, 10).alignment = Alignment(horizontal="center", vertical="center")
     for c in range(10, 19):
         ws1.cell(2, c).fill = fill_sub_right
-    ws1.row_dimensions[2].height = 18.0
+    ws1.row_dimensions[2].height = 22.0
 
-    # Row 3: Headers
+    # Row 3: Headers (increase height for better readability)
     headers_left = [
         "No", "Order Number", "Customer", "Post Office (Staff)",
         "Status", "Type", "Age (Days)", "Penalty Fine ($)"
@@ -656,7 +851,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         "Total Handover", "Total Delivery", "% RIGHT Handover", "% RIGHT Delivery", "Total Penalty ($)"
     ]
 
-    ws1.row_dimensions[3].height = 26.0
+    ws1.row_dimensions[3].height = 32.0  # Increased header height
     for ci, h in enumerate(headers_left, 1):
         cell = ws1.cell(3, ci, h)
         cell.font = font_hdr
@@ -680,8 +875,8 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
 
     if overdue_rows:
         for idx, item in enumerate(overdue_rows, 1):
-            ws1.row_dimensions[r_curr].height = 18.0
-            fine_text = f"-${item['penalty_fine']:.2f}" if item['penalty_fine'] > 0 else "$0.00"
+            ws1.row_dimensions[r_curr].height = 22.0  # Increased row height for better readability
+            fine_text = f"${item['penalty_fine']:.2f}" if item['penalty_fine'] > 0 else "$0.00"  # Show as positive
             row_vals = [
                 idx,
                 item["order_number"],
@@ -708,7 +903,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             tot_fine_left += item["penalty_fine"]
             r_curr += 1
     else:
-        ws1.row_dimensions[r_curr].height = 22.0
+        ws1.row_dimensions[r_curr].height = 26.0  # Increased height for "no penalty" message
         ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=8)
         no_pen_cell = ws1.cell(r_curr, 1, "✓ No pending or penalized bills")
         no_pen_cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="16A34A")
@@ -719,7 +914,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         r_curr += 1
 
     # Left Grand Total
-    ws1.row_dimensions[r_curr].height = 24.0
+    ws1.row_dimensions[r_curr].height = 28.0  # Increased total row height
     ws1.merge_cells(start_row=r_curr, start_column=1, end_row=r_curr, end_column=2)
     pen_count = sum(1 for item in overdue_rows if item["penalty_fine"] > 0)
     gt_left = ws1.cell(r_curr, 1, f"Total Listed: {len(overdue_rows)} (Penalized: {pen_count})")
@@ -765,7 +960,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     font_pen_red  = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # Bold Red
 
     for stats in sorted_branches:
-        ws1.row_dimensions[r_sum].height = 18.0
+        ws1.row_dimensions[r_sum].height = 22.0  # Increased summary row height
         
         # Calculate RIGHT (On-Time)
         r_ho = max(0, stats["total_handover"] - stats["penalty_handover"])
@@ -829,7 +1024,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         n_idx += 1
 
     # Right Grand Total Row
-    ws1.row_dimensions[r_sum].height = 24.0
+    ws1.row_dimensions[r_sum].height = 28.0  # Increased grand total height
     ws1.merge_cells(start_row=r_sum, start_column=10, end_row=r_sum, end_column=11)
     rt_tot = ws1.cell(r_sum, 10, "Grand Total")
     rt_tot.font = font_tot
@@ -878,11 +1073,11 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         cell.border = tot_border_accounting
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Generous Column Widths
+    # Generous Column Widths (increased for better readability)
     col_widths = {
-        1: 5, 2: 15, 3: 20, 4: 22, 5: 18, 6: 10, 7: 12, 8: 15,
-        9: 4,
-        10: 5, 11: 14, 12: 15, 13: 15, 14: 15, 15: 15, 16: 16, 17: 16, 18: 16
+        1: 6, 2: 18, 3: 25, 4: 28, 5: 20, 6: 12, 7: 14, 8: 18,
+        9: 5,
+        10: 6, 11: 16, 12: 18, 13: 18, 14: 18, 15: 18, 16: 18, 17: 18, 18: 18
     }
     for c, w in col_widths.items():
         ws1.column_dimensions[get_column_letter(c)].width = w

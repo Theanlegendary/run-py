@@ -1,7 +1,92 @@
 import os
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from datetime import datetime
+from datetime import datetime, timedelta
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+def create_ceo_executive_table(ws, start_row, start_col, title, headers, data_rows, total_row=None):
+    """Create a professional CEO-style table with teal header"""
+    
+    # Define styles matching CEO table design
+    header_fill = PatternFill(start_color="2E8B8B", end_color="2E8B8B", fill_type="solid")  # Teal
+    total_fill = PatternFill(start_color="B8E6E6", end_color="B8E6E6", fill_type="solid")   # Light teal
+    white_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")   # White
+    
+    header_font = Font(name="Arial", size=10, bold=True, color="FFFFFF")  # White text
+    data_font = Font(name="Arial", size=10, color="000000")               # Black text
+    total_font = Font(name="Arial", size=11, bold=True, color="000000")   # Bold black
+    title_font = Font(name="Arial", size=12, bold=True, color="FFFFFF")   # White title
+    
+    center_align = Alignment(horizontal="center", vertical="center")
+    left_align = Alignment(horizontal="left", vertical="center") 
+    right_align = Alignment(horizontal="right", vertical="center")
+    
+    border_style = Border(
+        left=Side(style="thin", color="CCCCCC"),
+        right=Side(style="thin", color="CCCCCC"),
+        top=Side(style="thin", color="CCCCCC"),
+        bottom=Side(style="thin", color="CCCCCC")
+    )
+    
+    current_row = start_row
+    num_cols = len(headers)
+    
+    # Title row
+    ws.merge_cells(start_row=current_row, start_column=start_col, 
+                   end_row=current_row, end_column=start_col + num_cols - 1)
+    title_cell = ws.cell(row=current_row, column=start_col, value=title)
+    title_cell.font = title_font
+    title_cell.fill = header_fill
+    title_cell.alignment = center_align
+    title_cell.border = border_style
+    ws.row_dimensions[current_row].height = 25
+    current_row += 1
+    
+    # Header row
+    for col_idx, header in enumerate(headers):
+        cell = ws.cell(row=current_row, column=start_col + col_idx, value=header)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = center_align
+        cell.border = border_style
+    ws.row_dimensions[current_row].height = 40
+    current_row += 1
+    
+    # Data rows
+    for row_data in data_rows:
+        for col_idx, value in enumerate(row_data):
+            cell = ws.cell(row=current_row, column=start_col + col_idx, value=value)
+            cell.font = data_font
+            cell.fill = white_fill
+            cell.border = border_style
+            
+            if col_idx <= 1:  # Zone/Branch columns - center
+                cell.alignment = center_align
+            elif isinstance(value, (int, float)):  # Numbers - right align
+                cell.alignment = right_align
+            else:
+                cell.alignment = center_align
+                
+        ws.row_dimensions[current_row].height = 20
+        current_row += 1
+    
+    # Total row
+    if total_row:
+        for col_idx, value in enumerate(total_row):
+            cell = ws.cell(row=current_row, column=start_col + col_idx, value=value)
+            cell.font = total_font
+            cell.fill = total_fill
+            cell.border = border_style
+            
+            if col_idx == 0:
+                cell.alignment = left_align
+            elif isinstance(value, (int, float)):
+                cell.alignment = right_align
+            else:
+                cell.alignment = center_align
+        ws.row_dimensions[current_row].height = 25
+    
+    return current_row + 1
 
 def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
     """
@@ -35,6 +120,74 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
     
     # Active transit shipments only (Status 306, 309, 302, 310, 311)
     df_active = df[df['sc'].isin(['306', '309', '302', '310', '311'])].copy()
+    
+    # Deduplication: Keep only the LATEST scan row per ORDER ID
+    # TMS export has multiple rows per bill showing scan history
+    # We need the most recent status, not historical ones
+    
+    col_order_id = next((c for c in df.columns if 'ORDER ID' in c or 'BILL' in c), 'ORDER ID')
+    col_action_time = next((c for c in df.columns if 'ACTION TIME' in c or 'CURRENT TIME' in c), 'CURRENT TIME')
+    
+    # Convert action time to datetime for proper sorting
+    def parse_action_datetime(val):
+        val_str = str(val or '').strip()
+        if not val_str or val_str == 'nan':
+            return None
+        try:
+            # Your format: 07/09/2026 07:12:41
+            return datetime.strptime(val_str, '%d/%m/%Y %H:%M:%S')
+        except ValueError:
+            try:
+                return datetime.strptime(val_str[:19], '%d/%m/%Y %H:%M:%S')
+            except ValueError:
+                return None
+    
+    df_active['action_datetime'] = df_active[col_action_time].apply(parse_action_datetime)
+    
+    # Sort by order_id and action_time (latest first), then keep first (latest) record per order
+    df_active = df_active.sort_values([col_order_id, 'action_datetime'], ascending=[True, False])
+    df_active = df_active.drop_duplicates(subset=[col_order_id], keep='first')
+    
+    print(f"After deduplication: {len(df_active)} unique bills (latest scan per bill)")
+    
+    # Apply 14-day cutoff filter (same as /total mega for consistency)
+    from datetime import timedelta
+    today = datetime.now().date()
+    cutoff_date = today - timedelta(days=14)
+    
+    # Find action date column and parse dates
+    col_action_date = next((c for c in df.columns if 'ACTION TIME' in c or 'CURRENT TIME' in c), 'CURRENT TIME')
+    col_created = next((c for c in df.columns if 'CREATED' in c), 'CREATED AT')
+    
+    def parse_action_date(row):
+        action_val = str(row.get(col_action_date, '') or '')
+        created_val = str(row.get(col_created, '') or '')
+        
+        for val in [action_val, created_val]:
+            if val and val != 'nan' and len(val) > 5:
+                try:
+                    val_clean = val.strip()
+                    if '/' in val_clean and len(val_clean) >= 10:
+                        try:
+                            return datetime.strptime(val_clean[:10], '%d/%m/%Y').date()
+                        except ValueError:
+                            pass
+                    for fmt in ['%d/%m/%Y %H:%M:%S', '%d/%m/%Y %H:%M', '%Y-%m-%d %H:%M:%S']:
+                        try:
+                            return datetime.strptime(val_clean.split('.')[0], fmt).date()
+                        except ValueError:
+                            continue
+                except Exception:
+                    continue
+        return None
+    
+    df_active['parsed_date'] = df_active.apply(parse_action_date, axis=1)
+    
+    # Apply 14-day cutoff (align with /total mega)
+    df_active = df_active[
+        df_active['parsed_date'].isna() | 
+        (df_active['parsed_date'] >= cutoff_date)
+    ].copy()
 
     # Zone / Post office filtering
     tgt = target_label.upper().replace(" ", "")
@@ -60,8 +213,23 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
         target_zone_name = tgt if len(tgt) > 4 else "ZONE1"
         df_active['zone'] = df_active['dest_prov_clean'].map(zone_by_prefix).fillna("ZONE1")
         df_matched = df_active[df_active['zone'] == target_zone_name].copy()
+    # For "ALL" or "TOTAL" - show packages at DVCMEGA1 hub ONLY (exclude MEGA1)
+    # Must match /total mega DVMEGA section exactly
     elif tgt in ("ALL", "TOTAL", "MEGA", "BRANCH", "BRANCHES"):
-        df_matched = df_active.copy()
+        col_current_po = next((c for c in df.columns if 'CURRENT POST OFFICE' in c), 'CURRENT POST OFFICE')
+        
+        df_active['current_po_clean'] = df_active[col_current_po].astype(str).str.strip().str.upper()
+        
+        # ONLY DVCMEGA1 hub (EXCLUDE MEGA1) with Status 306
+        # This matches the DVMEGA section in /total mega report
+        df_matched = df_active[
+            (df_active['current_po_clean'].isin(['DVCMEGA1', 'DVCMEGA', 'DVMEGA']) | 
+             df_active['current_po_clean'].str.contains('DVCMEGA|DVMEGA', na=False)) &
+            (~df_active['current_po_clean'].isin(['MEGA1'])) &  # EXCLUDE MEGA1 
+            (df_active['sc'] == '306')  # Only Status 306 at DVCMEGA1
+        ].copy()
+        
+        print(f"DVCMEGA1 only (excluded MEGA1) + Status 306: {len(df_matched)} bills")
     elif tgt in PROVINCIAL_BRANCH_CODES or (len(tgt) == 3 and tgt in zone_by_prefix and tgt not in ("PNP", "KAN")):
         df_matched = df_active[
             (df_active['dest_prov_clean'] == tgt[:3]) |

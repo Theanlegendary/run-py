@@ -1646,8 +1646,8 @@ async def cmd_penalty(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     z_ho, z_del, z_pen, z_fine = penalty_report.build_penalty_report(src, z_xlsx, target_label=z_name, report_date=target_date)
                     z_caption = (
                         f"📊 *INVENTORY & SLA PENALTY REPORT ({z_name}{ytd_tag})*\n"
-                        f"Overdue Handover (> 4h): `{z_ho}`\n"
-                        f"Overdue Delivery (> 10h): `{z_del}`\n"
+                        f"Total Handover: `{z_ho}`\n"
+                        f"Total Delivery: `{z_del}`\n"
                         f"Penalized Bills: `{z_pen}`\n"
                         f"Total Fine: `${z_fine:.2f}`"
                     )
@@ -1688,8 +1688,8 @@ async def cmd_penalty(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         b_ho, b_del, b_pen, b_fine = penalty_report.build_penalty_report(src, br_xlsx, target_label=br_code, report_date=target_date)
                         b_caption = (
                             f"📊 *INVENTORY & SLA PENALTY REPORT ({br_code}{ytd_tag})*\n"
-                            f"Overdue Handover (> 4h): `{b_ho}`\n"
-                            f"Overdue Delivery (> 10h): `{b_del}`\n"
+                            f"Total Handover: `{b_ho}`\n"
+                            f"Total Delivery: `{b_del}`\n"
                             f"Penalized Bills: `{b_pen}`\n"
                             f"Total Fine: `${b_fine:.2f}`"
                         )

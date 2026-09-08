@@ -84,6 +84,21 @@ def _has_khmer(text: str) -> bool:
     """Return True if text contains any Khmer Unicode characters (U+1780–U+17FF)."""
     return any('\u1780' <= ch <= '\u17FF' for ch in text)
 
+def _is_corrupted_khmer(text: str) -> bool:
+    """Detect corrupted/truncated Khmer text that will display as black glitches."""
+    if not _has_khmer(text):
+        return False
+    
+    # Count Khmer characters
+    khmer_chars = [c for c in text if '\u1780' <= c <= '\u17FF']
+    
+    # If very short text with only 1-2 isolated Khmer chars, it's likely corrupted
+    if len(khmer_chars) <= 2 and len(text) < 20:
+        # Examples: "0882031979 - ដ", "0886340998 - ស"
+        return True
+        
+    return False
+
 def _load_font(size, bold=False):
     # Try system paths first
     for name in (['arialbd.ttf', 'Arial Bold.ttf', 'DejaVuSans-Bold.ttf'] if bold
@@ -107,6 +122,11 @@ def _load_khmer_font(size):
 
 def _get_font(text: str, size: int, bold: bool = False):
     """Return Khmer font if text has Khmer chars, otherwise return normal font."""
+    # Skip corrupted/truncated Khmer to prevent black glitches
+    if _is_corrupted_khmer(text):
+        # Use regular font for corrupted Khmer to avoid display issues
+        return _load_font(size, bold)
+        
     if _has_khmer(text):
         # Khmer fonts are slightly smaller, boost size dynamically based on scale
         return _load_khmer_font(size + int(1.5 * SCALE))
@@ -117,14 +137,21 @@ def excel_to_image(xlsx_path: str) -> io.BytesIO:
     # ── Try Excel COM rendering first (for perfect Khmer text shaping and native styling on Windows) ──
     try:
         import win32com.client
+        import pythoncom
         import time
         import os
         from PIL import ImageGrab
         
+        try:
+            pythoncom.CoInitialize()
+        except Exception:
+            pass
+
         abs_path = os.path.abspath(xlsx_path)
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = False
         excel.DisplayAlerts = False
+
         
         wb = None
         try:
@@ -323,9 +350,6 @@ def excel_to_image(xlsx_path: str) -> io.BytesIO:
                 bold = _cell_bold(ws.cell(r, c))
                 f = _get_font(text, FONT_SIZE, bold)
                 stroke_w = 0
-                if bold and _has_khmer(text):
-                    # Simulate bold for Khmer OS fonts using a stroke outline
-                    stroke_w = max(1, int(0.4 * SCALE))
                 try:
                     bb = d.textbbox((0, 0), text, font=f, stroke_width=stroke_w)
                     w  = bb[2] - bb[0]
@@ -407,9 +431,6 @@ def excel_to_image(xlsx_path: str) -> io.BytesIO:
             if text:
                 f = _get_font(text, FONT_SIZE, bold)
                 stroke_w = 0
-                if bold and _has_khmer(text):
-                    # Simulate bold for Khmer OS fonts using a stroke outline
-                    stroke_w = max(1, int(0.4 * SCALE))
                 try:
                     bb = draw.textbbox((0, 0), text, font=f, stroke_width=stroke_w)
                     tw, th = bb[2] - bb[0], bb[3] - bb[1]

@@ -35,6 +35,74 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
     
     # Active transit shipments only (Status 306, 309, 302, 310, 311)
     df_active = df[df['sc'].isin(['306', '309', '302', '310', '311'])].copy()
+    
+    # Deduplication: Keep only the LATEST scan row per ORDER ID
+    # TMS export has multiple rows per bill showing scan history
+    # We need the most recent status, not historical ones
+    
+    col_order_id = next((c for c in df.columns if 'ORDER ID' in c or 'BILL' in c), 'ORDER ID')
+    col_action_time = next((c for c in df.columns if 'ACTION TIME' in c or 'CURRENT TIME' in c), 'CURRENT TIME')
+    
+    # Convert action time to datetime for proper sorting
+    def parse_action_datetime(val):
+        val_str = str(val or '').strip()
+        if not val_str or val_str == 'nan':
+            return None
+        try:
+            # Your format: 07/09/2026 07:12:41
+            return datetime.strptime(val_str, '%d/%m/%Y %H:%M:%S')
+        except ValueError:
+            try:
+                return datetime.strptime(val_str[:19], '%d/%m/%Y %H:%M:%S')
+            except ValueError:
+                return None
+    
+    df_active['action_datetime'] = df_active[col_action_time].apply(parse_action_datetime)
+    
+    # Sort by order_id and action_time (latest first), then keep first (latest) record per order
+    df_active = df_active.sort_values([col_order_id, 'action_datetime'], ascending=[True, False])
+    df_active = df_active.drop_duplicates(subset=[col_order_id], keep='first')
+    
+    print(f"After deduplication: {len(df_active)} unique bills (latest scan per bill)")
+    
+    # Apply 14-day cutoff filter (same as /total mega for consistency)
+    from datetime import timedelta
+    today = datetime.now().date()
+    cutoff_date = today - timedelta(days=14)
+    
+    # Find action date column and parse dates
+    col_action_date = next((c for c in df.columns if 'ACTION TIME' in c or 'CURRENT TIME' in c), 'CURRENT TIME')
+    col_created = next((c for c in df.columns if 'CREATED' in c), 'CREATED AT')
+    
+    def parse_action_date(row):
+        action_val = str(row.get(col_action_date, '') or '')
+        created_val = str(row.get(col_created, '') or '')
+        
+        for val in [action_val, created_val]:
+            if val and val != 'nan' and len(val) > 5:
+                try:
+                    val_clean = val.strip()
+                    if '/' in val_clean and len(val_clean) >= 10:
+                        try:
+                            return datetime.strptime(val_clean[:10], '%d/%m/%Y').date()
+                        except ValueError:
+                            pass
+                    for fmt in ['%d/%m/%Y %H:%M:%S', '%d/%m/%Y %H:%M', '%Y-%m-%d %H:%M:%S']:
+                        try:
+                            return datetime.strptime(val_clean.split('.')[0], fmt).date()
+                        except ValueError:
+                            continue
+                except Exception:
+                    continue
+        return None
+    
+    df_active['parsed_date'] = df_active.apply(parse_action_date, axis=1)
+    
+    # Apply 14-day cutoff (align with /total mega)
+    df_active = df_active[
+        df_active['parsed_date'].isna() | 
+        (df_active['parsed_date'] >= cutoff_date)
+    ].copy()
 
     # Zone / Post office filtering
     tgt = target_label.upper().replace(" ", "")
@@ -60,8 +128,23 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
         target_zone_name = tgt if len(tgt) > 4 else "ZONE1"
         df_active['zone'] = df_active['dest_prov_clean'].map(zone_by_prefix).fillna("ZONE1")
         df_matched = df_active[df_active['zone'] == target_zone_name].copy()
+    # For "ALL" or "TOTAL" - show packages at DVCMEGA1 hub ONLY (exclude MEGA1)
+    # Must match /total mega DVMEGA section exactly
     elif tgt in ("ALL", "TOTAL", "MEGA", "BRANCH", "BRANCHES"):
-        df_matched = df_active.copy()
+        col_current_po = next((c for c in df.columns if 'CURRENT POST OFFICE' in c), 'CURRENT POST OFFICE')
+        
+        df_active['current_po_clean'] = df_active[col_current_po].astype(str).str.strip().str.upper()
+        
+        # ONLY DVCMEGA1 hub (EXCLUDE MEGA1) with Status 306
+        # This matches the DVMEGA section in /total mega report
+        df_matched = df_active[
+            (df_active['current_po_clean'].isin(['DVCMEGA1', 'DVCMEGA', 'DVMEGA']) | 
+             df_active['current_po_clean'].str.contains('DVCMEGA|DVMEGA', na=False)) &
+            (~df_active['current_po_clean'].isin(['MEGA1'])) &  # EXCLUDE MEGA1 
+            (df_active['sc'] == '306')  # Only Status 306 at DVCMEGA1
+        ].copy()
+        
+        print(f"DVCMEGA1 only (excluded MEGA1) + Status 306: {len(df_matched)} bills")
     elif tgt in PROVINCIAL_BRANCH_CODES or (len(tgt) == 3 and tgt in zone_by_prefix and tgt not in ("PNP", "KAN")):
         df_matched = df_active[
             (df_active['dest_prov_clean'] == tgt[:3]) |
