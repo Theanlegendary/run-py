@@ -462,8 +462,14 @@ def build_section_rows(df_h, index_cols, day_cols, date_col):
 def _fill(h):
     return PatternFill(start_color=h, end_color=h, fill_type='solid')
 
-def _font(name, color='000000', bold=False, size=10):
-    return Font(name=name, color=color, bold=bold, size=size)
+def _has_khmer(text: str) -> bool:
+    """Return True if text contains any Khmer Unicode characters (U+1780–U+17FF)."""
+    return any('\u1780' <= ch <= '\u17FF' for ch in str(text))
+
+def _font(name, color='000000', bold=False, size=11, text=''):
+    """Return Font object. Auto-switches to Khmer UI if text contains Khmer chars."""
+    font_name = 'Khmer UI' if _has_khmer(text) else name
+    return Font(name=font_name, color=color, bold=bold, size=size)
 
 def _align(h='center', v='center', wrap=False):
     return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
@@ -504,12 +510,12 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
 
     # Row 1 — Title Row
     r = start_row
-    ws.row_dimensions[r].height = 24
+    ws.row_dimensions[r].height = 28
     today_str = datetime.now().strftime("%d/%m/%Y %H:%M")
     report_name_kh = translate_header(report_name)
     title_text = f"{report_name_kh} — {handle} — {today_str}" if handle else f"{report_name_kh} — {today_str}"
     tc = ws.cell(r, start_col, title_text)
-    tc.font      = _font(fn, t_fg, bold=True, size=11)
+    tc.font      = _font(fn, t_fg, bold=True, size=12, text=title_text)
     tc.fill      = _fill(t_bg)
     tc.alignment = _align('center')
     tc.border    = bdr
@@ -523,8 +529,8 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
 
     # Row 2 — Month Row (merged per month group)
     # Row 3 — Day Number Row
-    ws.row_dimensions[r].height = 20
-    ws.row_dimensions[r + 1].height = 20
+    ws.row_dimensions[r].height = 22
+    ws.row_dimensions[r + 1].height = 22
 
     # 1. Pre-fill and style all cells in both header rows
     for ci in range(n):
@@ -542,7 +548,9 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
         is_index = (ci < len(padded_index))
         is_gt = (ci == n - 1)
         if is_index or is_gt:
-            ws.cell(r, col_idx, translate_header(col_name))
+            hdr_text = translate_header(col_name)
+            ws.cell(r, col_idx, hdr_text)
+            ws.cell(r, col_idx).font = _font(fn, h_fg, bold=False, text=hdr_text)
             ws.merge_cells(start_row=r, end_row=r + 1, start_column=col_idx, end_column=col_idx)
 
     # 3. Write day numbers on Row r + 1 (day number row) for day columns
@@ -567,7 +575,9 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
         month_groups.append((current_month, group_start, start_col + n - 2))
 
     for (yr, mo), start_c, end_c in month_groups:
-        ws.cell(r, start_c, get_khmer_month_name(mo))
+        month_text = get_khmer_month_name(mo)
+        ws.cell(r, start_c, month_text)
+        ws.cell(r, start_c).font = _font(fn, h_fg, bold=False, text=month_text)
         if end_c > start_c:
             ws.merge_cells(start_row=r, end_row=r, start_column=start_c, end_column=end_c)
 
@@ -578,7 +588,7 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
     highlight_fill = _fill(HIGHLIGHT_COLOR)
 
     for row_dict in rows:
-        ws.row_dimensions[r].height = 20
+        ws.row_dimensions[r].height = 22
         is_total = str(row_dict.get(index_cols[0], '')).strip() == 'Grand Total'
 
         # STRICT USER DIRECTIVE: Row fill is red ONLY if the date column in the table is 2+ days ago (older than yesterday).
@@ -602,6 +612,7 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
             val  = row_dict.get(col_name, '')
             cell = ws.cell(r, start_col + ci, val if val != '' else None)
             cell.border = bdr
+            val_str = str(val) if val is not None else ''
 
             # Row-level fill
             row_fill = None
@@ -613,38 +624,34 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
                 row_fill = _fill("FFEBEB")  # Light red row fill ONLY for 2+ days ago or return status
 
             cell_fill = row_fill
-            cell_font = _font(fn, '1E293B', bold=False)
+            cell_font = _font(fn, '1E293B', bold=False, text=val_str)
             cell_align = _align('center')
 
             # ========== VIP COLUMN HIGHLIGHTING ==========
-            # If this is the VIP column and cell has "VIP", use red text only
-            if col_name == 'VIP' and str(val).strip() == 'VIP':
-                # Keep row background color (no special fill)
-                # Just change text to red
-                cell_font = _font(fn, 'EF4444', bold=True)  # Red text, bold
+            if col_name == 'VIP' and val_str.strip() == 'VIP':
+                cell_font = _font(fn, 'EF4444', bold=True, text=val_str)
             # ========== END VIP HIGHLIGHTING ==========
 
             if is_total:
                 if row_fill:
                     cell.fill = row_fill
-                cell.font      = _font(fn, RED if col_name == 'Grand Total' or col_name in index_cols else '0F172A', bold=True)
+                cell.font = _font(fn, RED if col_name == 'Grand Total' or col_name in index_cols else '0F172A', bold=True, text=val_str)
             elif col_name == 'Age':
-                val_str = str(val or '').strip()
                 match = re.search(r'(\d+)\s*h(?:\s*(\d+)\s*m)?', val_str, re.IGNORECASE)
                 if match:
                     h_val = int(match.group(1))
                     m_val = int(match.group(2)) if match.group(2) else 0
                     t_mins = h_val * 60 + m_val
                     if status_code in ("420", "472"):
-                        cell_font = _font(fn, "065F46", bold=True)
-                    elif t_mins <= 600:  # 0-10h = Green
-                        cell_font = _font(fn, "065F46", bold=True)
-                    else:  # >10h = Red (no yellow)
-                        cell_font = _font(fn, "991B1B", bold=True)
+                        cell_font = _font(fn, "065F46", bold=True, text=val_str)
+                    elif t_mins <= 600:
+                        cell_font = _font(fn, "065F46", bold=True, text=val_str)
+                    else:
+                        cell_font = _font(fn, "991B1B", bold=True, text=val_str)
                 else:
-                    cell_font = _font(fn, '1E293B', bold=True)
+                    cell_font = _font(fn, '1E293B', bold=True, text=val_str)
             elif col_name == 'Grand Total':
-                cell_font = _font(fn, RED, bold=True)
+                cell_font = _font(fn, RED, bold=True, text=val_str)
 
             if cell_fill:
                 cell.fill = cell_fill
