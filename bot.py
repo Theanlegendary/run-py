@@ -436,6 +436,9 @@ async def safe_api_call(func, *args, **kwargs):
             log.warning(f"Flood control exceeded. Waiting for {wait_time} seconds before retrying (attempt {attempt + 1})...")
             await asyncio.sleep(wait_time + 1)
         except NetworkError as e:
+            if "chat not found" in str(e).lower():
+                log.warning(f"Chat not found: {e}. Skipping immediately (no retry).")
+                raise e
             log.warning(f"Network error: {e}. Retrying in 3 seconds (attempt {attempt + 1})...")
             await asyncio.sleep(3)
             _reset_io_buffers(args, kwargs)
@@ -443,6 +446,9 @@ async def safe_api_call(func, *args, **kwargs):
             raise e
         except Exception as e:
             error_msg = str(e)
+            if "chat not found" in error_msg.lower():
+                log.warning(f"Chat not found: {e}. Skipping immediately (no retry).")
+                raise e
             new_chat_id = _extract_migrated_chat_id(error_msg)
             if new_chat_id is not None:
                 old_chat_id = kwargs.get("chat_id")
@@ -1318,6 +1324,78 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await edit_or_send_requester_text(msg, update, context, f"Error: {e}")
             return
 
+        if zone_key == "dvc":
+            msg = await send_requester_text(update, context, "⏳ Fetching data for DVC HUB REPORT...")
+            tmpdir = tempfile.mkdtemp(prefix="dvc_")
+            track_report_dir(tmpdir)
+            stamp  = datetime.now().strftime("%d.%m_%HH%M")
+            src    = os.path.join(tmpdir, f"export_{stamp}.xlsx")
+            try:
+                msg = await edit_or_send_requester_text(msg, update, context, "⏳ [1/4] Downloading latest TMS data...")
+                await asyncio.to_thread(downloader.download_detail, cfg["api"], src, force_refresh=force_refresh)
+
+                msg = await edit_or_send_requester_text(msg, update, context, "📊 [2/4] Processing DVC Hub pivots...")
+                import pivot
+
+                rows = await asyncio.to_thread(pivot.read_source, src)
+
+                # Build full mega pivot then filter to DVC handles only
+                tree, day_keys, extra_data = await asyncio.to_thread(
+                    pivot.build_mega_pivot, rows, cfg.get("pivot", {}), cfg.get("zone_mapping", {})
+                )
+
+                # Keep only DVC-prefixed hub keys (DVCMEGA1, DVCZ12345, etc.)
+                dvc_tree = {
+                    hub: data for hub, data in tree.items()
+                    if str(hub).upper().startswith("DVC")
+                }
+
+                if not dvc_tree:
+                    await edit_or_send_requester_text(msg, update, context, "⚠️ No DVC hub data found in current export.")
+                    return
+
+                msg = await edit_or_send_requester_text(msg, update, context, "📸 [3/4] Rendering DVC Hub images...")
+                for hub, hub_data in dvc_tree.items():
+                    sub_tree = {hub: hub_data}
+                    hub_xlsx = os.path.join(tmpdir, f"Report_{hub}_{stamp}.xlsx")
+                    await asyncio.to_thread(pivot.export_mega_pivot, sub_tree, day_keys, hub_xlsx, extra_data=extra_data)
+                    try:
+                        img_buf = await asyncio.to_thread(excel_to_image.excel_to_image, hub_xlsx)
+                        img_buf.name = f"{hub}_report.png"
+                        await send_requester_photo(update, context, img_buf,
+                                                   caption=f"📦 {hub} Hub Report — {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+                    except Exception as e_img:
+                        log.warning("Failed rendering photo for %s: %s", hub, e_img)
+
+                # Build detailed Excel with all DVC orders
+                msg = await edit_or_send_requester_text(msg, update, context, "📁 [4/4] Building detailed Excel...")
+                try:
+                    import mega_detail
+                    detail_xlsx = os.path.join(tmpdir, f"DVC_Detail_{stamp}.xlsx")
+                    result_detail = await asyncio.to_thread(mega_detail.build_mega_detail, rows, detail_xlsx, cfg)
+                    total_orders  = result_detail[0] if result_detail else 0
+                    urgent_orders = result_detail[1] if result_detail else 0
+                    with open(detail_xlsx, "rb") as f:
+                        await send_requester_document(
+                            update, context, f,
+                            os.path.basename(detail_xlsx),
+                            caption=(
+                                f"📋 ទិន្នន័យលម្អិត DVC Hub {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
+                                f"Total: {total_orders} | Urgent: {urgent_orders}"
+                            ),
+                        )
+                except Exception as e:
+                    log.warning("Failed to build DVC detail Excel: %s", e)
+
+                await edit_or_send_requester_text(
+                    msg, update, context,
+                    f"✅ Done. DVC HUB REPORT {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+                )
+            except Exception as e:
+                log.exception("Error in /total dvc")
+                await edit_or_send_requester_text(msg, update, context, f"Error: {e}")
+            return
+
         if zone_key == "penalty":
             target_label = " ".join(args[1:]) if len(args) > 1 else "ALL"
             msg = await send_requester_text(update, context, f"⏳ Generating INVENTORY PENALTY REPORT ({target_label.upper()})...")
@@ -1411,7 +1489,8 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cache_dir = os.path.join(HERE, "cache")
         rev_cache = os.path.join(cache_dir, "latest_revenue.xlsx")
         mode = get_mode(cfg)
-        result = generate_report.generate_reports_from_data(
+        result = await asyncio.to_thread(
+            generate_report.generate_reports_from_data,
             src, REF_PATH, tmpdir, return_metadata=True, mode=mode,
             revenue_path=rev_cache if os.path.exists(rev_cache) else None
         )
@@ -2407,10 +2486,12 @@ async def run_time_vs(update: Update, context: ContextTypes.DEFAULT_TYPE, start_
 
     try:
         tmpdir = tempfile.mkdtemp(prefix="vs_")
-        res_1 = generate_report.generate_reports_from_data(
+        res_1 = await asyncio.to_thread(
+            generate_report.generate_reports_from_data,
             file_start[1], REF_PATH, tmpdir, return_metadata=True, mode="wide"
         )
-        res_2 = generate_report.generate_reports_from_data(
+        res_2 = await asyncio.to_thread(
+            generate_report.generate_reports_from_data,
             file_end[1], REF_PATH, tmpdir, return_metadata=True, mode="wide"
         )
         # Clean up
@@ -3183,6 +3264,43 @@ async def send_pickup_branch_export(update, context, cfg, raw_args):
     except Exception as e:
         log.exception("Error in pickup branch export")
         await edit_or_send_requester_text(msg, update, context, f"Export failed: {e}")
+
+
+@pm_required_handler
+async def cmd_trackinglog(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/trackinglog - Generates the Tracking Status Logs Report for the current month."""
+    await delete_group_command(update, context)
+    
+    msg = await private_or_current_reply(
+        update, context, "⏳ Starting Tracking Log Generation (month-to-date).\nThis will take ~1-3 minutes..."
+    )
+    
+    def update_progress(text):
+        log.info(f"TrackingLog: {text}")
+        
+    try:
+        from generate_tracking_log import generate_tracking_log_report
+        import asyncio
+        
+        # Run in thread
+        out_path = await asyncio.to_thread(generate_tracking_log_report, update_progress)
+        
+        await context.bot.send_document(
+            chat_id=msg.chat_id,
+            document=open(out_path, 'rb'),
+            caption="✅ Tracking Status Logs Generated Successfully!"
+        )
+        try:
+            await msg.delete()
+        except Exception:
+            pass
+            
+    except Exception as e:
+        log.exception("Error in /trackinglog")
+        await context.bot.send_message(
+            chat_id=msg.chat_id,
+            text=f"❌ Error generating tracking logs: {e}"
+        )
 
 
 @pm_required_handler
@@ -4774,6 +4892,37 @@ async def run_push(
                         all_branches.append(b.strip())
             zone_override_branch = ",".join(all_branches)
             zone_mode = "ZONE"
+            # The zone delivery never needs reports for unmapped offices.
+            target_handles = sorted({
+                str(handle).strip().upper()
+                for handles in total_zones.values() for handle in handles
+                if str(handle).strip()
+            })
+
+        elif zone_key_arg in ("branch", "branches", "province", "provinces"):
+            # "push branch" = all province branches only (excludes PNPP001 to PNPP014)
+            branch_handles = []
+            for zk in ["zone2", "zone3", "zone4", "zone5"]:
+                for h in total_zones.get(zk, []):
+                    if h.upper() not in branch_handles:
+                        branch_handles.append(h.upper())
+            # Also add non-PNPP handles from zone1 (KANP001, PREP001, SVAP001)
+            for h in total_zones.get("zone1", []):
+                if not h.upper().startswith("PNPP") and h.upper() not in branch_handles:
+                    branch_handles.append(h.upper())
+            target_handles = branch_handles
+            zone_mode = "BRANCHES"
+            # fetch only province branch codes
+            prov_branches = []
+            for zk in ["zone2", "zone3", "zone4", "zone5"]:
+                zb = zone_branches_map.get(zk, "")
+                for b in zb.split(","):
+                    if b.strip() and b.strip() not in prov_branches:
+                        prov_branches.append(b.strip())
+            for b in ["KAN", "PRE", "SVA"]:
+                if b not in prov_branches:
+                    prov_branches.append(b)
+            zone_override_branch = ",".join(prov_branches)
 
         elif zone_key_arg and zone_key_arg in total_zones:
             # "push zone5" = specific zone only
@@ -4789,7 +4938,7 @@ async def run_push(
 
         downloader.download_detail(cfg["api"], src, branch_code=zone_override_branch, force_refresh=force_refresh)
         msg = await edit_or_send_requester_text(
-            msg, update, context, "Download done. Generating reports..."
+            msg, update, context, "⏳ Download done. Generating reports for all branches (~1-2 mins)..."
         )
 
         if not os.path.exists(REF_PATH):
@@ -4813,9 +4962,17 @@ async def run_push(
         except Exception as e_rev:
             log.warning("Could not refresh revenue detail for /push: %s", e_rev)
 
-        result = generate_report.generate_reports_from_data(
+        zone_only_push = zone_mode == "ZONE" or (
+            zone_mode and zone_mode.startswith("ZONE") and zone_mode != "ALL"
+        )
+        result = await asyncio.to_thread(
+            generate_report.generate_reports_from_data,
             src, REF_PATH, tmpdir, return_metadata=True, mode=mode, target_handles=target_handles,
-            revenue_path=rev_cache if os.path.exists(rev_cache) else None
+            revenue_path=rev_cache if os.path.exists(rev_cache) else None,
+            # Zone forwarding builds five consolidated files below.  Avoid
+            # creating the per-handle/per-tab files that only normal Push sends.
+            render_handle_files=not zone_only_push,
+            render_final_excel=not zone_only_push,
         )
         update_webapp_cache(result)
         save_highlight_history(result)
@@ -4903,13 +5060,14 @@ async def run_push(
                     log.warning(f"Image render failed {hr['handle']}: {e}")
             await send_requester_text(update, context, hr["remark"])
 
-        with open(result["final_xlsx"], "rb") as f:
-            await send_requester_document(
-                update,
-                context,
-                f,
-                os.path.basename(result["final_xlsx"]),
-            )
+        if result.get("final_xlsx"):
+            with open(result["final_xlsx"], "rb") as f:
+                await send_requester_document(
+                    update,
+                    context,
+                    f,
+                    os.path.basename(result["final_xlsx"]),
+                )
         await send_requester_text(update, context, result["summary_caption"])
 
         # ── Forward to groups only outside test mode ──────────────────────────
@@ -4930,7 +5088,7 @@ async def run_push(
 
         # ── Zone group forwarding (push zone / push all) ────────────────────
         zone_fwd_map = cfg.get("zone_forward_mapping", {})
-        send_to_regular = zone_mode is None or zone_mode == "ALL"
+        send_to_regular = zone_mode is None or zone_mode in ("ALL", "BRANCHES")
         send_to_zones = zone_mode in ("ZONE", "ALL") or (
             zone_mode and zone_mode.startswith("ZONE") and zone_mode != "ALL"
         )
@@ -5014,97 +5172,26 @@ async def run_push(
                         zone_result["type_data"][rn] = pd.DataFrame()
 
                 try:
-                    # ── Build day_date_counts and urgent_counts for zone image ──
-                    zone_day_date_counts = {}
-                    zone_urgent_counts   = {}
-                    zone_fee_counts      = {}
-                    zone_cod_counts      = {}
-                    today_date = datetime.now().date()
-                    today_ts = pd.Timestamp.now().normalize()
-
-                    for rn in ["Pickup", "Delivery", "Transit", "Branch"]:
-                        df_z = zone_result["type_data"].get(rn)
-                        if df_z is None or df_z.empty:
-                            continue
-                        date_col_z = result.get("date_col") or (
-                            "CREATED DATE" if "CREATED DATE" in df_z.columns else
-                            "CURRENT TIME"  if "CURRENT TIME"  in df_z.columns else None
-                        )
-                        if date_col_z and date_col_z in df_z.columns:
-                            parsed_z = pd.to_datetime(df_z[date_col_z], dayfirst=True,
-                                                      format="mixed", errors="coerce")
-                            df_z = df_z.copy()
-                            df_z["_zdate"] = parsed_z.dt.date
-
-                        handle_col = "POST OFFICE HANDLE"
-                        if handle_col not in df_z.columns:
-                            continue
-
-                        df_z = df_z.copy()
-                        df_z["_h_upper"] = df_z[handle_col].fillna("").astype(str).str.strip().str.upper()
-                        df_z = df_z[df_z["_h_upper"] != ""]
-                        if df_z.empty:
-                            continue
-
-                        # 14-day date column counts
-                        date_col_z = result.get("date_col") or (
-                            "CREATED DATE" if "CREATED DATE" in df_z.columns else
-                            "CURRENT TIME"  if "CURRENT TIME"  in df_z.columns else None
-                        )
-                        if date_col_z and date_col_z in df_z.columns:
-                            parsed_z = pd.to_datetime(df_z[date_col_z], dayfirst=True, format="mixed", errors="coerce")
-                            df_z["_zdate"] = parsed_z.dt.date
-                            days_diff = (today_ts - parsed_z.dt.normalize()).dt.days
-                            df_recent = df_z[parsed_z.notna() & (days_diff <= 14)]
-                            if not df_recent.empty:
-                                date_grp = df_recent.groupby(["_h_upper", "_zdate"]).size()
-                                for (h, d_val), cnt in date_grp.items():
-                                    if h not in zone_day_date_counts:
-                                        zone_day_date_counts[h] = {}
-                                    zone_day_date_counts[h][d_val] = zone_day_date_counts[h].get(d_val, 0) + int(cnt)
-
-                        # Urgent counts (>1 day and >=3 days)
-                        if "CREATED DATE" in df_z.columns:
-                            cd_parsed = pd.to_datetime(df_z["CREATED DATE"], dayfirst=True, format="mixed", errors="coerce")
-                            days_old = (today_ts - cd_parsed.dt.normalize()).dt.days
-
-                            df_ge1 = df_z[days_old >= 1]
-                            if not df_ge1.empty:
-                                ge1_grp = df_ge1.groupby("_h_upper").size()
-                                for h, cnt in ge1_grp.items():
-                                    if h not in zone_urgent_counts:
-                                        zone_urgent_counts[h] = {"1day": 0, "3days": 0}
-                                    zone_urgent_counts[h]["1day"] += int(cnt)
-
-                            df_ge3 = df_z[days_old >= 3]
-                            if not df_ge3.empty:
-                                ge3_grp = df_ge3.groupby("_h_upper").size()
-                                for h, cnt in ge3_grp.items():
-                                    if h not in zone_urgent_counts:
-                                        zone_urgent_counts[h] = {"1day": 0, "3days": 0}
-                                    zone_urgent_counts[h]["3days"] += int(cnt)
-
-                        # Fee sum per handle
-                        fee_col = next((c for c in df_z.columns if 'FEE' in c.upper()), None)
-                        if fee_col:
-                            fee_nums = pd.to_numeric(df_z[fee_col], errors="coerce").fillna(0)
-                            df_fee = df_z[fee_nums > 0].copy()
-                            if not df_fee.empty:
-                                df_fee["_fee_val"] = fee_nums[fee_nums > 0]
-                                fee_grp = df_fee.groupby("_h_upper")["_fee_val"].sum()
-                                for h, f_v in fee_grp.items():
-                                    zone_fee_counts[h] = zone_fee_counts.get(h, 0.0) + float(f_v)
-
-                        # COD sum per handle
-                        cod_col = next((c for c in df_z.columns if 'COD' in c.upper()), None)
-                        if cod_col:
-                            cod_nums = pd.to_numeric(df_z[cod_col], errors="coerce").fillna(0)
-                            df_cod = df_z[cod_nums > 0].copy()
-                            if not df_cod.empty:
-                                df_cod["_cod_val"] = cod_nums[cod_nums > 0]
-                                cod_grp = df_cod.groupby("_h_upper")["_cod_val"].sum()
-                                for h, c_v in cod_grp.items():
-                                    zone_cod_counts[h] = zone_cod_counts.get(h, 0.0) + float(c_v)
+                    # Reuse the report generator's per-handle metrics.  These are
+                    # calculated from _scan_date (the latest status/action), which
+                    # is the same date logic used by a normal push.
+                    zone_day_date_counts = {
+                        handle: result.get("day_date_counts", {}).get(handle, {})
+                        for handle in zone_handles
+                    }
+                    zone_urgent_counts = {
+                        handle: result.get("urgent_counts", {}).get(handle, {"1day": 0, "3days": 0})
+                        for handle in zone_handles
+                    }
+                    zone_fee_counts = {
+                        handle: result.get("fee_counts", {}).get(handle, 0.0)
+                        for handle in zone_handles
+                    }
+                    zone_cod_counts = {
+                        handle: result.get("cod_counts", {}).get(handle, 0.0)
+                        for handle in zone_handles
+                    }
+                    zone_result["report_label"] = zone_label
 
                     # 1. Summary image
                     img_buf = generate_summary.build_summary_image(
@@ -6597,6 +6684,7 @@ def main():
     app.add_handler(CommandHandler("register",     cmd_register))
     app.add_handler(CommandHandler("unregister",   cmd_unregister))
     app.add_handler(CommandHandler("groups",       cmd_groups))
+    app.add_handler(CommandHandler("trackinglog",  cmd_trackinglog))
     app.add_handler(CommandHandler("export",       cmd_export))
     app.add_handler(CommandHandler("find",         cmd_find))
     app.add_handler(CommandHandler("ask",          cmd_ask))

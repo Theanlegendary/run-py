@@ -324,7 +324,7 @@ def build_mega_pivot(rows, pivot_cfg, zone_cfg):
         if po == "MEGA1":
             if status_code not in ("306", "309"):
                 continue
-        elif po in ("DVCMEGA1", "DVCMEGA", "DVMEGA") or "DVCMEGA" in po or "DVMEGA" in po:
+        elif po.startswith("DVC") or "DVCMEGA" in po or "DVMEGA" in po:
             if status_code != "306":
                 continue
         else:
@@ -342,8 +342,10 @@ def build_mega_pivot(rows, pivot_cfg, zone_cfg):
 
         if po == "MEGA1":
             hub_label = "MEGA1"
-        else:
+        elif po in ("DVCMEGA1", "DVCMEGA", "DVMEGA") or ("DVCMEGA" in po and not po.startswith("DVCZ")):
             hub_label = "DVCMEGA1"
+        else:
+            hub_label = po  # e.g. DVCZ12345 gets its own separate hub label
 
 
 
@@ -453,14 +455,14 @@ def export_mega_pivot(tree, day_keys, out_path, extra_data=None):
     thin_border = Side(style="thin", color="CBD5E1")
     cell_border = Border(left=thin_border, right=thin_border, top=thin_border, bottom=thin_border)
 
-    # Detect current hub label & status code
-    hub_keys = [h for h in ["MEGA1", "DVCMEGA1"] if h in tree and tree[h]]
+    # Detect hub label(s) dynamically — supports MEGA1, DVCMEGA1, DVCZ12345, etc.
+    hub_keys = [h for h in tree if tree[h]]
     if len(hub_keys) == 1:
         h_name = hub_keys[0]
         status_info = "(Status 309, 306)" if h_name == "MEGA1" else "(Status 306)"
         hub_title = f"{h_name} {status_info}"
     else:
-        hub_title = "MEGA (Status 306/309)"
+        hub_title = " & ".join(hub_keys) + " (Status 306)"
 
     # Filter day_keys to only dates that have orders in this tree (eliminates 25 empty columns)
     active_days = [

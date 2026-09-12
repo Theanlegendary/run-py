@@ -14,9 +14,9 @@ from PIL import Image, ImageDraw, ImageFont
 # ── Constants ──────────────────────────────────────────────────────────────────
 SCALE       = 3             # Increased from 2 to 3 for HD resolution quality
 
-FONT_SIZE   = 10 * SCALE
-ROW_H       = 22 * SCALE    # px — uniform row height
-PAD_X       = 8 * SCALE     # horizontal text padding
+FONT_SIZE   = 11 * SCALE    # Bumped from 10 to 11 for crystal clear text on mobile
+ROW_H       = 24 * SCALE    # px — breathable row height
+PAD_X       = 9 * SCALE     # horizontal text padding
 
 # Fixed pixel widths per column type
 PX_DAY      = 34 * SCALE    # day columns "01"-"31"  — all same size
@@ -100,9 +100,9 @@ def _is_corrupted_khmer(text: str) -> bool:
     return False
 
 def _load_font(size, bold=False):
-    # Try system paths first
-    for name in (['arialbd.ttf', 'Arial Bold.ttf', 'DejaVuSans-Bold.ttf'] if bold
-                 else ['arial.ttf', 'Arial.ttf', 'DejaVuSans.ttf']):
+    # Try system paths first — Segoe UI is crisp and clear on mobile screens
+    for name in (['segoeuib.ttf', 'Segoe UI Bold.ttf', 'arialbd.ttf', 'calibrib.ttf', 'DejaVuSans-Bold.ttf'] if bold
+                 else ['segoeui.ttf', 'Segoe UI.ttf', 'arial.ttf', 'calibri.ttf', 'DejaVuSans.ttf']):
         for prefix in (f"{_WIN_FONTS}/", ""):
             try:
                 return ImageFont.truetype(prefix + name, size)
@@ -111,8 +111,8 @@ def _load_font(size, bold=False):
     return ImageFont.load_default()
 
 def _load_khmer_font(size):
-    """Load Khmer OS Battambang font for Khmer text."""
-    for name in ['KhmerOSbattambang.ttf', 'KhmerOSsiemreap.ttf', 'KhmerOScontent.ttf', 'KhmerOS.ttf']:
+    """Load Khmer OS Siemreap / Battambang font for Khmer text."""
+    for name in ['KhmerOSsiemreap.ttf', 'KhmerOSbattambang.ttf', 'KhmerOScontent.ttf', 'KhmerOS.ttf']:
         for prefix in (f"{_WIN_FONTS}/", ""):
             try:
                 return ImageFont.truetype(prefix + name, size)
@@ -523,7 +523,7 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
             date_val = ws_z.Range("C1").Text
             time_val = ws_z.Range("C2").Text
             ws_zs.Range("A1").Value = f"Báo cáo kết quả sản xuất kinh doanh ngày {date_val} - {time_val}"
-            ws_zs.Range("A1").Font.Name = "Arial"
+            ws_zs.Range("A1").Font.Name = "Segoe UI"
             ws_zs.Range("A1").Font.Bold = True
             ws_zs.Range("A1").Font.Size = 13
             ws_zs.Range("A1").Font.Color = 0xFFFFFF
@@ -537,8 +537,8 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
             ws_zs.Range("A2:L10").Value = ws_z.Range("B6:M14").Value
             
             table_rng = ws_zs.Range("A2:L10")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
             ws_zs.Range("A2:L4").Font.Bold = True
             ws_zs.Range("A5:A10").Font.Bold = True
             
@@ -608,12 +608,12 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
             ws_cr.Range("A1:K9").Value = ws_z.Range("B56:L64").Value
             
             table_rng = ws_cr.Range("A1:K9")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
             
             ws_cr.Range("A1:K1").Merge()
             ws_cr.Range("A1").Value = "BÁO CÁO KHÁCH HÀNG PHÁT SINH LẦN ĐẦU"
-            ws_cr.Range("A1").Font.Name = "Arial"
+            ws_cr.Range("A1").Font.Name = "Segoe UI"
             ws_cr.Range("A1").Font.Bold = True
             ws_cr.Range("A1").Font.Size = 12
             ws_cr.Range("A1").HorizontalAlignment = -4108 # Center
@@ -693,8 +693,8 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
             ws_tmp_dr.Range("A1:Y26").Value = src_rng.Value
             
             table_rng = ws_tmp_dr.Range("A1:Y26")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
             
             ws_tmp_dr.Range("A1:Y3").Font.Bold = True
             ws_tmp_dr.Range("A4:D26").Font.Bold = True
@@ -770,8 +770,8 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
             ws_tmp_sr.Range("A1:R26").Value = src_rng.Value
             
             table_rng = ws_tmp_sr.Range("A1:R26")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
             
             ws_tmp_sr.Range("A1:R3").Font.Bold = True
             ws_tmp_sr.Range("A4:D26").Font.Bold = True
@@ -843,8 +843,8 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
             ws_tmp_ar.Range("A1:R26").Value = src_rng.Value
             
             table_rng = ws_tmp_ar.Range("A1:R26")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
             
             ws_tmp_ar.Range("A1:R3").Font.Bold = True
             ws_tmp_ar.Range("A4:D26").Font.Bold = True
@@ -914,8 +914,8 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
             
             # Apply Modern Clean Arial Font
             table_rng = ws_tmp.Range("A1:W42")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
             
             ws_tmp.Range("A1:W3").Font.Bold = True
             ws_tmp.Range("A1:W3").Font.Size = 10.5
@@ -996,7 +996,7 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
                 # Title Banner: Row 1 (Merged A1:W1)
                 ws_tmp.Range("A1:W1").Merge()
                 ws_tmp.Range("A1").Value = "[SERVICE POINT]-REPORT OF ORDER EXPRESS"
-                ws_tmp.Range("A1").Font.Name = "Arial"
+                ws_tmp.Range("A1").Font.Name = "Segoe UI"
                 ws_tmp.Range("A1").Font.Bold = True
                 ws_tmp.Range("A1").Font.Size = 13
                 ws_tmp.Range("A1").Font.Color = 0xFFFFFF
@@ -1022,8 +1022,8 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
                 
                 total_rows = 3 + num_rows
                 table_rng = ws_tmp.Range(f"A1:W{total_rows}")
-                table_rng.Font.Name = "Arial"
-                table_rng.Font.Size = 10
+                table_rng.Font.Name = "Segoe UI"
+                table_rng.Font.Size = 11
                 
                 ws_tmp.Range("A2:W3").Font.Bold = True
                 ws_tmp.Range(f"A4:B{total_rows}").Font.Bold = True
@@ -1099,7 +1099,7 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
             # Title Header
             ws_cd.Range("A1:Q1").Merge()
             ws_cd.Range("A1").Value = "[SERVICE POINT]-REPORT OF CUSTOMER DEVELOPMENT"
-            ws_cd.Range("A1").Font.Name = "Arial"
+            ws_cd.Range("A1").Font.Name = "Segoe UI"
             ws_cd.Range("A1").Font.Bold = True
             ws_cd.Range("A1").Font.Size = 13
             ws_cd.Range("A1").Font.Color = 0xFFFFFF
@@ -1201,7 +1201,7 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
             full_cd_rng = ws_cd.Range(f"A4:Q{3 + num_data_rows}")
             full_cd_rng.Value = matrix
             
-            ws_cd.Range(f"A1:Q{3 + num_data_rows}").Font.Name = "Arial"
+            ws_cd.Range(f"A1:Q{3 + num_data_rows}").Font.Name = "Segoe UI"
             ws_cd.Range(f"A4:Q{3 + num_data_rows}").Font.Size = 10
             ws_cd.Range("A2:Q3").Font.Size = 10.5
             

@@ -550,8 +550,27 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
 
     for idx, row in active_df.iterrows():
         sc = str(row['sc'])
+        order_id = str(row.get(col_order, ''))
         curr_po = str(row.get('curr_po_clean', '')).strip()
         deliv_po = str(row.get('deliv_po_clean', '')).strip()
+        
+        # DEBUG: Show branch assignment logic for specific bill
+        if order_id in ('3204162498', '3304599288'):
+            print(f"DEBUG: Bill {order_id} assignment:")
+            print(f"  Status: {sc}")
+            print(f"  Current PO (curr_po_clean): {curr_po}")
+            print(f"  Delivery PO: {deliv_po}")
+            print(f"  Is Return: {sc in return_statuses}")
+            print(f"  Is Delivery: {sc in ('400', '401', '402', '410', '430')}")
+            print(f"  Is Handover: {not (is_delivery or is_return)}")
+            print(f"  PENALTY LOGIC:")
+            if is_return:
+                print(f"    Return -> Penalty to CURRENT Post Office: {curr_po}")
+            elif is_delivery:
+                print(f"    Delivery -> Penalty to DELIVERY Post Office: {deliv_po}")
+            else:
+                print(f"    Handover -> Penalty to CURRENT Post Office: {curr_po} (NOT sender!)")
+                print(f"    (The Post Office who has the package is responsible for handover delays)")
 
         is_return = sc in return_statuses
         is_delivery = sc.startswith('4') and not is_return
@@ -573,13 +592,29 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             # FIXED: Handover penalty should go to CURRENT Post Office (not sender!)
             # The Post Office who currently has the package is responsible for handover delays
             raw_po = curr_po
+            
+            if order_id in ('3204162498', '3304599288'):
+                print(f"    Initial raw_po (current): {raw_po}")
+                
             if not raw_po or raw_po in ('MEGA1', 'DVCMEGA1') or 'HUB' in raw_po:
+                if order_id in ('3304599288',):
+                    print(f"    {raw_po} is a HUB/MEGA, looking for alternative...")
                 # If current PO is HUB/MEGA, find the last actual Post Office
                 for col in ['ACTION POST OFFICE.4', 'ACTION POST OFFICE.3', 'ACTION POST OFFICE.2', 'ACTION POST OFFICE.1', 'ACTION POST OFFICE']:
                     cand = str(row.get(col, '') or '').strip().upper()
+                    if order_id in ('3304599288',):
+                        print(f"      Checking {col}: {cand}")
                     if cand and cand not in ('NAN', 'MEGA1', 'DVCMEGA1') and 'HUB' not in cand:
                         raw_po = cand
+                        if order_id in ('3304599288',):
+                            print(f"      Found alternative: {cand}")
                         break
+                        
+                # If still no valid PO found, try delivery PO as last resort
+                if (not raw_po or raw_po in ('MEGA1', 'DVCMEGA1') or 'HUB' in raw_po) and deliv_po:
+                    if order_id in ('3304599288',):
+                        print(f"    No valid PO found, using delivery PO as fallback: {deliv_po}")
+                    raw_po = deliv_po
 
         if not raw_po or raw_po == 'NAN':
             continue
@@ -587,18 +622,39 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
         # EXCLUDE HUB/MEGA FACILITIES FROM PENALTIES - These are company infrastructure, not individual Post Offices
         if any(hub_pattern in raw_po.upper() for hub_pattern in ['MEGA1', 'DVCMEGA', 'HUB', 'DVCZ']):
             if order_id in ('3204556387', '3304599288'):
-                print(f"  ⚠️ SKIPPING penalty - {raw_po} is a HUB/MEGA facility (infrastructure, not Post Office)")
+                print(f"  [SKIP] SKIPPING penalty - {raw_po} is a HUB/MEGA facility (infrastructure, not Post Office)")
             continue
 
         # ALSO EXCLUDE when bill is CURRENTLY AT hub but trying to penalty previous Post Office
         curr_po_clean = str(row.get('curr_po_clean', '')).strip().upper()
         if any(hub_pattern in curr_po_clean for hub_pattern in ['MEGA1', 'DVCMEGA', 'HUB', 'DVCZ']):
             if order_id in ('3204556387', '3304599288'):
-                print(f"  ⚠️ SKIPPING penalty - Bill currently at HUB {curr_po_clean} (company infrastructure issue)")
+                print(f"  [SKIP] SKIPPING penalty - Bill currently at HUB {curr_po_clean} (company infrastructure issue)")
             continue
 
         po = map_po_to_main(raw_po)
+        
+        # DEBUG: Show final assignment for specific bills
+        if order_id in ('3204162498', '3304599288'):
+            print(f"  Raw PO selected: {raw_po}")
+            print(f"  Mapped to main branch: {po}")
+            
+            # Debug the mapping process
+            lk = load_penalty_lookup()
+            print(f"  Lookup loaded: {len(lk)} entries")
+            mapped_via_lookup = lk.get(raw_po)
+            print(f"  Lookup result for {raw_po}: {mapped_via_lookup}")
+            
+            if raw_po in MAIN_36_BRANCHES:
+                print(f"  {raw_po} is in MAIN_36_BRANCHES")
+            else:
+                print(f"  {raw_po} is NOT in MAIN_36_BRANCHES")
+                
+            print(f"  Final penalty goes to: {po}")
+            print()
         if not po or po == 'NAN':
+            if order_id in ('3204162498', '3304599288'):
+                print(f"  [SKIP] SKIPPING penalty - {raw_po} is agent/showroom, not penalizable")
             continue
 
         # Target filtering
@@ -931,7 +987,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # Populate Right Executive Summary Table
-    # SORT: % RIGHT Handover ascending (worst handover → top), then % RIGHT Delivery, then fine
+    # SORT: % RIGHT Handover ascending (worst handover -> top), then % RIGHT Delivery, then fine
     def calc_sort_key(stats):
         r_ho = max(0, stats["total_handover"] - stats["penalty_handover"])
         pct_ho = (r_ho / stats["total_handover"] * 100.0) if stats["total_handover"] > 0 else 100.0
@@ -960,7 +1016,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
     font_pen_red  = Font(name="Segoe UI", size=8.5, bold=True, color="DC2626") # Bold Red
 
     for stats in sorted_branches:
-        ws1.row_dimensions[r_sum].height = 22.0  # Increased summary row height
+        ws1.row_dimensions[r_sum].height = 26.0  # Increased summary row height for better visibility
         
         # Calculate RIGHT (On-Time)
         r_ho = max(0, stats["total_handover"] - stats["penalty_handover"])
@@ -1001,7 +1057,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
                     cell.font = Font(name="Segoe UI", size=8.5, italic=True, color="94A3B8")
             elif ci == 17:  # % RIGHT Delivery
                 cell.font = get_pct_font(pct_r_del)
-            elif ci == 18:  # Total Penalty ($) → Light Pink + Bold Red text
+            elif ci == 18:  # Total Penalty ($) -> Light Pink + Bold Red text
                 if stats["total_fine"] > 0:
                     cell.fill = fill_pen_pink
                     cell.font = font_pen_red
@@ -1060,7 +1116,7 @@ def build_penalty_report(src_xlsx, out_xlsx, target_label="ALL", report_date=Non
                 cell.font = Font(name="Segoe UI", size=9.5, italic=True, color="94A3B8")
         elif c == 17:
             cell.font = get_pct_font(tot_pct_r_del, is_tot=True)
-        elif c == 18:  # Total penalty grand total → light pink
+        elif c == 18:  # Total penalty grand total -> light pink
             cell.font = Font(name="Segoe UI", size=9.5, bold=True, color="DC2626")
             cell.fill = fill_pen_pink
             cell.border = tot_border_accounting

@@ -56,20 +56,24 @@ C_BORDER_DARK = ( 80, 100, 140)   # darker border for section separators
 
 _WIN_FONTS = "C:/Windows/Fonts"
 
+def _excel_font_name(text, default='Arial'):
+    """Match the requested fonts in generated Excel files."""
+    return 'Khmer OS Battambang' if any('\u1780' <= ch <= '\u17FF' for ch in str(text)) else default
+
 
 def _load_font(size, bold=False):
     candidates = (
         [
-            f"{_WIN_FONTS}/calibrib.ttf",
             f"{_WIN_FONTS}/arialbd.ttf",
+            f"{_WIN_FONTS}/calibrib.ttf",
             f"{_WIN_FONTS}/verdanab.ttf",
             f"{_WIN_FONTS}/DejaVuSans-Bold.ttf",
             "arialbd.ttf", "DejaVuSans-Bold.ttf",
         ]
         if bold else
         [
-            f"{_WIN_FONTS}/calibri.ttf",
             f"{_WIN_FONTS}/arial.ttf",
+            f"{_WIN_FONTS}/calibri.ttf",
             f"{_WIN_FONTS}/verdana.ttf",
             f"{_WIN_FONTS}/DejaVuSans.ttf",
             "arial.ttf", "DejaVuSans.ttf",
@@ -101,6 +105,13 @@ def _th(draw, text, font):
 
 def _draw_cell(draw, x, y, w, h, bg, text, font, fg, align="center", pad=8,
                border=True, border_col=None, border_w=1):
+    # PIL does not automatically select a Khmer typeface. Use Battambang for
+    # Khmer labels and action text in the Telegram summary image.
+    if any('\u1780' <= ch <= '\u17FF' for ch in str(text)):
+        try:
+            font = ImageFont.truetype(f"{_WIN_FONTS}/KhmerOSbattambang.ttf", font.size)
+        except Exception:
+            pass
     draw.rectangle([x, y, x + w - 1, y + h - 1], fill=bg)
     if text:
         tw = _tw(draw, text, font)
@@ -717,6 +728,8 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
         else:
             ws = wb.create_sheet(title=rn)
         ws.views.sheetView[0].showGridLines = True
+        ws.freeze_panes = "A4"
+        ws.sheet_view.zoomScale = 90
         current_row = 1
 
         internal_key_map = {
@@ -742,7 +755,13 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
             if col not in df.columns:
                 df[col] = ''
 
-        if date_col in df.columns:
+        # The date columns in every push report represent the latest action on
+        # the order.  Prefer the canonical _scan_date built by generate_report
+        # so Zone and normal Push files cannot drift to CREATED DATE.
+        if "_scan_date" in df.columns and df["_scan_date"].notna().any():
+            df = df.copy()
+            df['_date'] = pd.to_datetime(df['_scan_date'], errors='coerce').dt.date
+        elif date_col in df.columns:
             parsed = pd.to_datetime(df[date_col], dayfirst=True, format='mixed', errors='coerce')
             df = df.copy()
             df['_date'] = parsed.dt.date
@@ -844,8 +863,10 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
         title_row = current_row
         ws.row_dimensions[title_row].height = 22
         today_str = datetime.now().strftime('%d/%m/%Y %H:%M')
-        tc = ws.cell(title_row, 1, f"{rn.upper()} REPORT — {today_str}")
-        tc.font      = Font(name=fn, color='FFFFFF', bold=True, size=12)
+        report_label = str(result.get('report_label', '') or '').strip()
+        title = f"{rn.upper()} REPORT — {report_label} — {today_str}" if report_label else f"{rn.upper()} REPORT — {today_str}"
+        tc = ws.cell(title_row, 1, title)
+        tc.font      = Font(name=fn, color='FFFFFF', bold=True, size=13)
         tc.fill      = PatternFill(start_color=NAVY, end_color=NAVY, fill_type='solid')
         tc.alignment = Alignment(horizontal='center', vertical='center')
         tc.border    = bdr
@@ -866,7 +887,7 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
             for ri in (month_row, header_row):
                 cell = ws.cell(ri, ci, '')
                 cell.fill      = PatternFill(start_color=SLATE, end_color=SLATE, fill_type='solid')
-                cell.font      = Font(name=fn, color='FFFFFF', bold=True, size=10)
+                cell.font      = Font(name=fn, color='FFFFFF', bold=True, size=11)
                 cell.alignment = Alignment(horizontal='center', vertical='center')
                 cell.border    = bdr
 
@@ -913,7 +934,7 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
 
         for ri, row in agg.iterrows():
             r = data_start + ri
-            ws.row_dimensions[r].height = 15
+            ws.row_dimensions[r].height = 22
             gt_val = int(row.get('Grand Total', 0))
             grand_total += gt_val
 
@@ -948,8 +969,10 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
                 cell = ws.cell(r, ci, val if val != '' else None)
                 cell.border = bdr
                 
-                cell_fill = row_fill
-                cell_font = Font(name=fn, size=10)
+                # A subtle alternating fill makes long rows readable without
+                # hiding the existing overdue / status highlights.
+                cell_fill = row_fill or (PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid') if ri % 2 else None)
+                cell_font = Font(name=_excel_font_name(val, fn), size=11)
 
                 # AGE Column (2 Status Colors: 🟢 Green 0-10h, 🔴 Red >10h - no yellow)
                 if col == 'Age':
@@ -960,13 +983,13 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
                         m_val = int(match.group(2)) if match.group(2) else 0
                         t_mins = h_val * 60 + m_val
                         if status_code in ('420', '472'):
-                            cell_font = Font(name=fn, size=10, bold=True, color='065F46')
+                            cell_font = Font(name=_excel_font_name(val, fn), size=11, bold=True, color='065F46')
                         elif t_mins <= 600:  # 0-10h = Green
-                            cell_font = Font(name=fn, size=10, bold=True, color='065F46')
+                            cell_font = Font(name=_excel_font_name(val, fn), size=11, bold=True, color='065F46')
                         else:  # >10h = Red (no yellow)
-                            cell_font = Font(name=fn, size=10, bold=True, color='991B1B')
+                            cell_font = Font(name=_excel_font_name(val, fn), size=11, bold=True, color='991B1B')
                     else:
-                        cell_font = Font(name=fn, size=10, bold=True)
+                        cell_font = Font(name=_excel_font_name(val, fn), size=11, bold=True)
 
                 if cell_fill:
                     cell.fill = cell_fill
@@ -977,16 +1000,17 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
                     if isinstance(val, (int, float)) and val:
                         day_totals[col] = day_totals.get(col, 0) + int(val)
                 elif col == 'Grand Total':
-                    cell.font      = Font(name=fn, color=RED, bold=True, size=10)
+                    cell.font      = Font(name=fn, color=RED, bold=True, size=11)
                     cell.alignment = Alignment(horizontal='center', vertical='center')
                 else:
-                    cell.alignment = Alignment(horizontal='left', vertical='center')
+                    wrap = col in ('CURRENT POST OFFICE', 'RECEIVER', 'Cus name', 'NEXT_STEP')
+                    cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=wrap)
 
         gt_row = data_start + len(agg)
         ws.row_dimensions[gt_row].height = 17
         for ci, col in enumerate(all_cols, start=1):
             cell = ws.cell(gt_row, ci)
-            cell.font      = Font(name=fn, color=RED, bold=True, size=10)
+            cell.font      = Font(name=fn, color=RED, bold=True, size=11)
             cell.fill      = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
             cell.border    = bdr
             cell.alignment = Alignment(horizontal='center', vertical='center')

@@ -467,12 +467,13 @@ def _has_khmer(text: str) -> bool:
     return any('\u1780' <= ch <= '\u17FF' for ch in str(text))
 
 def _font(name, color='000000', bold=False, size=11, text=''):
-    """Return Font object. Auto-switches to Khmer UI if text contains Khmer chars."""
-    font_name = 'Khmer UI' if _has_khmer(text) else name
-    return Font(name=font_name, color=color, bold=bold, size=size)
+    """Use Khmer UI for Khmer text at smaller size to avoid heavy/blocky rendering in image exports."""
+    if _has_khmer(text):
+        return Font(name='Khmer UI', color=color, bold=bold, size=max(9, size - 2))
+    return Font(name=name, color=color, bold=bold, size=size)
 
-def _align(h='center', v='center', wrap=False):
-    return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
+def _align(h='center', v='center', wrap=False, indent=0):
+    return Alignment(horizontal=h, vertical=v, wrap_text=wrap, indent=indent if h in ('left', 'right') and indent > 0 else 0)
 
 def _border():
     t = Side(style='thin', color='BFBFBF')
@@ -486,7 +487,7 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
     Write one report section at (start_row, start_col).
     Returns (next_free_row, next_free_col_after_block).
     """
-    fn     = dc.get('font_name',         'Segoe UI')
+    fn     = dc.get('font_name',         'Arial')
     t_fg   = dc.get('title_color',       'FFFFFF')
     t_bg   = dc.get('title_fill_color',  '0F172A')
     h_bg   = dc.get('header_fill_color', '1E293B')
@@ -538,7 +539,7 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
         for row_idx in (r, r + 1):
             cell = ws.cell(row_idx, col_idx)
             cell.fill = _fill(h_bg)
-            cell.font = _font(fn, h_fg, bold=False)
+            cell.font = _font(fn, h_fg, bold=True)
             cell.alignment = _align('center')
             cell.border = bdr
 
@@ -550,7 +551,7 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
         if is_index or is_gt:
             hdr_text = translate_header(col_name)
             ws.cell(r, col_idx, hdr_text)
-            ws.cell(r, col_idx).font = _font(fn, h_fg, bold=False, text=hdr_text)
+            ws.cell(r, col_idx).font = _font(fn, h_fg, bold=True, text=hdr_text)
             ws.merge_cells(start_row=r, end_row=r + 1, start_column=col_idx, end_column=col_idx)
 
     # 3. Write day numbers on Row r + 1 (day number row) for day columns
@@ -577,7 +578,7 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
     for (yr, mo), start_c, end_c in month_groups:
         month_text = get_khmer_month_name(mo)
         ws.cell(r, start_c, month_text)
-        ws.cell(r, start_c).font = _font(fn, h_fg, bold=False, text=month_text)
+        ws.cell(r, start_c).font = _font(fn, h_fg, bold=True, text=month_text)
         if end_c > start_c:
             ws.merge_cells(start_row=r, end_row=r, start_column=start_c, end_column=end_c)
 
@@ -625,7 +626,13 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
 
             cell_fill = row_fill
             cell_font = _font(fn, '1E293B', bold=False, text=val_str)
-            cell_align = _align('center')
+            # Keep identifiers compact while allowing names, locations, and the
+            # action instruction to remain readable without horizontal scrolling.
+            cell_align = _align(
+                'left' if col_name in ('CURRENT POST OFFICE', 'RECEIVER', 'Cus name', 'NEXT_STEP') else 'center',
+                wrap=col_name in ('CURRENT POST OFFICE', 'RECEIVER', 'Cus name', 'NEXT_STEP'),
+                indent=1 if col_name in ('RECEIVER', 'Cus name') else 0,
+            )
 
             # ========== VIP COLUMN HIGHLIGHTING ==========
             if col_name == 'VIP' and val_str.strip() == 'VIP':
@@ -635,7 +642,7 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
             if is_total:
                 if row_fill:
                     cell.fill = row_fill
-                cell.font = _font(fn, RED if col_name == 'Grand Total' or col_name in index_cols else '0F172A', bold=True, text=val_str)
+                cell.font = _font(fn, RED if col_name == 'Grand Total' else ('0F172A' if col_name in index_cols else '0F172A'), bold=(col_name == 'Grand Total' or col_name in index_cols), text=val_str)
             elif col_name == 'Age':
                 match = re.search(r'(\d+)\s*h(?:\s*(\d+)\s*m)?', val_str, re.IGNORECASE)
                 if match:
@@ -643,13 +650,13 @@ def _write_table(ws, start_row, start_col, report_name, rows, index_cols, active
                     m_val = int(match.group(2)) if match.group(2) else 0
                     t_mins = h_val * 60 + m_val
                     if status_code in ("420", "472"):
-                        cell_font = _font(fn, "065F46", bold=True, text=val_str)
+                        cell_font = _font(fn, "065F46", bold=False, text=val_str)
                     elif t_mins <= 600:
-                        cell_font = _font(fn, "065F46", bold=True, text=val_str)
+                        cell_font = _font(fn, "065F46", bold=False, text=val_str)
                     else:
-                        cell_font = _font(fn, "991B1B", bold=True, text=val_str)
+                        cell_font = _font(fn, "991B1B", bold=False, text=val_str)
                 else:
-                    cell_font = _font(fn, '1E293B', bold=True, text=val_str)
+                    cell_font = _font(fn, '1E293B', bold=False, text=val_str)
             elif col_name == 'Grand Total':
                 cell_font = _font(fn, RED, bold=True, text=val_str)
 
@@ -715,7 +722,21 @@ def _set_col_widths(ws):
             header_val = ''
             for r_scan in range(1, min(10, ws.max_row + 1)):
                 cell_v = str(ws.cell(r_scan, c).value or '').strip()
-                if cell_v in ('Cus name', 'RECEIVER', 'Phone', 'ORDER ID', 'CURRENT POST OFFICE', 'POST OFFICE HANDLE', 'REMARK', 'Age', 'KPI TIME: 10', 'KPI Status'):
+                # Also match Khmer-translated headers written into cells
+                ORDER_ID_SET  = {'ORDER ID', 'លេខបុង', 'លើខបុង'}
+                RECEIVER_SET  = {'Cus name', 'RECEIVER', 'ឈ្មោះអតិថិជន', 'ឈ្មោហអតិតិជន'}
+                PHONE_SET     = {'Phone', 'លេខទូរស័ព្ទ', 'លើខតូរស័ព្ត'}
+                if cell_v in ORDER_ID_SET:
+                    header_val = 'ORDER ID'
+                    break
+                elif cell_v in RECEIVER_SET:
+                    header_val = 'RECEIVER'
+                    break
+                elif cell_v in PHONE_SET:
+                    header_val = 'Phone'
+                    break
+                elif cell_v in ('CURRENT POST OFFICE', 'POST OFFICE HANDLE', 'REMARK', 'Age', 'KPI TIME: 10', 'KPI Status',
+                                'ប៉ុស្តិ៍បច្ចុប្បន្ន', 'ប៉ុស្តិ៍ទទួលខុសត្រូវ', 'សកម្មភាព ត្រូវធ្វើ', 'រយៈពេលអាយុ (Age)', 'គោលដៅ 10H KPI'):
                     header_val = cell_v
                     break
             
@@ -733,7 +754,7 @@ def _set_col_widths(ws):
             elif header_val == 'Phone':
                 ws.column_dimensions[letter].width = min(max(max_len + 4, 19), 38)
             elif header_val == 'ORDER ID':
-                ws.column_dimensions[letter].width = min(max(max_len + 3, 16), 24)
+                ws.column_dimensions[letter].width = min(max(max_len + 6, 22), 30)
             else:
                 ws.column_dimensions[letter].width = min(max(max_len + 2, W_MIN), W_MAX)
 
@@ -748,7 +769,9 @@ def build_handle_excel(handle, sections, day_cols, dc, out_path, mode='wide', or
     wb = Workbook()
     ws = wb.active
     ws.title = handle[:31]
-    fn  = dc.get('font_name', 'Segoe UI')
+    ws.freeze_panes = 'A4'
+    ws.sheet_view.zoomScale = 90
+    fn  = dc.get('font_name', 'Arial')
 
     # Shared active days = union of all section active days, in sorted order
     shared_days = sorted(set(d for _, _, _, _, ad in sections for d in ad))
@@ -806,6 +829,8 @@ def build_final_excel(all_handle_sections, day_cols, dc, out_path, mode='wide', 
             ws.title = display_title
         else:
             ws = wb.create_sheet(title=display_title)
+        ws.freeze_panes = 'A4'
+        ws.sheet_view.zoomScale = 90
             
         rows = combined_data[rn]
         icols = index_cols_map.get(rn)
@@ -882,7 +907,8 @@ def build_final_excel(all_handle_sections, day_cols, dc, out_path, mode='wide', 
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def generate_reports_from_data(export_path, ref_path, output_dir,
-                                return_metadata=False, mode='wide', target_handles=None, revenue_path=None):
+                                return_metadata=False, mode='wide', target_handles=None, revenue_path=None,
+                                render_handle_files=True, render_final_excel=True):
     config_path = os.path.join(os.path.dirname(__file__), 'config.json')
     with open(config_path, encoding='utf-8') as f:
         cfg = json.load(f)
@@ -973,24 +999,29 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
     # Clean up column names
     df.columns = [str(c).strip() for c in df.columns]
 
-    # Date column for day-of-month grouping (prioritize CURRENT TIME / current scan time over CREATED DATE)
-    scan_cols_priority = [
+    # Date columns represent the most recent action on an order.  Some TMS
+    # exports leave CURRENT TIME unchanged after a scan, so use the latest of
+    # every action timestamp rather than the first non-empty timestamp.
+    action_time_cols = [
         'CURRENT TIME',
         'STATUS 306 AT STORE / AGENT (LAST TIME)',
         'STATUS 306 AT STORE / AGENT FROM HUB (FIRST TIME)',
         'STATUS 302/310 AT RECEIVING STORE / RECEIVING AGENT (FIRST TIME)',
         'STATUS 306  AT ORIGIN HUB (FIRST TIME)',
         'STATUS 210 TIME',
-        'CREATED DATE'
     ]
-
-    dates_series = pd.Series(index=df.index, dtype='object')
-    for col in scan_cols_priority:
-        if col in df.columns:
-            parsed_col = pd.to_datetime(df[col], dayfirst=True, format='mixed', errors='coerce').dt.date
-            dates_series = dates_series.fillna(parsed_col)
-
-    df['_scan_date'] = dates_series
+    parsed_actions = [
+        pd.to_datetime(df[col], dayfirst=True, format='mixed', errors='coerce')
+        for col in action_time_cols if col in df.columns
+    ]
+    if parsed_actions:
+        latest_action = pd.concat(parsed_actions, axis=1).max(axis=1)
+    else:
+        latest_action = pd.Series(pd.NaT, index=df.index)
+    if 'CREATED DATE' in df.columns:
+        created_dates = pd.to_datetime(df['CREATED DATE'], dayfirst=True, format='mixed', errors='coerce')
+        latest_action = latest_action.fillna(created_dates)
+    df['_scan_date'] = latest_action.dt.date
 
     date_col = next(
         (c for c in df.columns if 'current time' in str(c).lower() or 'thời gian' in str(c).lower() or 'created date' in str(c).lower()), None
@@ -1198,7 +1229,7 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
                 if name:
                     vip_names.add(name.lower())
     except Exception as e:
-        print(f"⚠️  Warning: Could not load VIP list: {e}")
+        print(f"[WARNING]  Warning: Could not load VIP list: {e}")
     
     # Add VIP column after RECEIVER
     dm['VIP'] = ''
@@ -1558,14 +1589,15 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
             all_handle_sections.append((handle, sections))
 
         handle_files = []
-        for rn, rows, total, icols, active_days in sections:
-            tmp_xlsx = os.path.join(output_dir, f"Report_{handle}_{rn}_{today.strftime('%d_%m_%Y_%H%M%S')}.xlsx")
-            build_handle_excel(f"Report_{handle}_{rn}", [(rn, rows, total, icols, active_days)], day_cols, excel_design, tmp_xlsx, mode=mode, order_created_map=order_created_map, order_status_map=order_status_map)
-            handle_files.append({'path': tmp_xlsx, 'handle': handle})
-
-        # Build exactly ONE multi-tab Excel file for this branch containing all tabs
-        combined_xlsx = os.path.join(output_dir, f"Report_{handle}_{today.strftime('%d_%m_%Y')}.xlsx")
-        build_final_excel([(handle, sections)], day_cols, excel_design, combined_xlsx, mode=mode, order_created_map=order_created_map, order_status_map=order_status_map, handle_title=handle)
+        combined_xlsx = None
+        if render_handle_files:
+            for rn, rows, total, icols, active_days in sections:
+                tmp_xlsx = os.path.join(output_dir, f"Report_{handle}_{rn}_{today.strftime('%d_%m_%Y_%H%M%S')}.xlsx")
+                build_handle_excel(f"Report_{handle}_{rn}", [(rn, rows, total, icols, active_days)], day_cols, excel_design, tmp_xlsx, mode=mode, order_created_map=order_created_map, order_status_map=order_status_map)
+                handle_files.append({'path': tmp_xlsx, 'handle': handle})
+            # Normal Push sends this multi-tab file to mapped branch groups.
+            combined_xlsx = os.path.join(output_dir, f"Report_{handle}_{today.strftime('%d_%m_%Y')}.xlsx")
+            build_final_excel([(handle, sections)], day_cols, excel_design, combined_xlsx, mode=mode, order_created_map=order_created_map, order_status_map=order_status_map, handle_title=handle)
 
         remark = (
             f"{handle}  |  "
@@ -1582,19 +1614,21 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
             'sections':          sections,
         })
 
-    final_xlsx = os.path.join(output_dir, f"Report_All_{today.strftime('%d_%m_%Y')}.xlsx")
-    if all_handle_sections:
-        build_final_excel(all_handle_sections, day_cols, excel_design, final_xlsx, mode=mode, order_created_map=order_created_map, order_status_map=order_status_map)
-    else:
-        wb = Workbook()
-        wb.save(final_xlsx)
+    final_xlsx = None
+    if render_final_excel:
+        final_xlsx = os.path.join(output_dir, f"Report_All_{today.strftime('%d_%m_%Y')}.xlsx")
+        if all_handle_sections:
+            build_final_excel(all_handle_sections, day_cols, excel_design, final_xlsx, mode=mode, order_created_map=order_created_map, order_status_map=order_status_map)
+        else:
+            wb = Workbook()
+            wb.save(final_xlsx)
         
     if not handle_results:
         handle_str = 'ALL' if not target_handles else ', '.join(target_handles)
         handle_results = [{
             'handle':        handle_str,
             'handle_counts': overall,
-            'handle_files':  [{'path': final_xlsx, 'handle': handle_str}],
+            'handle_files':  ([{'path': final_xlsx, 'handle': handle_str}] if final_xlsx else []),
             'remark':        f"No data found for {handle_str}",
             'sections':      [],
         }]

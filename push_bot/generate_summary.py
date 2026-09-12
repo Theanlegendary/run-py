@@ -56,20 +56,24 @@ C_BORDER_DARK = ( 80, 100, 140)   # darker border for section separators
 
 _WIN_FONTS = "C:/Windows/Fonts"
 
+def _excel_font_name(text, default='Arial'):
+    """Match the requested fonts in generated Excel files."""
+    return 'Khmer OS Battambang' if any('\u1780' <= ch <= '\u17FF' for ch in str(text)) else default
+
 
 def _load_font(size, bold=False):
     candidates = (
         [
-            f"{_WIN_FONTS}/calibrib.ttf",
             f"{_WIN_FONTS}/arialbd.ttf",
+            f"{_WIN_FONTS}/calibrib.ttf",
             f"{_WIN_FONTS}/verdanab.ttf",
             f"{_WIN_FONTS}/DejaVuSans-Bold.ttf",
             "arialbd.ttf", "DejaVuSans-Bold.ttf",
         ]
         if bold else
         [
-            f"{_WIN_FONTS}/calibri.ttf",
             f"{_WIN_FONTS}/arial.ttf",
+            f"{_WIN_FONTS}/calibri.ttf",
             f"{_WIN_FONTS}/verdana.ttf",
             f"{_WIN_FONTS}/DejaVuSans.ttf",
             "arial.ttf", "DejaVuSans.ttf",
@@ -101,6 +105,13 @@ def _th(draw, text, font):
 
 def _draw_cell(draw, x, y, w, h, bg, text, font, fg, align="center", pad=8,
                border=True, border_col=None, border_w=1):
+    # PIL does not automatically select a Khmer typeface. Use Battambang for
+    # Khmer labels and action text in the Telegram summary image.
+    if any('\u1780' <= ch <= '\u17FF' for ch in str(text)):
+        try:
+            font = ImageFont.truetype(f"{_WIN_FONTS}/KhmerOSbattambang.ttf", font.size)
+        except Exception:
+            pass
     draw.rectangle([x, y, x + w - 1, y + h - 1], fill=bg)
     if text:
         tw = _tw(draw, text, font)
@@ -949,7 +960,7 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
                 cell.border = bdr
                 
                 cell_fill = row_fill
-                cell_font = Font(name=fn, size=10)
+                cell_font = Font(name=_excel_font_name(val, fn), size=10)
 
                 # AGE Column (2 Status Colors: 🟢 Green 0-10h, 🔴 Red >10h - no yellow)
                 if col == 'Age':
@@ -960,13 +971,13 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
                         m_val = int(match.group(2)) if match.group(2) else 0
                         t_mins = h_val * 60 + m_val
                         if status_code in ('420', '472'):
-                            cell_font = Font(name=fn, size=10, bold=True, color='065F46')
+                            cell_font = Font(name=_excel_font_name(val, fn), size=10, bold=True, color='065F46')
                         elif t_mins <= 600:  # 0-10h = Green
-                            cell_font = Font(name=fn, size=10, bold=True, color='065F46')
+                            cell_font = Font(name=_excel_font_name(val, fn), size=10, bold=True, color='065F46')
                         else:  # >10h = Red (no yellow)
-                            cell_font = Font(name=fn, size=10, bold=True, color='991B1B')
+                            cell_font = Font(name=_excel_font_name(val, fn), size=10, bold=True, color='991B1B')
                     else:
-                        cell_font = Font(name=fn, size=10, bold=True)
+                        cell_font = Font(name=_excel_font_name(val, fn), size=10, bold=True)
 
                 if cell_fill:
                     cell.fill = cell_fill

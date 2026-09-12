@@ -219,14 +219,10 @@ def find_po_arrival_time_from_trips(trips, po, action_user, deliv_time):
     return None
 
 
-def load_speed_context(src_xlsx, revenue_path=None):
+def load_speed_context(src_xlsx=None, revenue_path=None):
     """
-    Reads src_xlsx and revenue_path once into memory.
-    Builds vas_mapping from revenue export and note/service columns.
+    Builds vas_mapping from revenue export.
     """
-    df = pd.read_excel(src_xlsx)
-    df.columns = [str(c).strip() for c in df.columns]
-
     vas_mapping = {}
     if not revenue_path:
         cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache")
@@ -265,7 +261,7 @@ def load_speed_context(src_xlsx, revenue_path=None):
         except Exception as e:
             print(f"Failed to load revenue data in speed report: {e}")
 
-    return df, vas_mapping
+    return None, vas_mapping
 
 
 import re
@@ -513,13 +509,25 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
 
     # 2. Delivered Today (Status 410) with enhanced filtering
     # Filter for delivered orders from today
-    delivered_df = df[(df['status_code_clean'] == '410') & (df['deliv_date'] == today)]
+    
+    yesterday = today - timedelta(days=1)
+    delivered_df = df[
+        (df['status_code_clean'].isin(pending_statuses)) |
+        ((df['status_code_clean'] == '410') & (df['deliv_date'].isin([today, yesterday])))
+    ]
+
     if delivered_df.empty:
         # Fallback to latest available delivery date in export if today has 0 records
         latest_date = df[df['status_code_clean'] == '410']['deliv_date'].max()
         if latest_date and not report_date:
             today = latest_date
-            delivered_df = df[(df['status_code_clean'] == '410') & (df['deliv_date'] == today)]
+            
+    yesterday = today - timedelta(days=1)
+    delivered_df = df[
+        (df['status_code_clean'].isin(pending_statuses)) |
+        ((df['status_code_clean'] == '410') & (df['deliv_date'].isin([today, yesterday])))
+    ]
+
 
     # Additional filtering for target branches only
     if target_branches and target_branches != ["ALL"] and set(target_branches) != set(MAIN_36_BRANCHES):
@@ -569,8 +577,11 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
         is_vtt = bool(('VTT' in vas_mapped) or ('VTT' in combined_notes) or ('VTT' in svc_val))
         if not is_vtt:
             continue
+            
+        is_delivered = row.get('status_code_clean') == '410'
+        is_today = row.get('deliv_date') == today
 
-        t410 = parse_time(row.get(col_action_time)) or parse_time(row.get(col_created))
+        t410 = (parse_time(row.get(col_action_time)) or parse_time(row.get(col_created))) if is_delivered else None
         
         t_start = None
         po_306_first = str(row.get(col_306_po_first, '') or '').strip().upper() if col_306_po_first else ""
@@ -585,7 +596,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
 
         # 3. If arrival at THIS branch is not in the export columns (e.g. inter-branch transfer or po_306_first is from origin branch):
         # Query live tracking trips API to find the physical arrival/processing scan (306/309/311/402) at 'po' by the courier:
-        if not t_start or (po_306_first and po_306_first != po):
+        if is_delivered and (not t_start or (po_306_first and po_306_first != po)):
             trips = get_tracking_trips(order_id)
             if trips:
                 t_trip = find_po_arrival_time_from_trips(trips, po, action_user_val, t410)
@@ -613,38 +624,88 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
             else:
                 t_start = parse_time(row.get(col_created))
 
-        if t410 and t_start and t410 >= t_start:
-            duration_hours = (t410 - t_start).total_seconds() / 3600.0
-        elif t410 and pd.notna(row.get(col_created)):
-            t_created = parse_time(row.get(col_created))
-            duration_hours = (t410 - t_created).total_seconds() / 3600.0 if (t_created and t410 >= t_created) else 4.0
+        if is_delivered:
+            if t410 and t_start and t410 >= t_start:
+                duration_hours = (t410 - t_start).total_seconds() / 3600.0
+            elif t410 and pd.notna(row.get(col_created)):
+                t_created = parse_time(row.get(col_created))
+                duration_hours = (t410 - t_created).total_seconds() / 3600.0 if (t_created and t410 >= t_created) else 4.0
+            else:
+                duration_hours = 4.0
+
+            # If duration > 8 hours or parcel arrived on a previous day,
+            # check if there was a customer appointment (420/472/reschedule)
+            if t410 and t_start and (duration_hours > 8.0 or t_start.date() < t410.date()):
+                trips = get_tracking_trips(order_id)
+                if trips:
+                    has_appointment = False
+                    for t in trips:
+                        st = str(t.get('status', '')).upper()
+                        desc = str(t.get('desc', '')).lower()
+                        item_type = str(t.get('itemType', '')).upper()
+                        status_name = str(t.get('statusName', '')).upper()
+                        if (st in ('S420', '420', 'S472', '472', 'S425', '425') or 
+                            status_name in ('SHIP_AGAIN', 'APPOINT', 'POSTPONE') or
+                            item_type in ('SHIP_AGAIN', 'APPOINT', 'POSTPONE') or
+                            any(k in desc for k in ['appoint', 'postpon', 'ណាត់', 'hẹn', 'reschedul'])):
+                            has_appointment = True
+                            break
+                    
+                    if has_appointment:
+                        deliv_date = t410.date()
+                        # Look for scans on the actual delivery date
+                        day_scans = []
+                        for t in trips:
+                            ts_str = t.get('updatedAt') or t.get('actionDate') or t.get('time')
+                            if ts_str:
+                                try:
+                                    dt = datetime.fromisoformat(ts_str.replace('Z', '+00:00')).replace(tzinfo=None)
+                                    if dt.date() == deliv_date and dt < t410:
+                                        day_scans.append(dt)
+                                except Exception:
+                                    pass
+                        if day_scans:
+                            t_start = min(day_scans)
+                        else:
+                            t_start = datetime(t410.year, t410.month, t410.day, 8, 0, 0)
+                        
+                        duration_hours = max((t410 - t_start).total_seconds() / 3600.0, 0.1)
         else:
-            duration_hours = 4.0
+            duration_hours = None
 
-        summary_data[po]["total_delivered"] += 1
-
-        if duration_hours < 2.0:
-            tier = "< 2 Hours (+50%)"
-            rate_usd = 0.30
-            summary_data[po]["under_2h"] += 1
-            tag_color = "GREEN"
-        elif duration_hours <= 4.0:
-            tier = "2 - 4 Hours (+25%)"
-            rate_usd = 0.25
-            summary_data[po]["between_2_4h"] += 1
-            tag_color = "BLUE"
-        elif duration_hours <= 8.0:
-            tier = "4 - 8 Hours (Normal)"
-            rate_usd = 0.20
-            summary_data[po]["between_4_8h"] += 1
+        if duration_hours is not None:
+            if duration_hours < 2.0:
+                tier = "< 2 Hours (+50%)"
+                rate_usd = 0.30
+                tag_color = "GREEN"
+            elif duration_hours <= 4.0:
+                tier = "2 - 4 Hours (+25%)"
+                rate_usd = 0.25
+                tag_color = "BLUE"
+            elif duration_hours <= 8.0:
+                tier = "4 - 8 Hours (Normal)"
+                rate_usd = 0.20
+                tag_color = "NORMAL"
+            else:
+                tier = "> 8 Hours (-25% Fine)"
+                rate_usd = 0.15
+                tag_color = "RED"
+        else:
+            tier = "PENDING"
+            rate_usd = 0.0
             tag_color = "NORMAL"
-        else:
-            tier = "> 8 Hours (-25% Fine)"
-            rate_usd = 0.15
-            summary_data[po]["over_8h"] += 1
-            tag_color = "RED"
 
-        summary_data[po]["total_commission"] += rate_usd
+        if is_delivered and is_today:
+            summary_data[po]["total_delivered"] += 1
+            if duration_hours < 2.0:
+                summary_data[po]["under_2h"] += 1
+            elif duration_hours <= 4.0:
+                summary_data[po]["between_2_4h"] += 1
+            elif duration_hours <= 8.0:
+                summary_data[po]["between_4_8h"] += 1
+            else:
+                summary_data[po]["over_8h"] += 1
+            summary_data[po]["total_commission"] += rate_usd
         dur_str = f"{int(duration_hours)}h {int((duration_hours%1)*60):02d}m" if duration_hours else "N/A"
 
         base_rows.append({
@@ -663,7 +724,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
             "t_start": str(t_start or ""),
             "t410": str(t410 or ""),
             "duration": dur_str,
-            "duration_hours": round(duration_hours, 2),
+            "duration_hours": round(duration_hours, 2) if duration_hours is not None else "",
             "tier": tier,
             "rate_usd": rate_usd,
             "tag_color": tag_color

@@ -1,19 +1,25 @@
 @echo off
+cd /d "%~dp0"
 echo ========================================
-echo RESTARTING BOT
+echo  SAFE RESTART BOT (no duplicate check)
 echo ========================================
 echo.
 
-echo Step 1: Killing all Python processes...
-taskkill /F /IM python.exe /T 2>nul
-timeout /t 2 >nul
+echo [1/3] Killing ALL running bot.py instances...
+taskkill /F /IM python.exe /T >nul 2>&1
+timeout /t 3 >nul
 
-echo Step 2: Clearing Python cache...
-del /S /Q __pycache__ 2>nul
-del /S /Q *.pyc 2>nul
-timeout /t 1 >nul
+echo [2/3] Verifying no duplicates remain...
+tasklist /FI "IMAGENAME eq python.exe" | findstr python.exe >nul
+if %ERRORLEVEL% EQU 0 (
+    echo [!] Still found Python processes. Force killing again...
+    taskkill /F /IM python.exe /T >nul 2>&1
+    timeout /t 2 >nul
+) else (
+    echo [OK] No Python processes running. Safe to start.
+)
 
-echo Step 3: Starting bot...
+echo [3/3] Starting bot.py fresh...
 echo.
 python bot.py
 
