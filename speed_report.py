@@ -810,7 +810,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     headers_summary = [
         "NO", "BRANCH", "PENDING", "DELIVERED", "< 2h (+50%)",
         "2-4h (+25%)", "4-8h (Normal)", "> 8h (-25%)",
-        "% < 8h", "% > 8h", "COMMISSION"
+        "% <= 8h", "% > 8h", "COMMISSION"
     ]
     headers_detail = [
         "No\n(ល.រ)", "Order Number\n(លេខប័ណ្ណ)", "Customer\n(អតិថិជន)", "VAS Service\n(ប្រភេទសេវា)", "Post Office\n(សាខា)",
@@ -870,12 +870,12 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
         tot_b = stats["total_delivered"]
         total_orders = need_cnt + tot_b
 
-        # KPI calculation: percentage based on completed delivered orders (or total orders)
+        # KPI calculation: percentage based on total orders (delivered + pending) as required by management (% = on_time / (delivered + pending))
         on_time_delivered = stats["under_2h"] + stats["between_2_4h"] + stats["between_4_8h"]
         slow_delivered = stats["over_8h"]
 
-        pct_under_8h = (on_time_delivered / tot_b * 100.0) if tot_b > 0 else 0.0
-        pct_over_8h = (slow_delivered / tot_b * 100.0) if tot_b > 0 else 0.0
+        pct_under_8h = (on_time_delivered / total_orders * 100.0) if total_orders > 0 else 0.0
+        pct_over_8h = (slow_delivered / total_orders * 100.0) if total_orders > 0 else 0.0
 
         str_pct_u8 = f"{pct_under_8h:.1f}%"
         str_pct_o8 = f"{pct_over_8h:.1f}%"
@@ -918,15 +918,15 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
                 cell.font = font_4_8h
             elif ci == 8:        # > 8 HOURS (-25%)
                 cell.font = font_o8h
-            elif ci == 9:        # % < 8 HOUR
-                if tot_b > 0 and pct_under_8h >= 85.0:
+            elif ci == 9:        # % <= 8 HOUR
+                if total_orders > 0 and pct_under_8h >= 85.0:
                     cell.font = font_pct_good
-                elif tot_b > 0 and pct_under_8h < 85.0:
+                elif total_orders > 0 and pct_under_8h < 85.0:
                     cell.font = font_pct_bad
                 else:
                     cell.font = font_data
             elif ci == 10:       # % > 8 HOUR
-                if tot_b > 0 and stats["over_8h"] > 0:
+                if total_orders > 0 and stats["over_8h"] > 0:
                     cell.font = font_pct_bad
                 else:
                     cell.font = font_data
@@ -954,10 +954,10 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
     tot_total_orders = tot_need + tot_del
     on_time_tot = tot_u2 + tot_24 + tot_48
     
-    # Grand Total percentage calculation consistent with branch rows (on delivered orders)
-    tot_pct_u8_num = (on_time_tot / tot_del * 100.0) if tot_del > 0 else 0.0
+    # Grand Total percentage calculation consistent with branch rows (on total orders: pending + delivered)
+    tot_pct_u8_num = (on_time_tot / tot_total_orders * 100.0) if tot_total_orders > 0 else 0.0
     tot_pct_u8 = f"{tot_pct_u8_num:.1f}%"
-    tot_pct_o8_num = (tot_o8 / tot_del * 100.0) if tot_del > 0 else 0.0
+    tot_pct_o8_num = (tot_o8 / tot_total_orders * 100.0) if tot_total_orders > 0 else 0.0
     tot_pct_o8 = f"{tot_pct_o8_num:.1f}%"
 
 
