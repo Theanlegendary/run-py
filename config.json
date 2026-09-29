@@ -10,12 +10,12 @@
     "allowed_user_ids": [],
     "proxy_url": "",
     "webapp_url": "http://localhost:8080",
-    "daily_report_group_id": -5587688944,
+    "daily_report_group_id": -1004391592278,
     "daily_report_schedule": {
       "enabled": true,
       "time": "18:00",
       "target_group_ids": [
-        -5587688944
+        -1004391592278
       ]
     },
     "forward_mapping": {
@@ -129,7 +129,7 @@
       ]
     },
     "image_mode": "long",
-    "paused": true
+    "paused": false
   },
   "api": {
     "url": "https://gw-express.metfone.com.kh/tms-report/api/v1/reports/stages/export-detail",
