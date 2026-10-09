@@ -785,8 +785,7 @@
       "title": "🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT",
       "hours": [
         "08:00",
-        "14:00",
-        "16:00"
+        "14:00"
       ],
       "reports": [
         "total_pending"
@@ -797,8 +796,7 @@
       "title": "🔴 QUALITY - METFONE EXPRESS",
       "hours": [
         "08:00",
-        "14:00",
-        "16:00"
+        "14:00"
       ],
       "reports": [
         "total_pending"
@@ -809,8 +807,7 @@
       "title": "MEGA HUB",
       "hours": [
         "08:00",
-        "14:00",
-        "16:00"
+        "14:00"
       ],
       "reports": [
         "total_mega"
@@ -820,7 +817,7 @@
       "chat_id": 0,
       "title": "All Branches & Zones (Operational Push)",
       "hours": [
-        "08:30",
+        "08:00",
         "14:00"
       ],
       "reports": [

@@ -1317,26 +1317,26 @@ async def run_pending_auto_scheduler(app: Application):
         {
             "chat_id": -1003964504795,
             "title": "🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT",
-            "hours": ["08:00", "14:00", "16:00"],
+            "hours": ["08:00", "14:00"],
             "reports": ["total_pending"],
         },
         {
             "chat_id": -5481716194,
             "title": "🔴 QUALITY - METFONE EXPRESS",
-            "hours": ["08:00", "14:00", "16:00"],
+            "hours": ["08:00", "14:00"],
             "reports": ["total_pending"],
         },
         {
             "chat_id": -1004493373354,
             "title": "MEGA HUB",
-            "hours": ["08:00", "14:00", "16:00"],
+            "hours": ["08:00", "14:00"],
             "reports": ["total_mega"],
         },
 
         {
             "chat_id": 0,
             "title": "All Branches & Zones (Operational Push)",
-            "hours": ["08:30", "14:00"],
+            "hours": ["08:00", "14:00"],
             "reports": ["push"],
         },
     ]
@@ -1369,7 +1369,7 @@ async def run_pending_auto_scheduler(app: Application):
                 continue
 
             SCHEDULED_TARGETS = cfg.get("scheduled_targets") or DEFAULT_SCHEDULED_TARGETS
-            ALL_SCHEDULED_HOURS = sorted(list(set(["08:00", "08:30", "11:00", "14:00", "15:00", "16:00"]).union(*(t.get("hours", []) for t in SCHEDULED_TARGETS))))
+            ALL_SCHEDULED_HOURS = sorted(list(set(["08:00", "14:00"]).union(*(t.get("hours", []) for t in SCHEDULED_TARGETS))))
 
             now = datetime.now()
             date_str = now.strftime("%Y-%m-%d")
@@ -1417,9 +1417,9 @@ async def run_pending_auto_scheduler(app: Application):
             else:
                 active_targets = [t for t in SCHEDULED_TARGETS if slot_time in t.get("hours", [])]
 
-            if not active_targets and (slot_time in ("08:30", "14:00") or is_forced_push):
+            if not active_targets and (slot_time in ("08:00", "14:00") or is_forced_push):
                 active_targets = [
-                    {"chat_id": 0, "title": "All Branches & Zones (Operational Push)", "hours": ["08:30", "14:00"], "reports": ["push"]}
+                    {"chat_id": 0, "title": "All Branches & Zones (Operational Push)", "hours": ["08:00", "14:00"], "reports": ["push"]}
                 ]
 
             if not active_targets:
@@ -1436,12 +1436,9 @@ async def run_pending_auto_scheduler(app: Application):
             try:
                 await asyncio.to_thread(downloader.download_detail, cfg["api"], src, force_refresh=True)
 
-                is_speed_slot = (slot_time in ("11:00", "15:00")) or is_forced_speed
-                is_push_slot = (slot_time in ("08:30", "14:00")) or is_forced_push
-                needs_speed = any(
-                    "speed_all" in t.get("reports", []) or "speed" in t.get("reports", [])
-                    for t in active_targets
-                ) or is_speed_slot
+                is_speed_slot = is_forced_speed
+                is_push_slot = (slot_time in ("08:00", "14:00")) or is_forced_push
+                needs_speed = is_forced_speed  # only run speed when manually forced, never in auto-schedule
 
                 needs_push = any(
                     "push" in t.get("reports", [])
@@ -2174,22 +2171,19 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cfg["telegram"]["paused"] = False
         save_config(cfg)
         msg = (
-            "✅ *Auto-Schedule ENABLED (6 Slots / Day)*\n"
+            "✅ *Auto-Schedule ENABLED (2 Slots / Day)*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "• Morning:\n"
-            "  - 08:00: /total pending & /total mega\n"
-            "  - 08:30: Operational Push (All Branches & Zones)\n"
-            "  - 11:00: /speed all (Delivery Speed SLA)\n"
+            "  - 08:00: Operational Push + /total pending & /total mega\n"
             "• Afternoon:\n"
             "  - 14:00: Operational Push + /total pending & /total mega\n"
-            "  - 15:00 (3:00 PM): /speed all (Delivery Speed SLA)\n"
-            "  - 16:00: /total pending & /total mega\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "• Note: /speed all is manual only (not in auto-schedule)\n"
             "• Targets:\n"
             "  - 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
             "  - 🔴 QUALITY - METFONE EXPRESS (-5481716194)\n"
             "  - MEGA HUB (-1004493373354)\n"
-            "  - All Branch Groups & 5 Zone Groups (Push & Speed SLA)\n"
+            "  - All Branch Groups & 5 Zone Groups (Operational Push)\n"
             "• Status: Active in background"
         )
     elif sub in ("off", "pause", "stop", "disable"):
@@ -2235,7 +2229,7 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if force_push:
             msg = "🚀 Triggering scheduled operational push (all branches & zones) now..."
         elif force_speed:
-            msg = "🚀 Triggering scheduled /speed all report now..."
+            msg = "🚀 Triggering manual /speed all report now..."
         else:
             msg = "🚀 Triggering scheduled reports (/total pending & /total mega) now..."
     else:
@@ -2245,25 +2239,22 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📅 *Auto-Schedule Status: {status_str}*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "• Morning:\n"
-            "  - 08:00: /total pending & /total mega\n"
-            "  - 08:30: Operational Push (All Branches & Zones)\n"
-            "  - 11:00: /speed all (Delivery Speed SLA)\n"
+            "  - 08:00: Operational Push + /total pending & /total mega\n"
             "• Afternoon:\n"
             "  - 14:00: Operational Push + /total pending & /total mega\n"
-            "  - 15:00 (3:00 PM): /speed all (Delivery Speed SLA)\n"
-            "  - 16:00: /total pending & /total mega\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "• Note: /speed all is manual only (not in auto-schedule)\n"
             "• Targets:\n"
             "  - 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
             "  - 🔴 QUALITY - METFONE EXPRESS (-5481716194)\n"
             "  - MEGA HUB (-1004493373354)\n"
-            "  - All Branch Groups & 5 Zone Groups (Push & Speed SLA)\n\n"
+            "  - All Branch Groups & 5 Zone Groups (Operational Push)\n\n"
             "Commands:\n"
             "• `/schedule on` — Enable schedule mode\n"
             "• `/schedule off` — Pause schedule mode\n"
             "• `/schedule run` — Run scheduled pending/mega report now\n"
             "• `/schedule run push` — Run scheduled operational push now\n"
-            "• `/schedule run speed` — Run scheduled /speed all now"
+            "• `/speed all` — Run manual speed report whenever needed"
         )
 
     await private_or_current_reply(update, context, msg, parse_mode="Markdown")
