@@ -339,7 +339,7 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
         'BANP001', 'BATP001', 'CHHP001', 'PURP001', 'SIEP001', 'PRHP001',
         'ODDP001', 'THOP001', 'SIHP001', 'KOHP001', 'KAMP001', 'SPEP001',
         'TAKP001', 'TBKP001', 'CHAP001', 'KRAP001', 'STUP001', 'ROTP001',
-        'MONP001', 'PREP001', 'SVAP001', 'PAIP001', 'KEPP001'
+        'MONP001', 'PREP001', 'SVAP001', 'PAIP001', 'KEPP001', 'KANP001'
     }
 
     df_active['dest_prov_clean'] = df_active[col_dest_prov].astype(str).str.strip().str.upper()
@@ -353,7 +353,7 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
     elif tgt in ("ALL", "TOTAL", "MEGA", "BRANCH", "BRANCHES"):
         df_matched = df_active.copy()
         print(f"DVC driver in-transit from MEGA (passed MEGA + latest action DV driver): {len(df_matched)} bills")
-    elif tgt in PROVINCIAL_BRANCH_CODES or (len(tgt) == 3 and tgt in zone_by_prefix and tgt not in ("PNP", "KAN")):
+    elif tgt in PROVINCIAL_BRANCH_CODES or (len(tgt) == 3 and tgt in zone_by_prefix and tgt != "PNP"):
         df_matched = df_active[
             (df_active['dest_prov_clean'] == tgt[:3]) |
             (df_active['dest_po_clean'].str.startswith(tgt[:3]))
@@ -431,6 +431,7 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
             'PNPP011': 'Dangkao',         'PNPA011': 'Dangkao',
             'PNPP014': 'Doun Penh',       'PNPA014': 'Doun Penh',
             'PNPP012': 'Kamboul',         'PNPA016': 'Kamboul', 'PNPA012': 'Kamboul',
+            'KANS005': 'Baek Chan (Kamboul)', 'KANS05': 'Baek Chan (Kamboul)',
             'PNPP002': 'Mean Chey',       'PNPP003': 'Mean Chey',
             'PNPA029': 'Mean Chey',       'PNPA055': 'Mean Chey',
             'PNPA003': 'Mean Chey',
@@ -670,7 +671,7 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
             'KAMS003': 'Satv Pong',
 
             # ── Kandal (KAN) – Agents / Showrooms ──
-            'KANS001': 'Ta Khmau',       'KANS005': 'Baek Chan',
+            'KANS001': 'Ta Khmau',
 
             # ── Kratie (KRA) – Agents / Showrooms ──
             'KRAS002': 'Snuol',          'KRAS004': 'Sambour',

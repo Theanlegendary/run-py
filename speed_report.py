@@ -17,7 +17,7 @@ speed_report.py — Fast Delivery Speed & Courier Commission Report
 import os
 import copy
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import pandas as pd
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -29,6 +29,7 @@ MAIN_36_BRANCHES = [
     "BANP001", "BATP001", "CHAP001", "CHHP001", "KAMP001", "KANP001", "KOHP001", "KRAP001",
     "MONP001", "ODDP001", "PNPP001", "PNPP002", "PNPP003", "PNPP004", "PNPP005", "PNPP006",
     "PNPP007", "PNPP008", "PNPP009", "PNPP010", "PNPP011", "PNPP012", "PNPP013", "PNPP014",
+    "PNPP015",
     "PREP001", "PRHP001", "PURP001", "ROTP001", "SIEP001", "SIHP001", "SPEP001", "STUP001",
     "SVAP001", "TAKP001", "TBKP001", "THOP001"
 ]
@@ -37,6 +38,7 @@ ZONE_BRANCHES = {
     "ZONE1": [
         "PNPP001", "PNPP002", "PNPP003", "PNPP004", "PNPP005", "PNPP006", "PNPP007",
         "PNPP008", "PNPP009", "PNPP010", "PNPP011", "PNPP012", "PNPP013", "PNPP014",
+        "PNPP015",
         "KANP001", "PREP001", "SVAP001"
     ],
     "ZONE2": ["KAMP001", "KOHP001", "SIHP001", "SPEP001", "TAKP001"],
@@ -748,8 +750,17 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
                 t_start = parse_time(row.get(col_created))
 
         if is_delivered:
-            if t410 and t_start and t410 >= t_start:
-                duration_hours = (t410 - t_start).total_seconds() / 3600.0
+            # 16:00 Cutoff Rule for Service Points:
+            # If parcel arrived at branch/service point after 16:00 and was delivered on a subsequent day,
+            # delivery speed countdown starts from 08:00 AM next day (excluding overnight non-working hours).
+            t_speed_start = t_start
+            if t_start and (t_start.time() >= time(16, 0)) and t410 and (t410.date() > t_start.date()):
+                t_speed_start = datetime(t_start.year, t_start.month, t_start.day, 8, 0, 0) + timedelta(days=1)
+
+            if t410 and t_speed_start and t410 >= t_speed_start:
+                duration_hours = (t410 - t_speed_start).total_seconds() / 3600.0
+            elif t410 and t_speed_start and t410 < t_speed_start:
+                duration_hours = 0.1
             elif t410 and pd.notna(row.get(col_created)):
                 t_created = parse_time(row.get(col_created))
                 duration_hours = (t410 - t_created).total_seconds() / 3600.0 if (t_created and t410 >= t_created) else 4.0
@@ -758,7 +769,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
 
             # If duration > 8 hours or parcel arrived on a previous day,
             # check if there was a customer appointment (420/472/reschedule)
-            if t410 and t_start and (duration_hours > 8.0 or t_start.date() < t410.date()):
+            if t410 and t_speed_start and (duration_hours > 8.0 or t_speed_start.date() < t410.date()):
                 trips = get_tracking_trips(order_id)
                 if trips:
                     has_appointment = False
@@ -788,21 +799,21 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
                                 except Exception:
                                     pass
                         if day_scans:
-                            t_start = min(day_scans)
+                            t_speed_start = min(day_scans)
                         else:
-                            t_start = datetime(t410.year, t410.month, t410.day, 8, 0, 0)
+                            t_speed_start = datetime(t410.year, t410.month, t410.day, 8, 0, 0)
                         
-                        duration_hours = max((t410 - t_start).total_seconds() / 3600.0, 0.1)
+                        duration_hours = max((t410 - t_speed_start).total_seconds() / 3600.0, 0.1)
         else:
             duration_hours = None
 
         if duration_hours is not None:
             if duration_hours < 2.0:
-                tier = "< 2 Hours (+50%)"
+                tier = "< 2 Hours (50%)"
                 rate_usd = 0.30
                 tag_color = "GREEN"
             elif duration_hours <= 4.0:
-                tier = "2 - 4 Hours (+25%)"
+                tier = "2 - 4 Hours (25%)"
                 rate_usd = 0.25
                 tag_color = "BLUE"
             elif duration_hours <= 8.0:
@@ -810,7 +821,7 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
                 rate_usd = 0.20
                 tag_color = "NORMAL"
             else:
-                tier = "> 8 Hours (-25% Fine)"
+                tier = "> 8 Hours (25% Fine)"
                 rate_usd = 0.15
                 tag_color = "RED"
         else:
@@ -931,8 +942,8 @@ def build_speed_report(src_xlsx, out_xlsx, target_label="ALL", report_date=None,
 
     # Row 2: Headers (Option C: Concise, clean, executive headers)
     headers_summary = [
-        "NO", "BRANCH", "PENDING", "DELIVERED", "< 2h (+50%)",
-        "2-4h (+25%)", "4-8h (Normal)", "> 8h (-25%)",
+        "NO", "BRANCH", "PENDING", "DELIVERED", "< 2h (50%)",
+        "2-4h (25%)", "4-8h (Normal)", "> 8h (25%)",
         "% <= 8h", "% > 8h", "COMMISSION"
     ]
     headers_detail = [
@@ -1275,7 +1286,10 @@ def render_speed_summary_image(out_xlsx):
                 cell_tgt.border = copy.copy(cell_orig.border)
                 cell_tgt.alignment = copy.copy(cell_orig.alignment)
 
-    col_widths = {1: 8, 2: 18, 3: 16, 4: 16, 5: 18, 6: 18, 7: 18, 8: 16, 9: 14, 10: 14, 11: 18}
+    col_widths = {1: 6, 2: 15, 3: 16, 4: 15, 5: 16, 6: 16, 7: 16, 8: 15, 9: 13, 10: 13, 11: 17}
+    for c, w in col_widths.items():
+        ws_sum.column_dimensions[get_column_letter(c)].width = w
+
     for c, w in col_widths.items():
         ws_sum.column_dimensions[get_column_letter(c)].width = w
 

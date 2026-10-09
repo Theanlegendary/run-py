@@ -284,8 +284,8 @@ def _make_run_cache(name: str) -> str:
     base_dir = os.path.join(HERE, "cache", name)
     try:
         os.makedirs(base_dir, exist_ok=True)
-        # Clean up runs older than 1 hour
-        cutoff = time.time() - 3600
+        # Clean up runs older than 14 hours (keeps entire working day)
+        cutoff = time.time() - 14 * 3600
         for entry in os.scandir(base_dir):
             if entry.is_dir() and entry.name.startswith("run_"):
                 try:
@@ -700,6 +700,7 @@ async def send_requester_text(
     context: ContextTypes.DEFAULT_TYPE,
     text: str,
     parse_mode: str = None,
+    **kwargs,
 ):
     chat_id = requester_chat_id(update)
     if chat_id is None:
@@ -709,7 +710,7 @@ async def send_requester_text(
     try:
         # Try to send privately to user
         return await safe_api_call(
-            context.bot.send_message, chat_id=chat_id, text=text, parse_mode=parse_mode
+            context.bot.send_message, chat_id=chat_id, text=text, parse_mode=parse_mode, **kwargs
         )
     except Exception as e:
         err_msg = str(e)
@@ -725,6 +726,7 @@ async def send_requester_text(
                     chat_id=update.effective_chat.id,
                     text=text,
                     parse_mode=parse_mode,
+                    **kwargs,
                 )
             except Exception as e2:
                 log.warning("Failed to send fallback requester text to group: %s", e2)
@@ -738,15 +740,16 @@ async def edit_or_send_requester_text(
     context: ContextTypes.DEFAULT_TYPE,
     text: str,
     parse_mode: str = None,
+    **kwargs,
 ):
     if message:
         try:
-            await safe_api_call(message.edit_text, text, parse_mode=parse_mode)
+            await safe_api_call(message.edit_text, text, parse_mode=parse_mode, **kwargs)
             return message
         except Exception as e:
             log.warning("Could not edit requester status message: %s", e)
 
-    return await send_requester_text(update, context, text, parse_mode=parse_mode)
+    return await send_requester_text(update, context, text, parse_mode=parse_mode, **kwargs)
 
 
 _PRIMARY_TOKEN = None
@@ -883,7 +886,7 @@ async def send_requester_document(
 
 
 
-async def forward_result_to_groups(context: ContextTypes.DEFAULT_TYPE, payload):
+async def forward_result_to_groups(context: ContextTypes.DEFAULT_TYPE = None, payload: dict = None):
     result = payload["result"]
     forward_groups = payload["forward_groups"]
     forward_mapping = payload["forward_mapping"]
@@ -1125,8 +1128,190 @@ async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def execute_scheduled_push(app: Application, cfg: dict = None, src: str = None, tmpdir: str = None) -> int:
+    """
+    Executes operational push to all configured branch groups (forward_mapping)
+    and all 5 zone groups (zone_forward_mapping).
+    Called by run_pending_auto_scheduler at 08:30 and 14:00 (or forced run).
+    """
+    cfg = cfg or load_config()
+    if is_paused(cfg):
+        log.info("Operational push skipped because bot is paused.")
+        return 0
+
+    if not tmpdir:
+        tmpdir = _make_run_cache("auto_push_run")
+
+    stamp = datetime.now().strftime("%d.%m_%HH%M")
+    if not src or not os.path.exists(src):
+        src = os.path.join(tmpdir, f"export_{stamp}.xlsx")
+        log.info("Downloading data for scheduled push...")
+        await asyncio.to_thread(downloader.download_detail, cfg["api"], src, force_refresh=True)
+
+    rev_cache = os.path.join(tmpdir, "latest_revenue.xlsx")
+    if not os.path.exists(rev_cache):
+        try:
+            await asyncio.to_thread(downloader.download_revenue_detail, cfg["api"], rev_cache, force_refresh=True)
+        except Exception as e_rev:
+            log.warning("Could not refresh revenue detail for scheduled push: %s", e_rev)
+
+    if not os.path.exists(REF_PATH):
+        log.error("Missing reference file %s for scheduled push", REF_PATH)
+        return 0
+
+    mode = get_mode(cfg)
+    import generate_report, importlib
+    importlib.reload(generate_report)
+    log.info("Generating reports for scheduled push...")
+    result = await asyncio.to_thread(
+        generate_report.generate_reports_from_data,
+        src, REF_PATH, tmpdir, return_metadata=True, mode=mode,
+        revenue_path=rev_cache if os.path.exists(rev_cache) else None,
+        render_handle_files=True,
+        render_final_excel=True,
+    )
+    update_webapp_cache(result)
+    save_highlight_history(result)
+
+    if not result.get("handle_results"):
+        log.warning("No handle_results generated for scheduled push.")
+        return 0
+
+    # 1. Forward to regular branch groups
+    forward_groups = get_all_forward_groups(cfg)
+    forward_mapping = get_forward_mapping(cfg)
+    actual_forward_groups = []
+    for group_id_str in forward_groups:
+        allowed = forward_mapping.get(str(group_id_str), [])
+        wants_all = "*" in allowed
+        for hr in result["handle_results"]:
+            if wants_all or hr["handle"] in allowed:
+                actual_forward_groups.append(group_id_str)
+                break
+
+    sent_branch_groups = 0
+    if actual_forward_groups:
+        payload = {
+            "result": result,
+            "forward_groups": actual_forward_groups,
+            "forward_mapping": forward_mapping,
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        sent_branch_groups = await forward_result_to_groups(None, payload)
+        log.info("Scheduled push delivered to %d branch group(s)", sent_branch_groups)
+
+    # 2. Forward to 5 Zone Groups
+    zone_fwd_map = cfg.get("zone_forward_mapping", {})
+    total_zones = cfg.get("total_zones", {})
+    zone_sent = 0
+    sender_bot = get_group_sender_bot() or app.bot
+    if zone_fwd_map:
+        import pandas as pd
+        import generate_summary
+        for group_id_str, zone_key in zone_fwd_map.items():
+            zone_handles = [h.upper() for h in total_zones.get(zone_key, [])]
+            if not zone_handles:
+                continue
+            zone_results = [
+                hr for hr in result["handle_results"]
+                if hr["handle"] in zone_handles
+            ]
+            if not zone_results:
+                continue
+
+            try:
+                group_id = int(group_id_str)
+            except ValueError:
+                group_id = group_id_str
+
+            zone_overall = {"Pickup": 0, "Delivery": 0, "Transit": 0, "Branch": 0}
+            for hr in zone_results:
+                for k in zone_overall:
+                    zone_overall[k] += hr["handle_counts"].get(k, 0)
+            zone_grand = sum(zone_overall.values())
+
+            zone_label = zone_key.upper()
+            zone_caption = "\n".join([
+                f"📋 {zone_label} Report  {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                f"Pickup: {zone_overall['Pickup']}  |  Delivery: {zone_overall['Delivery']}  |  Transit: {zone_overall['Transit']}  |  Branch: {zone_overall['Branch']}",
+                f"Grand Total: {zone_grand}",
+            ])
+
+            zone_result = {**result, "handle_results": zone_results, "overall_counts": zone_overall}
+            zone_result["type_data"] = {}
+            for rn in ["Pickup", "Delivery", "Transit", "Branch"]:
+                df = result.get("type_data", {}).get(rn)
+                if df is not None and not df.empty:
+                    filter_col = generate_report.REPORT_FILTER_COLS.get(rn, "POST OFFICE HANDLE")
+                    if filter_col in df.columns:
+                        zone_result["type_data"][rn] = df[df[filter_col].isin(zone_handles)].copy()
+                    else:
+                        zone_result["type_data"][rn] = df.copy()
+                else:
+                    zone_result["type_data"][rn] = pd.DataFrame()
+
+            try:
+                zone_day_date_counts = {
+                    handle: result.get("day_date_counts", {}).get(handle, {})
+                    for handle in zone_handles
+                }
+                zone_urgent_counts = {
+                    handle: result.get("urgent_counts", {}).get(handle, {"1day": 0, "3days": 0})
+                    for handle in zone_handles
+                }
+                zone_fee_counts = {
+                    handle: result.get("fee_counts", {}).get(handle, 0.0)
+                    for handle in zone_handles
+                }
+                zone_cod_counts = {
+                    handle: result.get("cod_counts", {}).get(handle, 0.0)
+                    for handle in zone_handles
+                }
+                zone_vip_counts = {
+                    handle: result.get("vip_counts", {}).get(handle, 0)
+                    for handle in zone_handles
+                }
+                zone_result["report_label"] = zone_label
+
+                # Summary image
+                img_buf = generate_summary.build_summary_image(
+                    zone_results,
+                    zone_overall,
+                    zone_label=zone_label,
+                    day_date_counts=zone_day_date_counts if zone_day_date_counts else None,
+                    urgent_counts=zone_urgent_counts if zone_urgent_counts else None,
+                    fee_counts=zone_fee_counts if zone_fee_counts else None,
+                    cod_counts=zone_cod_counts if zone_cod_counts else None,
+                    vip_counts=zone_vip_counts if any(zone_vip_counts.values()) else None,
+                )
+                img_buf.name = f"{zone_key}_summary.png"
+                await safe_api_call(sender_bot.send_photo, chat_id=group_id, photo=img_buf)
+                await asyncio.sleep(0.5)
+
+                # Total Excel
+                zone_xlsx = os.path.join(tmpdir, f"Total_{zone_label}_{stamp}.xlsx")
+                generate_summary.build_total_excel(zone_result, zone_xlsx)
+                with open(zone_xlsx, "rb") as f:
+                    await safe_api_call(
+                        sender_bot.send_document,
+                        chat_id=group_id,
+                        document=f,
+                        filename=os.path.basename(zone_xlsx),
+                        caption=zone_caption,
+                    )
+                zone_sent += 1
+                await asyncio.sleep(1.0)
+            except Exception as e_zf:
+                log.exception("Zone forward error to %s (%s): %s", group_id, zone_key, e_zf)
+
+    total_sent = sent_branch_groups + zone_sent
+    log.info("Scheduled push completed: %d branch groups, %d zone groups sent (Total %d).",
+             sent_branch_groups, zone_sent, total_sent)
+    return total_sent
+
+
 async def run_pending_auto_scheduler(app: Application):
-    """Background task loop that sends scheduled reports (/total, /total pending, /total mega) at scheduled hours to registered target groups."""
+    """Background task loop that sends scheduled reports (/total, /total pending, /total mega, /speed all, push) at scheduled hours to registered target groups."""
     log.info("Starting background auto-scheduler...")
     DEFAULT_SCHEDULED_TARGETS = [
         {
@@ -1139,13 +1324,20 @@ async def run_pending_auto_scheduler(app: Application):
             "chat_id": -5481716194,
             "title": "🔴 QUALITY - METFONE EXPRESS",
             "hours": ["08:00", "14:00", "16:00"],
-            "reports": ["total", "total_pending"],
+            "reports": ["total_pending"],
         },
         {
             "chat_id": -1004493373354,
             "title": "MEGA HUB",
             "hours": ["08:00", "14:00", "16:00"],
             "reports": ["total_mega"],
+        },
+
+        {
+            "chat_id": 0,
+            "title": "All Branches & Zones (Operational Push)",
+            "hours": ["08:30", "14:00"],
+            "reports": ["push"],
         },
     ]
     state_file = os.path.join(HERE, "pending_schedule_state.json")
@@ -1177,7 +1369,7 @@ async def run_pending_auto_scheduler(app: Application):
                 continue
 
             SCHEDULED_TARGETS = cfg.get("scheduled_targets") or DEFAULT_SCHEDULED_TARGETS
-            ALL_SCHEDULED_HOURS = sorted(list(set().union(*(t.get("hours", ["08:00", "14:00", "16:00"]) for t in SCHEDULED_TARGETS))))
+            ALL_SCHEDULED_HOURS = sorted(list(set(["08:00", "08:30", "11:00", "14:00", "15:00", "16:00"]).union(*(t.get("hours", []) for t in SCHEDULED_TARGETS))))
 
             now = datetime.now()
             date_str = now.strftime("%Y-%m-%d")
@@ -1192,8 +1384,10 @@ async def run_pending_auto_scheduler(app: Application):
 
             state = _load_state()
             is_forced = bool(state.get("force_run", False))
+            is_forced_speed = bool(state.get("force_speed", False))
+            is_forced_push = bool(state.get("force_push", False))
 
-            if not past_slots and not is_forced:
+            if not past_slots and not is_forced and not is_forced_speed and not is_forced_push:
                 # No scheduled slot reached yet today (e.g. before 08:00)
                 await asyncio.sleep(15)
                 continue
@@ -1203,18 +1397,31 @@ async def run_pending_auto_scheduler(app: Application):
             current_slot = f"{date_str}_{slot_time.replace(':', '')}"
 
             completed_slots = set(state.get("completed_slots", []))
-            if not is_forced and (state.get("last_run_slot") == current_slot or current_slot in completed_slots):
+            if not is_forced and not is_forced_speed and not is_forced_push and (state.get("last_run_slot") == current_slot or current_slot in completed_slots):
                 await asyncio.sleep(15)
                 continue
 
             # Cooldown if this slot failed very recently (avoid tight error loop)
-            if not is_forced and state.get("failed_slot") == current_slot:
+            if not is_forced and not is_forced_speed and not is_forced_push and state.get("failed_slot") == current_slot:
                 last_fail = state.get("last_fail_ts", 0)
                 if (now.timestamp() - last_fail) < 120:
                     await asyncio.sleep(15)
                     continue
 
-            active_targets = SCHEDULED_TARGETS if is_forced else [t for t in SCHEDULED_TARGETS if slot_time in t.get("hours", [])]
+            if is_forced_push:
+                active_targets = [t for t in SCHEDULED_TARGETS if any("push" in r for r in t.get("reports", []))]
+            elif is_forced_speed:
+                active_targets = [t for t in SCHEDULED_TARGETS if any("speed" in r for r in t.get("reports", []))]
+            elif is_forced:
+                active_targets = [t for t in SCHEDULED_TARGETS if not any("speed" in r or "push" in r for r in t.get("reports", []))]
+            else:
+                active_targets = [t for t in SCHEDULED_TARGETS if slot_time in t.get("hours", [])]
+
+            if not active_targets and (slot_time in ("08:30", "14:00") or is_forced_push):
+                active_targets = [
+                    {"chat_id": 0, "title": "All Branches & Zones (Operational Push)", "hours": ["08:30", "14:00"], "reports": ["push"]}
+                ]
+
             if not active_targets:
                 await asyncio.sleep(15)
                 continue
@@ -1229,13 +1436,32 @@ async def run_pending_auto_scheduler(app: Application):
             try:
                 await asyncio.to_thread(downloader.download_detail, cfg["api"], src, force_refresh=True)
 
-                needs_total_or_pending = any(
-                    "total" in t.get("reports", ["total", "total_pending"]) or
-                    "total_pending" in t.get("reports", ["total", "total_pending"])
+                is_speed_slot = (slot_time in ("11:00", "15:00")) or is_forced_speed
+                is_push_slot = (slot_time in ("08:30", "14:00")) or is_forced_push
+                needs_speed = any(
+                    "speed_all" in t.get("reports", []) or "speed" in t.get("reports", [])
+                    for t in active_targets
+                ) or is_speed_slot
+
+                needs_push = any(
+                    "push" in t.get("reports", [])
+                    for t in active_targets
+                ) or is_push_slot
+
+                needs_total = not is_speed_slot and any(
+                    "total" in t.get("reports", [])
                     for t in active_targets
                 )
-                needs_mega = any(
+                needs_pending = not is_speed_slot and any(
+                    "total_pending" in t.get("reports", [])
+                    for t in active_targets
+                )
+                needs_mega = not is_speed_slot and any(
                     "total_mega" in t.get("reports", [])
+                    for t in active_targets
+                )
+                needs_dvc = not is_speed_slot and any(
+                    "total_dvc" in t.get("reports", []) or "dvc" in t.get("reports", [])
                     for t in active_targets
                 )
 
@@ -1243,9 +1469,11 @@ async def run_pending_auto_scheduler(app: Application):
                 summary_df, grand_total, df_detail, out_xlsx, text_caption, img_buf = None, {}, None, None, None, None
                 img_pnp, pnp_caption, img_prov, prov_caption, total_xlsx, total_summary_caption = None, None, None, None, None, None
                 mega_hub_images, mega_detail_xlsx, mega_detail_caption = [], None, None
+                dvc_xlsx, dvc_img_buf, dvc_caption, dvc_stats = None, None, None, {}
+                out_speed_xlsx, img_speed_buf, speed_caption = None, None, None
 
-                # ── 1. Generate /total pending & /total if needed ──
-                if needs_total_or_pending:
+                # ── 1. Generate /total pending if needed ──
+                if needs_pending:
                     import total_pending_report, importlib
                     importlib.reload(total_pending_report)
                     summary_df, grand_total, df_detail = await asyncio.to_thread(total_pending_report.process_pending_data, src)
@@ -1256,6 +1484,8 @@ async def run_pending_auto_scheduler(app: Application):
                     img_buf = await asyncio.to_thread(total_pending_report.render_total_pending_image, summary_df, grand_total, xlsx_path=out_xlsx)
                     img_buf.name = f"TOTAL_PENDING_{stamp}.png"
 
+                # ── 1b. Generate /total (full revenue/handle summary) if needed ──
+                if needs_total:
                     import generate_summary
                     cache_dir = os.path.join(HERE, "cache")
                     rev_cache = os.path.join(cache_dir, "latest_revenue.xlsx")
@@ -1443,11 +1673,86 @@ async def run_pending_auto_scheduler(app: Application):
                         m_urg_orders = 0
                     mega_detail_caption = f"📋 ទិន្នន័យលម្អិត MEGA {now.strftime('%d/%m/%Y %H:%M')}\nTotal: {m_tot_orders} | Urgent: {m_urg_orders}"
 
+                # ── 2b. Generate /total dvc if needed ──
+                if needs_dvc:
+                    import truck_kpi_report, importlib
+                    importlib.reload(truck_kpi_report)
+                    import glob
+
+                    user_dl = os.path.expanduser("~/Downloads/BCtyle*.xlsx")
+                    user_dt = os.path.expanduser("~/Desktop/BCtyle*.xlsx")
+                    candidates = sorted(
+                        glob.glob(user_dl) + glob.glob(user_dt) + glob.glob("BCtyle*.xlsx") + glob.glob("cache/**/BCtyle*.xlsx", recursive=True),
+                        key=os.path.getmtime,
+                        reverse=True
+                    )
+                    if candidates:
+                        src_bc = candidates[0]
+                        try:
+                            dvc_xlsx, dvc_img_buf, dvc_caption, dvc_stats = await asyncio.to_thread(
+                                truck_kpi_report.generate_truck_kpi_report, src_bc, tmpdir
+                            )
+                            date_tag = dvc_stats.get('date_str', 'report').replace('/', '.')
+                            if dvc_img_buf:
+                                dvc_img_buf.name = f"DVC_Truck_KPI_{date_tag}.png"
+                        except Exception as e_dvc_gen:
+                            log.warning("Failed generating scheduled truck/dvc report from %s: %s", src_bc, e_dvc_gen)
+                    else:
+                        log.warning("No BCtyle file found for scheduled /total dvc report.")
+
+                # ── 2c. Generate /speed all if needed ──
+                if needs_speed:
+                    import speed_report, importlib
+                    importlib.reload(speed_report)
+                    cache_dir = os.path.join(HERE, "cache")
+                    rev_file = os.path.join(cache_dir, "latest_revenue.xlsx")
+                    try:
+                        await asyncio.to_thread(downloader.download_revenue_detail, cfg["api"], rev_file, force_refresh=True)
+                    except Exception as e_rev:
+                        log.warning("Could not refresh revenue detail for scheduled speed report: %s", e_rev)
+
+                    shared_df, shared_vas_map = await asyncio.to_thread(speed_report.load_speed_context, src, rev_file)
+                    out_speed_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_ALL.xlsx")
+                    tot_del, tot_u2, tot_24, tot_o8, tot_pay = await asyncio.to_thread(
+                        speed_report.build_speed_report,
+                        src,
+                        out_speed_xlsx,
+                        target_label="ALL",
+                        report_date=now.date(),
+                        revenue_path=rev_file,
+                        preloaded_df=shared_df,
+                        preloaded_vas_map=shared_vas_map
+                    )
+                    speed_caption = (
+                        f"⚡ *DELIVERY SPEED SLA REPORT (ALL)*\n"
+                        f"Total Delivered (410): `{tot_del}`\n"
+                        f"< 2 Hours (50%): `{tot_u2}`\n"
+                        f"2 - 4 Hours (25%): `{tot_24}`\n"
+                        f"> 8 Hours (25%): `{tot_o8}`\n"
+                        f"Total Commission: `${tot_pay:.2f}`\n"
+                        f"Time: {now.strftime('%d/%m/%Y %H:%M')}"
+                    )
+                    try:
+                        img_speed_buf = await asyncio.to_thread(speed_report.render_speed_summary_image, out_speed_xlsx)
+                        img_speed_buf.name = f"speed_summary_{stamp}_ALL.png"
+                    except Exception as e_sp_img:
+                        log.warning("Could not render scheduled speed summary image: %s", e_sp_img)
+
+                # ── 2d. Generate & dispatch operational push if needed ──
+                if needs_push:
+                    try:
+                        sent_count = await execute_scheduled_push(app, cfg, src=src, tmpdir=tmpdir)
+                        log.info("Scheduled operational push completed (dispatched to %d groups)", sent_count)
+                    except Exception as e_push_sched:
+                        log.exception("Error executing scheduled operational push: %s", e_push_sched)
+
                 # ── 3. Deliver reports to active target groups ──
                 sender_bot = get_group_sender_bot() or app.bot
                 for target in active_targets:
-                    t_chat_id = target["chat_id"]
-                    t_title = target["title"]
+                    t_chat_id = target.get("chat_id")
+                    if not t_chat_id or t_chat_id == 0:
+                        continue
+                    t_title = target.get("title", "")
                     safe_title = str(t_title).encode('ascii', 'replace').decode('ascii')
                     t_reports = target.get("reports", ["total", "total_pending"])
 
@@ -1530,8 +1835,8 @@ async def run_pending_auto_scheduler(app: Application):
                                         filename=img_buf.name,
                                         caption=text_caption
                                     )
-
                             if out_xlsx and os.path.exists(out_xlsx):
+
                                 with open(out_xlsx, "rb") as f:
                                     await sender_bot.send_document(
                                         chat_id=t_chat_id,
@@ -1539,9 +1844,195 @@ async def run_pending_auto_scheduler(app: Application):
                                         filename=os.path.basename(out_xlsx),
                                         caption=f"TOTAL PENDING REPORT {now.strftime('%d/%m/%Y %H:%M')}"
                                     )
-                            log.info("Successfully delivered scheduled reports (/total & /total pending) to %s (%s)", t_chat_id, safe_title)
+                            log.info("Successfully delivered scheduled reports (/total pending) to %s (%s)", t_chat_id, safe_title)
                         except Exception as e_send:
                             log.exception("Error sending scheduled report to %s (%s): %s", t_chat_id, safe_title, e_send)
+
+                    # Deliver /total dvc
+                    if "total_dvc" in t_reports or "dvc" in t_reports:
+                        if dvc_img_buf is not None:
+                            try:
+                                if hasattr(dvc_img_buf, "seek"):
+                                    dvc_img_buf.seek(0)
+                                try:
+                                    await sender_bot.send_photo(
+                                        chat_id=t_chat_id,
+                                        photo=dvc_img_buf,
+                                        caption=dvc_caption,
+                                        parse_mode="Markdown"
+                                    )
+                                except Exception as e_ph:
+                                    log.warning("Could not send scheduled dvc photo with caption to %s (%s): %s. Fallback photo + text...", t_chat_id, safe_title, e_ph)
+                                    if hasattr(dvc_img_buf, "seek"):
+                                        dvc_img_buf.seek(0)
+                                    await sender_bot.send_photo(chat_id=t_chat_id, photo=dvc_img_buf)
+                                    await sender_bot.send_message(chat_id=t_chat_id, text=dvc_caption, parse_mode="Markdown")
+                            except Exception as e_dvc_p:
+                                log.warning("Could not send scheduled dvc photo to %s (%s): %s", t_chat_id, safe_title, e_dvc_p)
+
+                        if dvc_xlsx and os.path.exists(dvc_xlsx):
+                            try:
+                                with open(dvc_xlsx, "rb") as f_dvc:
+                                    await sender_bot.send_document(
+                                        chat_id=t_chat_id,
+                                        document=f_dvc,
+                                        filename=os.path.basename(dvc_xlsx),
+                                        caption=f"📋 Báo cáo chi tiết Xe Tải (DVC & Truck KPI) {dvc_stats.get('date_str', '')}"
+                                    )
+                                log.info("Successfully delivered scheduled /total dvc to %s (%s)", t_chat_id, safe_title)
+                            except Exception as e_dvc_doc:
+                                log.warning("Could not send scheduled dvc excel to %s (%s): %s", t_chat_id, safe_title, e_dvc_doc)
+
+                    # Deliver /speed all to target groups
+                    if "speed_all" in t_reports or "speed" in t_reports or (needs_speed and is_speed_slot):
+                        if img_speed_buf is not None:
+                            try:
+                                if hasattr(img_speed_buf, "seek"):
+                                    img_speed_buf.seek(0)
+                                await safe_api_call(
+                                    sender_bot.send_photo,
+                                    chat_id=t_chat_id,
+                                    photo=img_speed_buf,
+                                    caption=speed_caption,
+                                    parse_mode="Markdown"
+                                )
+                            except Exception as e_sp_ph:
+                                log.warning("Could not send scheduled speed photo to %s (%s): %s", t_chat_id, safe_title, e_sp_ph)
+
+                        if out_speed_xlsx and os.path.exists(out_speed_xlsx):
+                            try:
+                                with open(out_speed_xlsx, "rb") as f_sp:
+                                    await safe_api_call(
+                                        sender_bot.send_document,
+                                        chat_id=t_chat_id,
+                                        document=f_sp,
+                                        filename=os.path.basename(out_speed_xlsx),
+                                        caption=f"DELIVERY SPEED SLA REPORT (ALL) {now.strftime('%d/%m/%Y %H:%M')}"
+                                    )
+                                log.info("Successfully delivered scheduled /speed all to %s (%s)", t_chat_id, safe_title)
+                            except Exception as e_sp_doc:
+                                log.warning("Could not send scheduled speed doc to %s (%s): %s", t_chat_id, safe_title, e_sp_doc)
+
+                # ── 4. Forward scheduled /speed all to Zone Groups and Branch Groups ──
+                if needs_speed:
+                    total_sent_zones = 0
+                    total_sent_branches = 0
+
+                    # A. Forward to 5 Zone Groups
+                    zone_fwd_map = cfg.get("zone_forward_mapping", {})
+                    if zone_fwd_map:
+                        for z_idx in range(1, 6):
+                            z_name = f"Zone {z_idx}"
+                            z_clean = f"zone{z_idx}"
+                            z_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{z_name.replace(' ', '_')}.xlsx")
+                            try:
+                                z_del, z_u2, z_24, z_o8, z_pay = await asyncio.to_thread(
+                                    speed_report.build_speed_report,
+                                    src,
+                                    z_xlsx,
+                                    target_label=z_name,
+                                    report_date=now.date(),
+                                    revenue_path=rev_file,
+                                    preloaded_df=shared_df,
+                                    preloaded_vas_map=shared_vas_map
+                                )
+                                z_caption = (
+                                    f"⚡ *DELIVERY SPEED SLA REPORT ({z_name})*\n"
+                                    f"Total Delivered (410): `{z_del}`\n"
+                                    f"< 2 Hours (50%): `{z_u2}`\n"
+                                    f"2 - 4 Hours (25%): `{z_24}`\n"
+                                    f"> 8 Hours (25%): `{z_o8}`\n"
+                                    f"Total Commission: `${z_pay:.2f}`\n"
+                                    f"Time: {now.strftime('%d/%m/%Y %H:%M')}"
+                                )
+                                for gid, zkey in zone_fwd_map.items():
+                                    if str(zkey).lower().strip() == z_clean:
+                                        try:
+                                            z_img = await asyncio.to_thread(speed_report.render_speed_summary_image, z_xlsx)
+                                            z_img.name = f"SPEED_SUMMARY_{z_name.replace(' ', '_')}.png"
+                                            await safe_api_call(
+                                                sender_bot.send_photo,
+                                                chat_id=int(gid),
+                                                photo=z_img,
+                                                caption=z_caption,
+                                                parse_mode="Markdown"
+                                            )
+                                        except Exception as e_zf_img:
+                                            log.warning("Failed forwarding scheduled speed photo to zone group %s: %s", gid, e_zf_img)
+
+                                        try:
+                                            with open(z_xlsx, "rb") as z_f_doc:
+                                                await safe_api_call(
+                                                    sender_bot.send_document,
+                                                    chat_id=int(gid),
+                                                    document=z_f_doc,
+                                                    filename=os.path.basename(z_xlsx)
+                                                )
+                                            total_sent_zones += 1
+                                        except Exception as e_zf_doc:
+                                            log.warning("Failed forwarding scheduled speed doc to zone group %s: %s", gid, e_zf_doc)
+                            except Exception as e_z_gen:
+                                log.warning("Failed building scheduled speed report for zone %s: %s", z_name, e_z_gen)
+
+                    # B. Forward to 36 Branch Groups
+                    fwd_map = get_forward_mapping(cfg)
+                    if fwd_map:
+                        for gid, handles in fwd_map.items():
+                            if not handles or "*" in handles:
+                                continue
+                            br_code = handles[0].upper()
+                            if br_code not in speed_report.MAIN_36_BRANCHES:
+                                continue
+
+                            br_xlsx = os.path.join(tmpdir, f"DELIVERY_SPEED_REPORT_{stamp}_{br_code}.xlsx")
+                            try:
+                                b_del, b_u2, b_24, b_o8, b_pay = await asyncio.to_thread(
+                                    speed_report.build_speed_report,
+                                    src,
+                                    br_xlsx,
+                                    target_label=br_code,
+                                    report_date=now.date(),
+                                    revenue_path=rev_file,
+                                    preloaded_df=shared_df,
+                                    preloaded_vas_map=shared_vas_map
+                                )
+                                b_caption = (
+                                    f"⚡ *DELIVERY SPEED SLA REPORT ({br_code})*\n"
+                                    f"Total Delivered (410): `{b_del}`\n"
+                                    f"< 2 Hours (50%): `{b_u2}`\n"
+                                    f"2 - 4 Hours (25%): `{b_24}`\n"
+                                    f"> 8 Hours (25%): `{b_o8}`\n"
+                                    f"Total Commission: `${b_pay:.2f}`\n"
+                                    f"Time: {now.strftime('%d/%m/%Y %H:%M')}"
+                                )
+                                try:
+                                    b_img = await asyncio.to_thread(speed_report.render_speed_summary_image, br_xlsx)
+                                    b_img.name = f"SPEED_SUMMARY_{br_code}.png"
+                                    await safe_api_call(
+                                        sender_bot.send_photo,
+                                        chat_id=int(gid),
+                                        photo=b_img,
+                                        caption=b_caption,
+                                        parse_mode="Markdown"
+                                    )
+                                except Exception as e_bf_img:
+                                    log.warning("Failed sending scheduled speed photo to branch %s: %s", br_code, e_bf_img)
+
+                                try:
+                                    with open(br_xlsx, "rb") as b_f_doc:
+                                        await safe_api_call(
+                                            sender_bot.send_document,
+                                            chat_id=int(gid),
+                                            document=b_f_doc,
+                                            filename=os.path.basename(br_xlsx)
+                                        )
+                                    total_sent_branches += 1
+                                except Exception as e_bf_doc:
+                                    log.warning("Failed sending scheduled speed doc to branch %s: %s", br_code, e_bf_doc)
+                            except Exception as e_b_gen:
+                                log.warning("Failed building scheduled speed report for branch %s: %s", br_code, e_b_gen)
+
+                    log.info("Scheduled /speed all successfully dispatched (Zones: %s, Branches: %s)", total_sent_zones, total_sent_branches)
 
                 state["last_run_slot"] = current_slot
                 state["last_run_time"] = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -1550,6 +2041,8 @@ async def run_pending_auto_scheduler(app: Application):
                 state.pop("last_fail_ts", None)
                 state.pop("last_error", None)
                 state.pop("force_run", None)
+                state.pop("force_speed", None)
+                state.pop("force_push", None)
                 completed_slots.add(current_slot)
                 state["completed_slots"] = sorted(list(completed_slots))[-30:]
                 _save_state(state)
@@ -1559,6 +2052,8 @@ async def run_pending_auto_scheduler(app: Application):
                 state["last_fail_ts"] = now.timestamp()
                 state["last_error"] = str(e_run)
                 state.pop("force_run", None)
+                state.pop("force_speed", None)
+                state.pop("force_push", None)
                 _save_state(state)
 
         except Exception as e_loop:
@@ -1597,8 +2092,8 @@ async def run_daily_report_auto_scheduler(app: Application):
                 await asyncio.sleep(15)
                 continue
 
-            sched_cfg = cfg.get("daily_report_schedule", {})
-            if not sched_cfg.get("enabled", True):
+            sched_cfg = cfg.get("daily_report_schedule") or cfg.get("telegram", {}).get("daily_report_schedule", {})
+            if not sched_cfg.get("enabled", False):
                 await asyncio.sleep(20)
                 continue
 
@@ -1643,8 +2138,21 @@ async def run_daily_report_auto_scheduler(app: Application):
 
 async def on_post_init(app: Application):
     """Start background tasks on bot startup."""
+    cfg = load_config()
+    # Always ensure Auto-Schedule is ON on bot startup
+    if cfg.get("telegram", {}).get("paused", False):
+        cfg["telegram"]["paused"] = False
+        save_config(cfg)
+        log.info("✅ Auto-Schedule automatically ENABLED on startup (resumed from paused).")
+    else:
+        log.info("✅ Auto-Schedule is ACTIVE on startup.")
+
     asyncio.create_task(run_pending_auto_scheduler(app))
-    asyncio.create_task(run_daily_report_auto_scheduler(app))
+    sched_cfg = cfg.get("daily_report_schedule") or cfg.get("telegram", {}).get("daily_report_schedule", {})
+    if sched_cfg.get("enabled", False):
+        asyncio.create_task(run_daily_report_auto_scheduler(app))
+    else:
+        log.info("Daily report auto-scheduler (18:00) disabled per configuration (3 times daily mode active: 08:00, 14:00, 16:00).")
     # Clean up old accumulated temp dirs from previous sessions
     await asyncio.to_thread(_cleanup_old_temp_bot_dirs)
     # Pre-create fixed run-cache dirs so first /push is fast
@@ -1666,14 +2174,22 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cfg["telegram"]["paused"] = False
         save_config(cfg)
         msg = (
-            "✅ *Auto-Schedule ENABLED*\n"
+            "✅ *Auto-Schedule ENABLED (6 Slots / Day)*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "• Target 1: 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
-            "  Hours: 08:00, 14:00, 16:00 | Reports: /total pending\n"
-            "• Target 2: 🔴 QUALITY - METFONE EXPRESS (-5481716194)\n"
-            "  Hours: 08:00, 14:00, 16:00 | Reports: /total pending & /total\n"
-            "• Target 3: MEGA HUB (-1004493373354)\n"
-            "  Hours: 08:00, 14:00, 16:00 | Reports: /total mega\n"
+            "• Morning:\n"
+            "  - 08:00: /total pending & /total mega\n"
+            "  - 08:30: Operational Push (All Branches & Zones)\n"
+            "  - 11:00: /speed all (Delivery Speed SLA)\n"
+            "• Afternoon:\n"
+            "  - 14:00: Operational Push + /total pending & /total mega\n"
+            "  - 15:00 (3:00 PM): /speed all (Delivery Speed SLA)\n"
+            "  - 16:00: /total pending & /total mega\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "• Targets:\n"
+            "  - 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
+            "  - 🔴 QUALITY - METFONE EXPRESS (-5481716194)\n"
+            "  - MEGA HUB (-1004493373354)\n"
+            "  - All Branch Groups & 5 Zone Groups (Push & Speed SLA)\n"
             "• Status: Active in background"
         )
     elif sub in ("off", "pause", "stop", "disable"):
@@ -1682,13 +2198,13 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = (
             "⏸ *Auto-Schedule PAUSED*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "• Target 1: 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
-            "• Target 2: 🔴 QUALITY - METFONE EXPRESS (-5481716194)\n"
-            "• Target 3: MEGA HUB (-1004493373354)\n"
+            "• All automatic scheduled reports paused.\n"
             "• Status: Paused\n\n"
             "Use `/schedule on` or `/resume` to re-enable."
         )
-    elif sub in ("run", "now", "force"):
+    elif sub in ("run", "now", "force", "speed", "speedall", "speed_all", "push"):
+        force_speed = sub in ("speed", "speedall", "speed_all") or any(a.lower() in ("speed", "speed_all", "speedall") for a in args[1:])
+        force_push = sub == "push" or any(a.lower() == "push" for a in args[1:])
         # Reset state so scheduler triggers current slot immediately
         state_file = os.path.join(HERE, "pending_schedule_state.json")
         try:
@@ -1700,28 +2216,54 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             st.pop("last_run_slot", None)
             st.pop("completed_slots", None)
             st.pop("failed_slot", None)
-            st["force_run"] = True
+            if force_push:
+                st["force_push"] = True
+                st.pop("force_speed", None)
+                st.pop("force_run", None)
+            elif force_speed:
+                st["force_speed"] = True
+                st.pop("force_push", None)
+                st.pop("force_run", None)
+            else:
+                st["force_run"] = True
+                st.pop("force_push", None)
+                st.pop("force_speed", None)
             with open(state_file, "w", encoding="utf-8") as f:
                 json.dump(st, f, indent=2)
         except Exception:
             pass
-        msg = "🚀 Triggering scheduled reports (/total, /total pending & /total mega) now..."
+        if force_push:
+            msg = "🚀 Triggering scheduled operational push (all branches & zones) now..."
+        elif force_speed:
+            msg = "🚀 Triggering scheduled /speed all report now..."
+        else:
+            msg = "🚀 Triggering scheduled reports (/total pending & /total mega) now..."
     else:
         paused = is_paused(cfg)
         status_str = "⏸ PAUSED" if paused else "✅ ACTIVE"
         msg = (
             f"📅 *Auto-Schedule Status: {status_str}*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "• Target 1: 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
-            "  Hours: 08:00, 14:00, 16:00 | Reports: /total pending\n"
-            "• Target 2: 🔴 QUALITY - METFONE EXPRESS (-5481716194)\n"
-            "  Hours: 08:00, 14:00, 16:00 | Reports: /total pending & /total\n"
-            "• Target 3: MEGA HUB (-1004493373354)\n"
-            "  Hours: 08:00, 14:00, 16:00 | Reports: /total mega\n\n"
+            "• Morning:\n"
+            "  - 08:00: /total pending & /total mega\n"
+            "  - 08:30: Operational Push (All Branches & Zones)\n"
+            "  - 11:00: /speed all (Delivery Speed SLA)\n"
+            "• Afternoon:\n"
+            "  - 14:00: Operational Push + /total pending & /total mega\n"
+            "  - 15:00 (3:00 PM): /speed all (Delivery Speed SLA)\n"
+            "  - 16:00: /total pending & /total mega\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "• Targets:\n"
+            "  - 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
+            "  - 🔴 QUALITY - METFONE EXPRESS (-5481716194)\n"
+            "  - MEGA HUB (-1004493373354)\n"
+            "  - All Branch Groups & 5 Zone Groups (Push & Speed SLA)\n\n"
             "Commands:\n"
             "• `/schedule on` — Enable schedule mode\n"
             "• `/schedule off` — Pause schedule mode\n"
-            "• `/schedule run` — Run scheduled report now"
+            "• `/schedule run` — Run scheduled pending/mega report now\n"
+            "• `/schedule run push` — Run scheduled operational push now\n"
+            "• `/schedule run speed` — Run scheduled /speed all now"
         )
 
     await private_or_current_reply(update, context, msg, parse_mode="Markdown")
@@ -2207,10 +2749,13 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await edit_or_send_requester_text(msg, update, context, f"Error: {e}")
             return
 
-        if zone_key in ("dvc", "dvczone"):
+        if zone_key in ("dvc", "truck", "truckkpi", "chuyenxe"):
+            return await cmd_truck_kpi(update, context)
+
+        if zone_key in ("dvchub", "hub", "dvczone"):
             target_zone = args[1] if len(args) > 1 else None
-            zone_desc = f" ({target_zone.upper()})" if target_zone else " (ALL 5 ZONES)"
-            msg = await send_requester_text(update, context, f"⏳ Fetching data for DVC BY ZONE REPORT{zone_desc}...")
+            zone_desc = f" ({target_zone.upper()})" if target_zone else ""
+            msg = await send_requester_text(update, context, f"⏳ Fetching data for DVC & MEGA HUB DISTRIBUTION{zone_desc}...")
             tmpdir = tempfile.mkdtemp(prefix="dvc_")
             track_report_dir(tmpdir)
             stamp  = datetime.now().strftime("%d.%m_%HH%M")
@@ -2219,55 +2764,88 @@ async def cmd_total(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 msg = await edit_or_send_requester_text(msg, update, context, "⏳ [1/4] Downloading latest TMS data...")
                 await asyncio.to_thread(downloader.download_detail, cfg["api"], src, force_refresh=force_refresh)
 
-                msg = await edit_or_send_requester_text(msg, update, context, "📊 [2/4] Processing DVC Hub by Zone pivots...")
+                msg = await edit_or_send_requester_text(msg, update, context, "📊 [2/4] Processing DVC & Mega Hub distributions...")
                 import dvc_report
 
                 rows = await asyncio.to_thread(dvc_report.read_source, src)
-                tree, day_keys, extra_data, dvc_rows = await asyncio.to_thread(
-                    dvc_report.build_dvc_zone_pivot, rows, target_zone=target_zone,
+                stats, dvc_rows, c_tot_1, c_tot_2, grand_total = await asyncio.to_thread(
+                    dvc_report.build_dvc_2tables_data, rows,
+                    target_zone=target_zone,
                     exclude_test=cfg.get("pivot", {}).get("exclude_test", True),
                     test_keywords=cfg.get("pivot", {}).get("test_keywords", ["test"])
                 )
 
-                if not dvc_rows or not tree:
-                    await edit_or_send_requester_text(msg, update, context, "⚠️ No DVC orders found for current filter.")
+                if not dvc_rows:
+                    await edit_or_send_requester_text(msg, update, context, "⚠️ No DVC or Mega Hub orders found in current data.")
                     return
 
-                msg = await edit_or_send_requester_text(msg, update, context, "📸 [3/4] Rendering DVC Zone dashboard image...")
-                hub_xlsx = os.path.join(tmpdir, f"Report_DVC_Zone_{stamp}.xlsx")
-                tot_orders, urg_orders = await asyncio.to_thread(
-                    dvc_report.export_dvc_zone_pivot, tree, day_keys, hub_xlsx, extra_data=extra_data
+                msg = await edit_or_send_requester_text(msg, update, context, "📸 [3/4] Rendering 2-table distribution dashboard...")
+                hub_xlsx = os.path.join(tmpdir, f"DVC_Hubs_Distribution_{stamp}.xlsx")
+                await asyncio.to_thread(
+                    dvc_report.export_dvc_2tables_workbook, stats, dvc_rows, hub_xlsx
                 )
+
+                now_str = datetime.now().strftime('%d/%m/%Y %H:%M')
+                tot_lt30 = sum(s.get("lt_30m", 0) for s in stats.values())
+                tot_gt30 = sum(s.get("gt_30m", 0) for s in stats.values())
+                tot_cor = sum(s.get("correct", s.get("total", 0)) for s in stats.values())
+                gt_pct = (tot_cor / grand_total * 100) if grand_total > 0 else 100.0
+
+                def _fmt_hub_line(code, desc):
+                    s = stats.get(code, {})
+                    tot = s.get("total", 0)
+                    pct = s.get("pct_correct", 100.0)
+                    lt = s.get("lt_30m", 0)
+                    gt = s.get("gt_30m", 0)
+                    return f"  • {code}: {tot:,} bills | {pct:.1f}% Correct (<30p: {lt}, >30p: {gt}) — {desc}"
+
+                caption_lines = [
+                    f"📦 DVC & MEGA HUB DISTRIBUTION — {now_str}",
+                    "🚚 Truck/Trip Accuracy & Delay Breakdown (< 30p & > 30p):",
+                    "",
+                    f"🏢 Central Mega Hubs: {c_tot_1:,} bills",
+                    _fmt_hub_line("MEGA1", "Central Mega Hub"),
+                    _fmt_hub_line("DVCMEGA1", "Central Mega Sorting Hub"),
+                    "",
+                    f"🚚 Regional Zone Transit Hubs: {c_tot_2:,} bills",
+                    _fmt_hub_line("DVCZ1", "PNP, Kandal, Prey Veng, Svay Rieng"),
+                    _fmt_hub_line("DVCZ2", "Kampot, Kep, Sihanoukville, Koh Kong, Speu, Takeo"),
+                    _fmt_hub_line("DVCZ3", "Battambang, Banteay Meanchey, Pursat, Chhnang"),
+                    _fmt_hub_line("DVCZ4", "Siem Reap, Oddar Meanchey, Preah Vihear, Thom"),
+                    _fmt_hub_line("DVCZ5", "Kampong Cham, Kratie, Mondulkiri, Ratanakiri, STU, TBK"),
+                    "",
+                    f"🏆 Grand Total: {grand_total:,} bills | Accuracy: {gt_pct:.1f}% (>30p Delay: {tot_gt30:,} bills)"
+                ]
+                photo_caption = "\n".join(caption_lines)
+
                 try:
                     img_buf = await asyncio.to_thread(excel_to_image.excel_to_image, hub_xlsx)
-                    img_buf.name = f"DVC_Zone_Report_{stamp}.png"
+                    img_buf.name = f"DVC_Hubs_{stamp}.png"
                     await send_requester_photo(
                         update, context, img_buf,
-                        caption=f"📦 DVC HUB BY ZONE REPORT — {datetime.now().strftime('%d/%m/%Y %H:%M')}\nTotal: {tot_orders:,} | Urgent: {urg_orders:,}"
+                        caption=photo_caption
                     )
                 except Exception as e_img:
-                    log.warning("Failed rendering photo for DVC Zone: %s", e_img)
+                    log.warning("Failed rendering photo for DVC Hubs: %s", e_img)
 
-                # Build detailed Excel with all DVC orders
-                msg = await edit_or_send_requester_text(msg, update, context, "📁 [4/4] Building detailed Excel...")
+                # Send the complete Excel workbook with Dashboard and Order Details
+                msg = await edit_or_send_requester_text(msg, update, context, "📁 [4/4] Sending detailed Excel workbook...")
                 try:
-                    detail_xlsx = os.path.join(tmpdir, f"DVC_Zone_Detail_{stamp}.xlsx")
-                    d_tot, d_urg = await asyncio.to_thread(dvc_report.build_dvc_zone_detail, dvc_rows, detail_xlsx, cfg)
-                    with open(detail_xlsx, "rb") as f:
+                    with open(hub_xlsx, "rb") as f:
                         await send_requester_document(
                             update, context, f,
-                            os.path.basename(detail_xlsx),
+                            os.path.basename(hub_xlsx),
                             caption=(
-                                f"📋 ទិន្នន័យលម្អិត DVC Hub {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
-                                f"Total: {d_tot:,} | Urgent: {d_urg:,}"
+                                f"📋 ទិន្នន័យលម្អិត DVC & Mega Hubs {now_str}\n"
+                                f"Total: {grand_total:,} bills across 7 Hubs"
                             ),
                         )
                 except Exception as e:
-                    log.warning("Failed to build DVC detail Excel: %s", e)
+                    log.warning("Failed to send DVC detail Excel: %s", e)
 
                 await edit_or_send_requester_text(
                     msg, update, context,
-                    f"✅ Done. DVC BY ZONE REPORT {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+                    f"✅ Done. DVC & MEGA HUB DISTRIBUTION {datetime.now().strftime('%d.%m.%Y %H:%M')}"
                 )
             except Exception as e:
                 log.exception("Error in /total dvc")
@@ -2891,9 +3469,9 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         z_caption = (
                             f"⚡ *DELIVERY SPEED SLA REPORT ({z_name}{ytd_tag})*\n"
                             f"Total Delivered (410): `{z_del}`\n"
-                            f"< 2 Hours (+50%): `{z_u2}`\n"
-                            f"2 - 4 Hours (+25%): `{z_24}`\n"
-                            f"> 8 Hours (-25%): `{z_o8}`\n"
+                            f"< 2 Hours (50%): `{z_u2}`\n"
+                            f"2 - 4 Hours (25%): `{z_24}`\n"
+                            f"> 8 Hours (25%): `{z_o8}`\n"
                             f"Total Commission: `${z_pay:.2f}`"
                         )
 
@@ -2950,9 +3528,9 @@ async def cmd_speed(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         b_caption = (
                             f"⚡ *DELIVERY SPEED SLA REPORT ({br_code}{ytd_tag})*\n"
                             f"Total Delivered (410): `{b_del}`\n"
-                            f"< 2 Hours (+50%): `{b_u2}`\n"
-                            f"2 - 4 Hours (+25%): `{b_24}`\n"
-                            f"> 8 Hours (-25%): `{b_o8}`\n"
+                            f"< 2 Hours (50%): `{b_u2}`\n"
+                            f"2 - 4 Hours (25%): `{b_24}`\n"
+                            f"> 8 Hours (25%): `{b_o8}`\n"
                             f"Total Commission: `${b_pay:.2f}`"
                         )
 
@@ -3795,6 +4373,35 @@ def _classify_facility(code: str, type_label: str = "") -> str:
     return "Post Office"
 
 
+def _format_updated_date(val):
+    if not val or pd.isna(val):
+        return ""
+    s = str(val).strip()
+    if not s or s.lower() == "nan":
+        return ""
+    if "T" in s:
+        t_idx = s.index("T")
+        date_part = s[:t_idx]
+        time_part = s[t_idx + 1:].split("+")[0].split("Z")[0]
+        if "-" not in date_part and len(date_part) == 8:
+            clean_time = time_part.replace(":", "")
+            if len(clean_time) >= 6:
+                try:
+                    dt = datetime.strptime(f"{date_part}T{clean_time[:6]}", "%Y%m%dT%H%M%S")
+                    return dt.strftime("%d/%m/%Y")
+                except Exception:
+                    pass
+        else:
+            try:
+                dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                return dt.strftime("%d/%m/%Y")
+            except Exception:
+                pass
+    elif "/" in s and len(s) > 10:
+        return s.split(" ")[0]
+    return s
+
+
 def _post_office_export_row(item, fallback_branch=""):
     branch = item.get("branch") if isinstance(item.get("branch"), dict) else {}
     code = str(item.get("code") or item.get("Pickup Branch") or item.get("Post code") or "").strip().upper()
@@ -3820,7 +4427,18 @@ def _post_office_export_row(item, fallback_branch=""):
     phone = _clean_export_phone(item.get("Phone Number") or item.get("Phone") or item.get("phone") or item.get("phone_detail") or item.get("hpoUsername")) or _get_fallback_location_phone(code, branch_code)
 
     level = str(item.get("Post Office Level") or item.get("type") or item.get("Category") or item.get("typeLabel") or "AGENT").strip()
-    status = str(item.get("Status") or item.get("status") or item.get("statusLabel") or "ACTIVE").strip()
+    
+    # Map status to friendly statusLabel like "In effect" / "Out of effect" (matching TMS web UI screenshot)
+    status_label = item.get("statusLabel") or item.get("Status") or item.get("status") or "In effect"
+    status_str = str(status_label).strip()
+    if status_str.upper() == "ACTIVE":
+        status_str = "In effect"
+    elif status_str.upper() == "INACTIVE":
+        status_str = "Out of effect"
+    status = status_str
+
+    raw_updated = item.get("Updated date") or item.get("Updated Date") or item.get("updatedAt") or item.get("updated_at") or ""
+    updated_date = _format_updated_date(raw_updated)
 
     address = f"{commune_en}, {dist_en}, {province_en}, Cambodia"
 
@@ -3845,18 +4463,21 @@ def _post_office_export_row(item, fallback_branch=""):
         province_en,
         dist_en,
         level,
+        status,
     ]
 
     return {
         "Post Code": code,
         "Post Office Name": po_name,
         "Post Office Level": level,
+        "Status": status,
+        "Updated date": updated_date,
+        "Updated Date": updated_date,
         "Phone": phone,
         "Province": province_en,
         "District": dist_en,
         "Commune": commune_en,
         "Address": address,
-        "Status": status,
         "Branch": branch_code,
 
         # Backward compatibility fields
@@ -4060,12 +4681,13 @@ def _write_post_office_export_excel(df, out_path, sheet_label, title):
         "Post Code",
         "Post Office Name",
         "Post Office Level",
+        "Status",
+        "Updated date",
         "Phone",
         "Province",
         "District",
         "Commune",
         "Address",
-        "Status",
         "Branch"
     ]
     
@@ -4081,13 +4703,14 @@ def _write_post_office_export_excel(df, out_path, sheet_label, title):
         "A": 16,
         "B": 26,
         "C": 20,
-        "D": 16,
-        "E": 22,
-        "F": 22,
+        "D": 14,
+        "E": 20,
+        "F": 16,
         "G": 22,
-        "H": 65,
-        "I": 14,
-        "J": 12,
+        "H": 22,
+        "I": 22,
+        "J": 65,
+        "K": 12,
     }
     for col_letter, width in col_widths.items():
         ws.column_dimensions[col_letter].width = width
@@ -4095,11 +4718,11 @@ def _write_post_office_export_excel(df, out_path, sheet_label, title):
     for idx, row in df.iterrows():
         row_idx = idx + 2
         for col_idx, col_name in enumerate(data_headers, 1):
-            val = row.get(col_name, "")
+            val = row.get(col_name) if col_name in row else (row.get("Updated Date", "") if col_name == "Updated date" else "")
             cell = ws.cell(row=row_idx, column=col_idx, value="" if pd.isna(val) else str(val))
             cell.font = Font(name="Calibri", size=10)
             cell.border = thin_border
-            if col_name in ("Post Code", "Post Office Level", "Status", "Branch"):
+            if col_name in ("Post Code", "Post Office Level", "Status", "Updated date", "Updated Date", "Branch"):
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             elif col_name == "Phone":
                 cell.alignment = Alignment(horizontal="left", vertical="center")
@@ -4108,7 +4731,7 @@ def _write_post_office_export_excel(df, out_path, sheet_label, title):
                 cell.alignment = Alignment(horizontal="left", vertical="center")
 
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:J{len(df)+1}"
+    ws.auto_filter.ref = f"A1:K{len(df)+1}"
     
     wb.save(out_path)
 
@@ -4130,10 +4753,21 @@ async def send_pickup_branch_export(update, context, cfg, raw_args):
         import pandas as pd
 
         branch_errors = []
+        used_cached_fallback = False
+        post_offices = []
+
         if all_mode and not branch_args:
-            post_offices = await asyncio.to_thread(downloader.download_all_post_offices, cfg["api"])
+            try:
+                post_offices = await asyncio.to_thread(downloader.download_all_post_offices, cfg["api"])
+            except Exception as e_api:
+                err_str = str(e_api)
+                if ("401" in err_str or "Unauthorized" in err_str or "ACCESS_DENIED" in err_str) and os.path.exists(PICKUP_BRANCH_LOOKUP_PATH):
+                    log.warning("Metfone API returned 401 Unauthorized for /export all. Using cached lookup fallback...")
+                    used_cached_fallback = True
+                    df = pd.read_csv(PICKUP_BRANCH_LOOKUP_PATH)
+                else:
+                    raise
         else:
-            post_offices = []
             sem = asyncio.Semaphore(4)
             
             async def sem_download(code):
@@ -4159,63 +4793,75 @@ async def send_pickup_branch_export(update, context, cfg, raw_args):
                             item["_export_branch_query"] = branch_code
                         post_offices.append(item)
 
-        if not post_offices:
-            extra = "\n".join(branch_errors[:5])
-            await edit_or_send_requester_text(
-                msg,
-                update,
-                context,
-                f"No post offices found for {description}." + (f"\n{extra}" if extra else "")
-            )
-            return
+            if not post_offices and os.path.exists(PICKUP_BRANCH_LOOKUP_PATH):
+                if all(("401" in str(e) or "Unauthorized" in str(e) or "ACCESS_DENIED" in str(e)) for e in branch_errors):
+                    log.warning("All branches returned 401 Unauthorized. Using cached lookup fallback...")
+                    used_cached_fallback = True
+                    df_all = pd.read_csv(PICKUP_BRANCH_LOOKUP_PATH)
+                    target_bcs = [bc.upper() for bc in branch_codes]
+                    df = df_all[
+                        df_all["Branch"].astype(str).str.upper().isin(target_bcs) |
+                        df_all["Post Code"].astype(str).str.upper().str.startswith(tuple(target_bcs))
+                    ].copy()
 
-        # Fetch coordinates in parallel
-        unique_codes = list(set(
-            str(item.get("code", "")).strip().upper()
-            for item in post_offices
-            if isinstance(item, dict) and item.get("code")
-        ))
-        
-        if unique_codes:
-            await edit_or_send_requester_text(
-                msg,
-                update,
-                context,
-                f"Fetched {len(post_offices)} offices. Retrieving coordinates..."
-            )
-            detail_sem = asyncio.Semaphore(15)
-            detail_tasks = [fetch_lat_long(code, cfg["api"]["bearer_token"], detail_sem) for code in unique_codes]
-            detail_results = await asyncio.gather(*detail_tasks, return_exceptions=True)
+        if not used_cached_fallback:
+            if not post_offices:
+                extra = "\n".join(branch_errors[:5])
+                await edit_or_send_requester_text(
+                    msg,
+                    update,
+                    context,
+                    f"No post offices found for {description}." + (f"\n{extra}" if extra else "")
+                )
+                return
+
+            # Fetch coordinates in parallel
+            unique_codes = list(set(
+                str(item.get("code", "")).strip().upper()
+                for item in post_offices
+                if isinstance(item, dict) and item.get("code")
+            ))
             
-            coords_map = {}
-            for res in detail_results:
-                if isinstance(res, tuple) and len(res) == 3:
-                    code, lat, lon = res
-                    coords_map[code] = (lat, lon)
-            
-            for item in post_offices:
-                if isinstance(item, dict):
-                    code = str(item.get("code", "")).strip().upper()
-                    lat, lon = coords_map.get(code, (None, None))
-                    item["latitude"] = lat
-                    item["longitude"] = lon
+            if unique_codes:
+                await edit_or_send_requester_text(
+                    msg,
+                    update,
+                    context,
+                    f"Fetched {len(post_offices)} offices. Retrieving coordinates..."
+                )
+                detail_sem = asyncio.Semaphore(15)
+                detail_tasks = [fetch_lat_long(code, cfg["api"]["bearer_token"], detail_sem) for code in unique_codes]
+                detail_results = await asyncio.gather(*detail_tasks, return_exceptions=True)
+                
+                coords_map = {}
+                for res in detail_results:
+                    if isinstance(res, tuple) and len(res) == 3:
+                        code, lat, lon = res
+                        coords_map[code] = (lat, lon)
+                
+                for item in post_offices:
+                    if isinstance(item, dict):
+                        code = str(item.get("code", "")).strip().upper()
+                        lat, lon = coords_map.get(code, (None, None))
+                        item["latitude"] = lat
+                        item["longitude"] = lon
 
-        rows = [
-            _post_office_export_row(item, item.get("_export_branch_query", ""))
-            for item in post_offices
-            if isinstance(item, dict)
-        ]
-        df = pd.DataFrame(rows)
-        if "Post Code" in df.columns:
-            df = df[df["Post Code"].astype(str).str.strip() != ""].copy()
-            df = df.drop_duplicates(subset=["Post Code"], keep="first")
-        elif "Pickup Branch" in df.columns:
-            df = df[df["Pickup Branch"].astype(str).str.strip() != ""].copy()
-            df = df.drop_duplicates(subset=["Pickup Branch"], keep="first")
+            rows = [
+                _post_office_export_row(item, item.get("_export_branch_query", ""))
+                for item in post_offices
+                if isinstance(item, dict)
+            ]
+            df = pd.DataFrame(rows)
+            if "Post Code" in df.columns:
+                df = df[df["Post Code"].astype(str).str.strip() != ""].copy()
+                df = df.drop_duplicates(subset=["Post Code"], keep="first")
+            elif "Pickup Branch" in df.columns:
+                df = df[df["Pickup Branch"].astype(str).str.strip() != ""].copy()
+                df = df.drop_duplicates(subset=["Pickup Branch"], keep="first")
 
-        sort_cols = [c for c in ("Branch", "Post Code", "Branch Code", "Pickup Branch") if c in df.columns]
-        if sort_cols:
-            df = df.sort_values(sort_cols).reset_index(drop=True)
+            sort_cols = [c for c in ("Branch", "Post Code", "Branch Code", "Pickup Branch") if c in df.columns]
+            if sort_cols:
+                df = df.sort_values(sort_cols).reset_index(drop=True)
 
         if df.empty:
             await edit_or_send_requester_text(
@@ -4245,6 +4891,15 @@ async def send_pickup_branch_export(update, context, cfg, raw_args):
 
         _write_post_office_export_excel(df, out_path, label, title)
 
+        # Save a copy directly in project root folder for easy user access
+        try:
+            import shutil
+            root_copy = os.path.join(HERE, filename)
+            shutil.copy2(out_path, root_copy)
+            log.info("Saved local copy of export to: %s", root_copy)
+        except Exception as e_copy:
+            log.warning("Could not save root export copy: %s", e_copy)
+
         with open(out_path, "rb") as f:
             await send_requester_document(update, context, f, filename)
 
@@ -4252,9 +4907,16 @@ async def send_pickup_branch_export(update, context, cfg, raw_args):
             f"Exported {len(df)} pickup branches for {description}.",
             f"Time: {datetime.now().strftime('%d.%m.%Y %H:%M')}",
         ]
-        if all_mode:
+        if used_cached_fallback:
+            done_lines.append(
+                "\n⚠️ *Note: Metfone API Bearer Token is expired (HTTP 401).*\n"
+                "Used latest saved database (754 branches).\n"
+                "👉 To sync live updates from TMS, please update your token:\n"
+                "`/token <new_bearer_token>`"
+            )
+        elif all_mode:
             done_lines.append(f"Updated local lookup: {os.path.basename(PICKUP_BRANCH_LOOKUP_PATH)}")
-        if branch_errors:
+        if branch_errors and not used_cached_fallback:
             done_lines.append("Some branches failed: " + "; ".join(branch_errors[:3]))
             if len(branch_errors) > 3:
                 done_lines.append(f"...and {len(branch_errors) - 3} more.")
@@ -4481,6 +5143,15 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             df = pd.DataFrame(post_offices)
 
+        # Ensure status and updatedAt are present if available under alternative keys
+        if 'status' not in df.columns and 'statusLabel' in df.columns:
+            df['status'] = df['statusLabel']
+        elif 'status' in df.columns:
+            df['status'] = df['status'].replace({'ACTIVE': 'In effect', 'INACTIVE': 'Out of effect'})
+
+        if 'updatedAt' not in df.columns and 'updated_at' in df.columns:
+            df['updatedAt'] = df['updated_at']
+
         # Select and rename useful columns to match management page
         col_map = {
             'code': 'Department Code',
@@ -4488,11 +5159,16 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'parentDepartmentCode': 'Branch Code',
             'branch_name': 'Branch Name',
             'type': 'Type',
+            'status': 'Status',
+            'updatedAt': 'Updated date',
             'phone': 'Phone',
         }
         # Only keep columns that exist
         keep = [c for c in col_map if c in df.columns]
         df = df[keep].rename(columns=col_map)
+
+        if 'Updated date' in df.columns:
+            df['Updated date'] = df['Updated date'].apply(_format_updated_date)
 
         # Strip code prefix from Department Name (e.g. "KAMA001 - Chamnaom" → "Chamnaom")
         if 'Department Name' in df.columns:
@@ -4587,6 +5263,15 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ws.auto_filter.ref = f"A2:{ws.cell(row=2, column=len(df.columns)).column_letter}2"
 
         wb.save(out_path)
+
+        # Save a copy directly in project root folder for easy user access
+        try:
+            import shutil
+            root_copy = os.path.join(HERE, filename)
+            shutil.copy2(out_path, root_copy)
+            log.info("Saved local copy of export to: %s", root_copy)
+        except Exception as e_copy:
+            log.warning("Could not save root export copy: %s", e_copy)
 
         with open(out_path, "rb") as f:
             await send_requester_document(
@@ -4714,6 +5399,579 @@ async def cmd_find(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg, update, context,
             f"❌ Search failed: {e}"
         )
+
+
+def _generate_branch_assist_excel(target_branch: str, out_dir: str):
+    target_branch = target_branch.strip().upper()
+    is_all = (target_branch in ['ALL', 'TOTAL', '*'])
+
+    import glob, re, urllib.parse, requests
+    import pandas as pd
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    st_names = {
+        '400': 'Not Assigned / មិនទាន់ចាត់តាំង',
+        '401': 'Out for Delivery / កំពុងចេញដឹក',
+        '402': 'Assigned to Rider / បានចាត់តាំង',
+        '420': 'Customer Postponed / អតិថិជនសុំពន្យារ',
+        '430': 'Cannot Contact / ទាក់ទងមិនបាន',
+        '460': 'Return Requested / ស្នើសុំផ្ញើត្រឡប់',
+        '472': 'Customer Problem / អតិថិជនមានបញ្ហា',
+        '480': 'Address Changed / ប្តូរអាសយដ្ឋាន',
+        '306': 'Arrived Branch / មកដល់សាខា',
+        '309': 'Sorting / កំពុងរៀបចំ',
+        '311': 'Handover / ប្រគល់បន្ត'
+    }
+
+    if is_all:
+        push_dirs = sorted(glob.glob(os.path.join(HERE, 'cache', 'push_run', '*')), key=os.path.getmtime, reverse=True)
+        report_files = []
+        if push_dirs:
+            for pdir in push_dirs[:2]:
+                for f in glob.glob(os.path.join(pdir, 'Report_*_*.xlsx')):
+                    bname = os.path.basename(f)
+                    if '_Delivery_' not in bname and 'Summary' not in bname and 'ALL' not in bname:
+                        report_files.append(f)
+        report_files = list(dict.fromkeys(report_files))
+    else:
+        candidates = sorted(
+            glob.glob(os.path.join(HERE, 'cache', 'push_run', '*', f'Report_{target_branch}_*.xlsx')) +
+            glob.glob(os.path.join(HERE, 'cache', f'Report_{target_branch}_*.xlsx')),
+            key=os.path.getmtime,
+            reverse=True
+        )
+        main_candidates = [c for c in candidates if '_Delivery_' not in os.path.basename(c)]
+        report_files = [main_candidates[0]] if main_candidates else ([candidates[0]] if candidates else [])
+
+    if not report_files:
+        return None, 0, 0, None
+
+    all_dfs = []
+    for rf in report_files:
+        try:
+            df_rep = pd.read_excel(rf, sheet_name=0, header=1)
+            df_d = df_rep[df_rep.iloc[:, 0].astype(str).str.contains('Zone', case=False, na=False)].copy()
+            if not df_d.empty:
+                all_dfs.append(df_d)
+        except Exception as e:
+            log.warning(f"Failed to read {rf}: {e}")
+
+    if not all_dfs:
+        return None, 0, 0, None
+
+    df_data = pd.concat(all_dfs, ignore_index=True)
+    total_count = len(df_data)
+
+    branch_col = df_data.columns[1]
+    oid_col = df_data.columns[3]
+    cus_col = df_data.columns[4]
+    sc_col = df_data.columns[6]
+    next_col = df_data.columns[8] if len(df_data.columns) > 8 else None
+    cod_col = df_data.columns[10] if len(df_data.columns) > 10 else None
+    age_col = df_data.columns[11] if len(df_data.columns) > 11 else None
+
+    df_data['sc_str'] = df_data[sc_col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+    df_data['is_urgent'] = df_data['sc_str'].isin(['420', '430', '460', '472', '480', '400'])
+    urgent_count = int(df_data['is_urgent'].sum())
+
+    # Sort urgent first, then branch, then status
+    df_data = df_data.sort_values(by=['is_urgent', branch_col, 'sc_str'], ascending=[False, True, True])
+
+    # Fetch real receiver addresses from Metfone API in parallel
+    unique_oids = [str(x).replace('.0', '').strip() for x in df_data[oid_col].dropna().unique() if str(x).strip()]
+    addr_map = {}
+    try:
+        from concurrent.futures import ThreadPoolExecutor
+        cfg_api = load_config().get('api', {})
+        t_token = cfg_api.get('bearer_token', '')
+        api_hdrs = {
+            'Authorization': f'Bearer {t_token}',
+            'Referer': 'https://opsexpress.metfone.com.kh/',
+            'Accept': 'application/json, text/plain, */*',
+            'x-client-id': 'TMS_ANDROID',
+        }
+        api_search_url = 'https://gw-express.metfone.com.kh/tms-receiving/api/v1/orders/search'
+
+        def _fetch_one_addr(o_code):
+            try:
+                r = requests.get(api_search_url, headers=api_hdrs, params={'order_code': o_code}, timeout=5)
+                if r.status_code == 200:
+                    sd = r.json()
+                    ca = sd.get('consignee', {}).get('address', {})
+                    ha = sd.get('consignee', {}).get('homeAddress', {})
+                    formatted = ca.get('formattedAddress') or ha.get('formattedAddress') or ''
+                    return o_code, formatted
+            except Exception:
+                pass
+            return o_code, ''
+
+        max_w = min(len(unique_oids), 25) or 1
+        with ThreadPoolExecutor(max_workers=max_w) as pool:
+            for o_code, f_addr in pool.map(_fetch_one_addr, unique_oids):
+                if f_addr:
+                    addr_map[o_code] = f_addr
+    except Exception as e_addr:
+        log.warning(f"Failed to fetch real addresses from API: {e_addr}")
+
+    def _parse_real_address(raw_addr, fallback_area):
+        if not raw_addr:
+            return fallback_area, f"{fallback_area}, Cambodia"
+        parts = [p.strip() for p in raw_addr.split(' - ') if p.strip()]
+        if not parts:
+            return fallback_area, f"{fallback_area}, Cambodia"
+        if parts[0] in ('Cambodia', 'Phnom Penh'):
+            landmark = parts[-1]
+            map_query = ', '.join(reversed(parts))
+        else:
+            landmark = parts[0]
+            map_query = ', '.join(parts)
+        return landmark, map_query
+
+    # Attach real address mapping to df_data so summary text can also use it
+    df_data['real_addr'] = df_data[oid_col].astype(str).str.replace(r'\.0$', '', regex=True).map(addr_map).fillna('')
+
+    # Group by customer (phone number) so multi-package customers merge into 1 single row
+    groups = {}
+    for _, r in df_data.iterrows():
+        rec_str = str(r[cus_col]).strip()
+        pm = re.search(r'0\d{8,9}', rec_str)
+        ph = pm.group(0) if pm else ''
+        b_name = str(r[branch_col]).strip()
+        oid = str(r[oid_col]).replace('.0', '').strip()
+        raw_address = addr_map.get(oid, '')
+        fallback_name = rec_str.replace(ph, '').strip(' -') or ('Phnom Penh' if 'PNP' in b_name else b_name)
+        landmark, map_query = _parse_real_address(raw_address, fallback_name)
+
+        sc = str(r['sc_str'])
+        is_urg = r['is_urgent']
+        try:
+            cod_num = float(r[cod_col]) if cod_col else 0.0
+        except Exception:
+            cod_num = 0.0
+
+        age_str = str(r[age_col]) if age_col and pd.notna(r[age_col]) else ''
+        next_step = str(r[next_col]) if next_col and pd.notna(r[next_col]) else ''
+
+        key = ph if ph else f'NO_PHONE_{oid}'
+        if key not in groups:
+            groups[key] = {
+                'phone': ph,
+                'addr': landmark,
+                'full_addr': raw_address,
+                'map_query': map_query,
+                'branch': b_name,
+                'bills': [],
+                'has_urgent': False,
+                'next_steps': [],
+                'ages': [],
+            }
+        else:
+            if raw_address and not groups[key].get('full_addr'):
+                groups[key]['full_addr'] = raw_address
+                groups[key]['addr'] = landmark
+                groups[key]['map_query'] = map_query
+
+        groups[key]['bills'].append({
+            'oid': oid,
+            'cod': cod_num,
+            'sc': sc,
+            'is_urgent': is_urg,
+            'age': age_str,
+            'next_step': next_step
+        })
+        if is_urg:
+            groups[key]['has_urgent'] = True
+        if next_step and next_step not in groups[key]['next_steps']:
+            groups[key]['next_steps'].append(next_step)
+        if age_str and age_str not in groups[key]['ages']:
+            groups[key]['ages'].append(age_str)
+
+    sorted_groups = sorted(
+        groups.values(),
+        key=lambda g: (g['has_urgent'], len(g['bills']), sum(b['cod'] for b in g['bills'])),
+        reverse=True
+    )
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    title_sheet = target_branch if len(target_branch) <= 25 else 'Action Plan'
+    ws.title = title_sheet
+    ws.freeze_panes = 'A2'
+
+    # Mobile-first column order: crucial action buttons and info in first 10 columns
+    headers = [
+        'No.', 'Priority', 'Packages', 'Order ID (លេខបុង)', 'Status Code',
+        'Customer Phone', 'COD ($)', '💬 Telegram', '📩 Direct SMS', '🗺️ Maps',
+        '📍 Nearby Location (ទីតាំង)', 'Age', 'Next Step', 'Branch', 'Remark'
+    ]
+    ws.append(headers)
+    ws.row_dimensions[1].height = 28
+
+    header_fill = PatternFill(start_color='1F4E78', end_color='1F4E78', fill_type='solid')
+    header_font = Font(name='Segoe UI', size=11, bold=True, color='FFFFFF')
+    border_thin = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+    urgent_fill = PatternFill(start_color='FCE4D6', end_color='FCE4D6', fill_type='solid')
+    multi_pkg_fill = PatternFill(start_color='FFF2CC', end_color='FFF2CC', fill_type='solid')
+    tg_btn_fill = PatternFill(start_color='D9E1F2', end_color='D9E1F2', fill_type='solid')
+    sms_btn_fill = PatternFill(start_color='FCE4D6', end_color='FCE4D6', fill_type='solid')
+    map_btn_fill = PatternFill(start_color='E2EFDA', end_color='E2EFDA', fill_type='solid')
+
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+    # Sheet 1: 1 Single Consolidated Row per Customer
+    for idx, g in enumerate(sorted_groups, 1):
+        b_name = g['branch']
+        phone = g['phone']
+        addr = g['addr']
+        bills = g['bills']
+        cust_pkg_count = len(bills)
+        all_oids = ", ".join([b['oid'] for b in bills])
+        tot_cod = sum([b['cod'] for b in bills])
+        all_sc = ", ".join(dict.fromkeys([b['sc'] for b in bills]))
+        is_urg = g['has_urgent']
+        priority_str = '🔴 URGENT' if is_urg else '🟡 Normal'
+        pkg_str = f"📦 {cust_pkg_count} Pkgs" if cust_pkg_count > 1 else "1 Pkg"
+        age_str = ", ".join(g['ages'])
+        next_step = ", ".join(g['next_steps'])
+
+        if cust_pkg_count > 1:
+            sms_tpl = f"ជំរាបសួរបង! ខាង Metfone Express មានអីវ៉ាន់ចំនួន {cust_pkg_count} កញ្ចប់ (លេខបុង: {all_oids}) សរុប COD: ${tot_cod:.2f}។ សូមជួយផ្ញើទីតាំង (Location) មកលេខនេះបង។"
+        else:
+            sms_tpl = f"ជំរាបសួរបង! ខាង Metfone Express មានអីវ៉ាន់លេខ {bills[0]['oid']} (COD: ${tot_cod:.2f})។ សូមជួយផ្ញើទីតាំង (Location) មកលេខនេះបង។"
+
+        encoded_tpl = urllib.parse.quote(sms_tpl)
+        intl_phone = '+855' + phone[1:] if phone.startswith('0') else phone
+        tg_url = f'https://t.me/{intl_phone}?text={encoded_tpl}' if phone else ''
+        sms_url = f'sms:{phone}?body={encoded_tpl}' if phone else ''
+        q_addr = g.get('map_query') or (f'{addr}, Phnom Penh, Cambodia' if 'PNP' in b_name else f'{addr}, Cambodia')
+        maps_url = f'https://www.google.com/maps/search/{urllib.parse.quote_plus(q_addr)}'
+
+        row_num = ws.max_row + 1
+        ws.append([
+            idx, priority_str, pkg_str, all_oids, all_sc,
+            phone, tot_cod,
+            'Chat Telegram' if tg_url else '',
+            'Send SMS' if sms_url else '',
+            'Open Maps',
+            addr, age_str, next_step, b_name,
+            sms_tpl
+        ])
+        ws.row_dimensions[row_num].height = 26
+
+        for c_idx in range(1, len(headers) + 1):
+            cell = ws.cell(row=row_num, column=c_idx)
+            cell.border = border_thin
+            if is_urg and c_idx not in [8, 9, 10]:
+                cell.fill = urgent_fill
+            if cust_pkg_count > 1 and c_idx == 3:
+                cell.fill = multi_pkg_fill
+            if c_idx in [1, 2, 3, 5]:
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+            elif c_idx == 7: # COD
+                cell.number_format = '$#,##0.00'
+                cell.alignment = Alignment(horizontal='right', vertical='center')
+            elif c_idx in [8, 9, 10]:
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        if phone:
+            c_phone = ws.cell(row=row_num, column=6)
+            c_phone.value = phone
+            c_phone.hyperlink = f"tel:{phone}"
+            c_phone.font = Font(name='Segoe UI', size=10, color='004C99', underline='single')
+
+        if tg_url:
+            c_tg = ws.cell(row=row_num, column=8)
+            c_tg.value = "Chat Telegram"
+            c_tg.hyperlink = tg_url
+            c_tg.fill = tg_btn_fill
+            c_tg.font = Font(name='Segoe UI', size=10, bold=True, color='1F4E78', underline='single')
+
+        if sms_url:
+            c_sms_btn = ws.cell(row=row_num, column=9)
+            c_sms_btn.value = "Send SMS"
+            c_sms_btn.hyperlink = sms_url
+            c_sms_btn.fill = sms_btn_fill
+            c_sms_btn.font = Font(name='Segoe UI', size=10, bold=True, color='8A3B00', underline='single')
+
+        c_map = ws.cell(row=row_num, column=10)
+        c_map.value = "Open Maps"
+        c_map.hyperlink = maps_url
+        c_map.fill = map_btn_fill
+        c_map.font = Font(name='Segoe UI', size=10, bold=True, color='375623', underline='single')
+
+        c_sms_text = ws.cell(row=row_num, column=15)
+        c_sms_text.value = sms_tpl
+        if tg_url:
+            c_sms_text.hyperlink = tg_url
+            c_sms_text.font = Font(name='Segoe UI', size=10, color='004C99', underline='single')
+        else:
+            c_sms_text.font = Font(name='Segoe UI', size=10, color='333333')
+
+    # Auto column widths for Sheet 1
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            val_str = str(cell.value or '')
+            if cell.column == 15: # SMS template
+                max_len = 45
+                break
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws.column_dimensions[col_letter].width = min(max(max_len + 3, 10), 45)
+
+    ws.auto_filter.ref = ws.dimensions
+
+    # Sheet 2: All Bills Detail (every individual package line-by-line)
+    ws2 = wb.create_sheet(title='All Bills Breakdown')
+    ws2.freeze_panes = 'A2'
+    ws2_headers = ['No.', 'Order ID (លេខបុង)', 'Status Code', 'Customer Phone', 'COD ($)', 'Priority', 'Branch', 'Nearby Location']
+    ws2.append(ws2_headers)
+    ws2.row_dimensions[1].height = 26
+    for c_i in range(1, len(ws2_headers) + 1):
+        cell = ws2.cell(row=1, column=c_i)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    b_idx = 1
+    for g in sorted_groups:
+        ph = g['phone']
+        addr = g['addr']
+        b_name = g['branch']
+        for b in g['bills']:
+            r_num = ws2.max_row + 1
+            p_str = '🔴 URGENT' if b['is_urgent'] else '🟡 Normal'
+            ws2.append([b_idx, b['oid'], b['sc'], ph, b['cod'], p_str, b_name, addr])
+            ws2.row_dimensions[r_num].height = 22
+            for c_i in range(1, len(ws2_headers) + 1):
+                c = ws2.cell(row=r_num, column=c_i)
+                c.border = border_thin
+                if b['is_urgent'] and c_i != 5:
+                    c.fill = urgent_fill
+                if c_i in [1, 3, 6]:
+                    c.alignment = Alignment(horizontal='center', vertical='center')
+                elif c_i == 5:
+                    c.number_format = '$#,##0.00'
+                    c.alignment = Alignment(horizontal='right', vertical='center')
+            b_idx += 1
+
+    for col in ws2.columns:
+        m_len = max(len(str(c.value or '')) for c in col)
+        ws2.column_dimensions[get_column_letter(col[0].column)].width = min(max(m_len + 3, 10), 35)
+    ws2.auto_filter.ref = ws2.dimensions
+
+    now_tag = datetime.now().strftime("%d_%m_%Y")
+    out_file = os.path.join(out_dir, f'Delivery_Action_{target_branch}_{now_tag}.xlsx')
+    wb.save(out_file)
+    return out_file, total_count, urgent_count, df_data
+
+
+def _build_branch_assist_summary_text(target_branch: str, df_data) -> str:
+    import urllib.parse, re
+
+    cus_col = df_data.columns[4]
+    oid_col = df_data.columns[3]
+    cod_col = df_data.columns[10] if len(df_data.columns) > 10 else None
+    sc_col = df_data.columns[6]
+
+    df_d = df_data.copy()
+    df_d['sc_str'] = df_d[sc_col].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+    df_d['is_urg'] = df_d['sc_str'].isin(['420', '430', '460', '472', '480', '400'])
+
+    def _parse_real_address(raw_addr, fallback_area):
+        if not raw_addr:
+            return fallback_area, f"{fallback_area}, Cambodia"
+        parts = [p.strip() for p in raw_addr.split(' - ') if p.strip()]
+        if not parts:
+            return fallback_area, f"{fallback_area}, Cambodia"
+        if parts[0] in ('Cambodia', 'Phnom Penh'):
+            landmark = parts[-1]
+            map_query = ', '.join(reversed(parts))
+        else:
+            landmark = parts[0]
+            map_query = ', '.join(parts)
+        return landmark, map_query
+
+    groups = {}
+    for _, r in df_d.iterrows():
+        rec = str(r[cus_col]).strip()
+        pm = re.search(r'0\d{8,9}', rec)
+        ph = pm.group(0) if pm else ''
+        oid = str(r[oid_col]).replace('.0', '').strip()
+        raw_address = str(r.get('real_addr', '')).strip() if 'real_addr' in r else ''
+        fallback_name = rec.replace(ph, '').strip(' -') or ('Phnom Penh' if 'PNP' in target_branch else target_branch)
+        landmark, map_query = _parse_real_address(raw_address, fallback_name)
+
+        sc = str(r['sc_str'])
+        urg = r['is_urg']
+        try:
+            cod = float(r[cod_col]) if cod_col else 0.0
+        except Exception:
+            cod = 0.0
+
+        key = ph if ph else f'NO_PHONE_{oid}'
+        if key not in groups:
+            groups[key] = {
+                'phone': ph,
+                'addr': landmark,
+                'full_addr': raw_address,
+                'map_query': map_query,
+                'bills': [],
+                'has_urg': False
+            }
+        else:
+            if raw_address and not groups[key].get('full_addr'):
+                groups[key]['full_addr'] = raw_address
+                groups[key]['addr'] = landmark
+                groups[key]['map_query'] = map_query
+
+        groups[key]['bills'].append({'oid': oid, 'cod': cod, 'sc': sc, 'urg': urg})
+        if urg:
+            groups[key]['has_urg'] = True
+
+    sorted_groups = sorted(
+        groups.values(),
+        key=lambda g: (g['has_urg'], len(g['bills'])),
+        reverse=True
+    )
+
+    st_names = {
+        '400': 'មិនទាន់ចាត់តាំង', '401': 'កំពុងចេញដឹក', '402': 'បានចាត់តាំង',
+        '420': 'អតិថិជនសុំពន្យារ', '430': 'ទាក់ទងមិនបាន', '460': 'ស្នើសុំផ្ញើត្រឡប់',
+        '472': 'អតិថិជនមានបញ្ហា', '480': 'ប្តូរអាសយដ្ឋាន', '306': 'មកដល់សាខា',
+        '309': 'កំពុងរៀបចំ', '311': 'ប្រគល់បន្ត'
+    }
+
+    lines = [
+        f"🛵 *{target_branch} — DELIVERY ACTION LIST*",
+        f"📦 *Total Bills:* {len(df_d)} | 👥 *Customers:* {len(groups)}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    ]
+
+    for idx, g in enumerate(sorted_groups[:7], 1):
+        ph = g['phone']
+        clean_addr = g['addr'].replace('_', ' ').replace('*', ' ').replace('`', '').replace('[', '(').replace(']', ')')
+        bills = g['bills']
+        cnt = len(bills)
+        tot_cod = sum(b['cod'] for b in bills)
+        urg_mark = '🔴' if g['has_urg'] else '🟡'
+
+        pkg_label = f"*{cnt} កញ្ចប់ (Multi-bill)*" if cnt > 1 else "1 កញ្ចប់"
+        oids_str = ", ".join(b['oid'] for b in bills)
+        sc_list = ", ".join(dict.fromkeys(b['sc'] for b in bills))
+        sc_desc = ", ".join(dict.fromkeys(st_names.get(b['sc'], b['sc']) for b in bills))
+
+        label_ph = ph if ph else 'No Phone'
+        lines.append(f"{urg_mark} *{idx}️⃣ `{label_ph}`* — 📍 ទីតាំង/Nearby: *{clean_addr[:25]}*")
+        lines.append(f"   • 📦 {pkg_label} | COD: *${tot_cod:.2f}*")
+        lines.append(f"   • 📋 Status: `{sc_list}` ({sc_desc})")
+
+        if ph:
+            if cnt > 1:
+                sms = f"ជំរាបសួរបង! ខាង Metfone Express មានអីវ៉ាន់ចំនួន {cnt} កញ្ចប់ (លេខបុង: {oids_str}) សរុប COD: ${tot_cod:.2f}។ សូមជួយផ្ញើទីតាំង (Location) មកលេខនេះបង។"
+            else:
+                sms = f"ជំរាបសួរបង! ខាង Metfone Express មានអីវ៉ាន់លេខ {bills[0]['oid']} (COD: ${tot_cod:.2f})។ សូមជួយផ្ញើទីតាំង (Location) មកលេខនេះបង។"
+
+            intl_ph = '+855' + ph[1:] if ph.startswith('0') else ph
+            tg_link = f"https://t.me/{intl_ph}"
+            call_link = f"tel:{ph}"
+            sms_link = f"sms:{ph}?body={urllib.parse.quote(sms)}"
+            q_addr = g.get('map_query') or (f"{clean_addr}, Phnom Penh, Cambodia" if "PNP" in target_branch else f"{clean_addr}, Cambodia")
+            map_link = f"https://www.google.com/maps/search/{urllib.parse.quote_plus(q_addr)}"
+            lines.append("   • 💬 *Remark (Tap box to copy):*")
+            lines.append(f"```\n{sms}\n```")
+            lines.append(f"   • 👉 [💬 Telegram]({tg_link})  •  [📩 SMS]({sms_link})  •  [📞 Call]({call_link})  •  [🗺️ Maps]({map_link})\n")
+        else:
+            lines.append(f"   • លេខបុង: `{oids_str}`\n")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("💡 *Tip 1:* ចុចលើប្រអប់អក្សរខាងលើដើម្បី Copy សារដោយស្វ័យប្រវត្ត (មិន Copy សារទាំងមូលទេ)!")
+    lines.append("💡 *Tip 2:* បើ Telegram មិនឃើញ (*User not found*) 👉 ចុច *[📩 SMS]* ឬ *[📞 Call]* ភ្លាមៗ!")
+    return "\n".join(lines)
+
+
+@pm_required_handler
+async def cmd_assist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/assist [branch_code] — Delivery Action Plan Excel & Telegram List for Branch Managers."""
+    await delete_group_command(update, context)
+    cfg = load_config()
+    args = [a.strip().upper() for a in (context.args or []) if a.strip()]
+
+    target_branch = None
+    if args:
+        target_branch = args[0]
+    elif is_group_chat(update):
+        mapped = get_forward_mapping(cfg).get(str(update.effective_chat.id), [])
+        if mapped and mapped[0] != "*":
+            target_branch = mapped[0].upper()
+
+    if not target_branch:
+        await private_or_current_reply(
+            update, context,
+            "💡 *Usage:* `/assist <BRANCH_CODE>` (or `/action`, `/deliveryhelp`)\n"
+            "Example: `/assist PNPP001` or `/assist ALL`\n\n"
+            "_Generates interactive mobile action cards directly in Telegram + full downloadable Excel spreadsheet._",
+            parse_mode="Markdown"
+        )
+        return
+
+    msg = await send_requester_text(
+        update, context,
+        f"🤖 Preparing Delivery Action Plan for *{target_branch}*...",
+        parse_mode="Markdown"
+    )
+
+    try:
+        tmpdir = tempfile.mkdtemp(prefix="assist_")
+        track_report_dir(tmpdir)
+        excel_path, total_count, urgent_count, df_data = await asyncio.to_thread(_generate_branch_assist_excel, target_branch, tmpdir)
+
+        if not excel_path or total_count == 0:
+            await edit_or_send_requester_text(
+                msg, update, context,
+                f"⚠️ No active delivery bills found for *{target_branch}* in today's cache.\n"
+                f"Please run `/push` or `/push {target_branch}` first!",
+                parse_mode="Markdown"
+            )
+            return
+
+        # 1. Send interactive action list cards directly into Telegram
+        summary_text = _build_branch_assist_summary_text(target_branch, df_data)
+        try:
+            await send_requester_text(update, context, summary_text, parse_mode="Markdown", disable_web_page_preview=True)
+        except Exception as e_md:
+            log.warning("Markdown send failed in cmd_assist (%s), fallback to plain text", e_md)
+            await send_requester_text(update, context, summary_text, disable_web_page_preview=True)
+
+        # 2. Send complete Excel spreadsheet
+        with open(excel_path, "rb") as f:
+            await send_requester_document(
+                update, context, f,
+                filename=os.path.basename(excel_path),
+                caption=f"📋 Full Delivery Action Excel — {target_branch} ({total_count} bills)"
+            )
+
+        if msg:
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+    except Exception as e:
+        log.exception(f"Error in /assist for {target_branch}: {e}")
+        await edit_or_send_requester_text(msg, update, context, f"❌ Failed to generate action plan: {e}")
+
 
 @pm_required_handler
 async def cmd_ask(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -8152,6 +9410,113 @@ async def cmd_set_token(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_requester_text(update, context, f"❌ Failed to update Bearer token: {e}")
 
 
+@user_guard
+async def cmd_truck_kpi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Generates Truck On-Time Connection KPI report from BCtyleketnoidungdugio file."""
+    await delete_group_command(update, context)
+    msg = await send_requester_text(update, context, "⏳ Đang xử lý Báo Cáo Tỷ Lệ Kết Nối Xe Tải (DVC & Truck KPI)...")
+    try:
+        import truck_kpi_report, importlib
+        importlib.reload(truck_kpi_report)
+        import glob
+
+        # Look for BCtyle file in Downloads, Desktop, workspace or cache
+        user_dl = os.path.expanduser("~/Downloads/BCtyle*.xlsx")
+        user_dt = os.path.expanduser("~/Desktop/BCtyle*.xlsx")
+        candidates = sorted(
+            glob.glob(user_dl) + glob.glob(user_dt) + glob.glob("BCtyle*.xlsx") + glob.glob("cache/**/BCtyle*.xlsx", recursive=True),
+            key=os.path.getmtime,
+            reverse=True
+        )
+        if not candidates:
+            await edit_or_send_requester_text(
+                msg, update, context,
+                "⚠️ Không tìm thấy file `BCtyleketnoidungdugio_*.xlsx`.\n"
+                "👉 Vui lòng xuất file từ hệ thống (*Operate > KPI Middle Mile > Sufficient & On-time Connection Rate Report*) "
+                "chọn đủ 3 loại (*Intra province, Inter region, Intra region*) và gửi file Excel vào chat để Bot tạo báo cáo!"
+            )
+            return
+
+        src_file = candidates[0]
+        tmpdir = tempfile.mkdtemp(prefix="truck_kpi_")
+        track_report_dir(tmpdir)
+
+        out_xlsx, img_buf, caption, stats = await asyncio.to_thread(
+            truck_kpi_report.generate_truck_kpi_report, src_file, tmpdir
+        )
+
+        date_tag = stats.get('date_str', 'report').replace('/', '.')
+        img_buf.name = f"DVC_Truck_KPI_{date_tag}.png"
+        try:
+            await send_requester_photo(update, context, img_buf, caption=caption, parse_mode="Markdown")
+        except Exception as e_ph:
+            log.warning("Failed sending photo with caption (%s), fallback sending photo + text", e_ph)
+            try:
+                img_buf.seek(0)
+                await send_requester_photo(update, context, img_buf)
+                await send_requester_text(update, context, caption, parse_mode="Markdown")
+            except Exception as e_ph2:
+                log.error("Failed sending fallback photo: %s", e_ph2)
+
+        with open(out_xlsx, "rb") as f:
+            await send_requester_document(
+                update, context, f,
+                os.path.basename(out_xlsx),
+                caption=f"📋 Báo cáo chi tiết Xe Tải (DVC & Truck KPI) {stats.get('date_str', '')}"
+            )
+        await edit_or_send_requester_text(msg, update, context, "✅ Báo cáo Tỷ Lệ Kết Nối Xe Tải (DVC KPI) hoàn tất.")
+    except Exception as e:
+        log.exception("Error in cmd_truck_kpi: %s", e)
+        await edit_or_send_requester_text(msg, update, context, f"❌ Lỗi xử lý báo cáo xe tải: {e}")
+
+
+async def on_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles uploaded Excel documents, specifically BCtyleketnoidungdugio reports."""
+    doc = update.message.document if update.message else None
+    if not doc or not doc.file_name:
+        return
+
+    fname = doc.file_name
+    if "BCtyle" in fname or "ketnoidungdugio" in fname.lower():
+        msg = await update.message.reply_text(f"⏳ Đang nhận và xử lý file `{fname}`...", parse_mode="Markdown")
+        try:
+            tmpdir = tempfile.mkdtemp(prefix="truck_upload_")
+            track_report_dir(tmpdir)
+            local_path = os.path.join(tmpdir, fname)
+            file_obj = await doc.get_file()
+            await file_obj.download_to_drive(local_path)
+
+            import truck_kpi_report, importlib
+            importlib.reload(truck_kpi_report)
+            out_xlsx, img_buf, caption, stats = await asyncio.to_thread(
+                truck_kpi_report.generate_truck_kpi_report, local_path, tmpdir
+            )
+
+            date_tag = stats.get('date_str', 'report').replace('/', '.')
+            img_buf.name = f"DVC_Truck_KPI_{date_tag}.png"
+            try:
+                await update.message.reply_photo(photo=img_buf, caption=caption, parse_mode="Markdown")
+            except Exception as e_ph:
+                log.warning("Failed sending photo with caption (%s), fallback sending photo + text", e_ph)
+                try:
+                    img_buf.seek(0)
+                    await update.message.reply_photo(photo=img_buf)
+                    await update.message.reply_text(caption, parse_mode="Markdown")
+                except Exception as e_ph2:
+                    log.error("Failed sending fallback photo: %s", e_ph2)
+
+            with open(out_xlsx, "rb") as f:
+                await update.message.reply_document(
+                    document=f,
+                    filename=os.path.basename(out_xlsx),
+                    caption=f"📋 Báo cáo chi tiết Xe Tải (DVC & Truck KPI) {stats.get('date_str', '')}"
+                )
+            await msg.delete()
+        except Exception as e:
+            log.exception("Error handling document upload: %s", e)
+            await msg.edit_text(f"❌ Lỗi xử lý file: {e}")
+
+
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -8314,6 +9679,9 @@ def create_bot_app(token: str, proxy_url: str = None, is_primary: bool = True) -
     app.add_handler(CommandHandler("agents",       cmd_export_agent))
     app.add_handler(CommandHandler("exportagent",  cmd_export_agent))
     app.add_handler(CommandHandler("find",         cmd_find))
+    app.add_handler(CommandHandler("assist",       cmd_assist))
+    app.add_handler(CommandHandler("action",       cmd_assist))
+    app.add_handler(CommandHandler("deliveryhelp", cmd_assist))
     app.add_handler(CommandHandler("ask",          cmd_ask))
     app.add_handler(CommandHandler("check",        cmd_check))
     app.add_handler(CommandHandler("qr",           cmd_qr))
@@ -8332,11 +9700,13 @@ def create_bot_app(token: str, proxy_url: str = None, is_primary: bool = True) -
     app.add_handler(CommandHandler("report",       cmd_report))
     app.add_handler(CommandHandler("deletereport", cmd_delete_report))
     app.add_handler(CommandHandler("delreport",    cmd_delete_report))
-    app.add_handler(CommandHandler("dailyreport",  cmd_daily_report))
-    app.add_handler(CommandHandler("scrape",       cmd_scrape))
-    app.add_handler(CommandHandler("syncshipped",   cmd_scrape))
     app.add_handler(CommandHandler("test",         cmd_test))
     app.add_handler(CommandHandler("testmode",     cmd_test_mode))
+    app.add_handler(CommandHandler("truck",        cmd_truck_kpi))
+    app.add_handler(CommandHandler("truckkpi",     cmd_truck_kpi))
+    app.add_handler(CommandHandler("truck_kpi",    cmd_truck_kpi))
+    app.add_handler(CommandHandler("chuyenxe",     cmd_truck_kpi))
+    app.add_handler(MessageHandler(filters.Document.ALL, on_document))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     return app
 
@@ -8364,6 +9734,9 @@ def main():
 
     cfg   = load_config()
     tg    = cfg["telegram"]
+    if tg.get("paused", False):
+        tg["paused"] = False
+        save_config(cfg)
 
     tokens = []
     primary_token = tg.get("bot_token")
