@@ -9711,6 +9711,16 @@ def create_bot_app(token: str, proxy_url: str = None, is_primary: bool = True) -
     return app
 
 
+async def _run_bot_coroutine(token: str, proxy_url: str = None, is_primary: bool = True):
+    app = create_bot_app(token, proxy_url, is_primary=is_primary)
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    # Run indefinitely
+    while True:
+        await asyncio.sleep(3600)
+
+
 def run_bot_in_thread(token: str, proxy_url: str = None, is_primary: bool = True):
     """Run a single bot instance in its own event loop thread."""
     import time
@@ -9719,15 +9729,10 @@ def run_bot_in_thread(token: str, proxy_url: str = None, is_primary: bool = True
     log.info("Bot instance running for token: %s... (primary=%s)", token[:12], is_primary)
     while True:
         try:
-            app = create_bot_app(token, proxy_url, is_primary=is_primary)
-            # On Linux, python-telegram-bot tries to install signal handlers via set_wakeup_fd
-            # which fails in non-main threads. stop_signals=None prevents this error.
-            is_main_thread = (threading.current_thread() is threading.main_thread())
-            stop_sigs = None if not is_main_thread else None  # safely avoid signal issues across all threads
-            app.run_polling(allowed_updates=Update.ALL_TYPES, close_loop=False, stop_signals=stop_sigs)
+            loop.run_until_complete(_run_bot_coroutine(token, proxy_url, is_primary))
             break
         except Exception as e:
-            log.error("Bot polling error [%s...]: %s. Restarting polling in 5s...", token[:12], e)
+            log.error("Bot polling error [%s...]: %s. Restarting in 5s...", token[:12], e)
             time.sleep(5)
 
 
