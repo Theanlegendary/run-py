@@ -431,6 +431,7 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
             'PNPP011': 'Dangkao',         'PNPA011': 'Dangkao',
             'PNPP014': 'Doun Penh',       'PNPA014': 'Doun Penh',
             'PNPP012': 'Kamboul',         'PNPA016': 'Kamboul', 'PNPA012': 'Kamboul',
+            'KANS005': 'Baek Chan (Kamboul)', 'KANS05': 'Baek Chan (Kamboul)',
             'PNPP002': 'Mean Chey',       'PNPP003': 'Mean Chey',
             'PNPA029': 'Mean Chey',       'PNPA055': 'Mean Chey',
             'PNPA003': 'Mean Chey',
@@ -670,7 +671,7 @@ def build_shipments_tomorrow_report(src_xlsx, out_xlsx, target_label="Zone 1"):
             'KAMS003': 'Satv Pong',
 
             # ── Kandal (KAN) – Agents / Showrooms ──
-            'KANS001': 'Ta Khmau',       'KANS005': 'Baek Chan',
+            'KANS001': 'Ta Khmau',
 
             # ── Kratie (KRA) – Agents / Showrooms ──
             'KRAS002': 'Snuol',          'KRAS004': 'Sambour',

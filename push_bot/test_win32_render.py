@@ -42,6 +42,6 @@ def excel_to_image_win32(xlsx_path, out_png_path):
             wb.Close(SaveChanges=False)
         excel.Quit()
 
-xlsx_path = r"test_out\Report_BATP001_Pending_04_07_2026_000000.xlsx"
-out_png = "batp001_pending_win32_test.png"
+xlsx_path = r"test_out\Report_SVAP001_Pending_14_07_2026_000000.xlsx"
+out_png = "svap001_pending_win32_test.png"
 excel_to_image_win32(xlsx_path, out_png)

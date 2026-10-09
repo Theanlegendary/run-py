@@ -92,9 +92,15 @@ def clean_cache_3_times_daily():
 
 def load_post_office_lookup_map():
     po_map = {}
-    if os.path.exists("post_office_lookup.csv"):
+    csv_candidates = [
+        "post_office_lookup.csv",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "post_office_lookup.csv"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "post_office_lookup.csv")
+    ]
+    lookup_file = next((p for p in csv_candidates if os.path.exists(p)), None)
+    if lookup_file:
         try:
-            df_po = pd.read_csv("post_office_lookup.csv", encoding="utf-8-sig")
+            df_po = pd.read_csv(lookup_file, encoding="utf-8-sig", dtype=str).fillna("")
             df_po.columns = [str(c).strip().lower() for c in df_po.columns]
             if "current_post_office" in df_po.columns and "post_office_handle" in df_po.columns:
                 for _, r in df_po.iterrows():

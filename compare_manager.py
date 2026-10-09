@@ -92,9 +92,15 @@ def clean_cache_3_times_daily():
 
 def load_post_office_lookup_map():
     po_map = {}
-    if os.path.exists("post_office_lookup.csv"):
+    csv_candidates = [
+        "post_office_lookup.csv",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "post_office_lookup.csv"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "post_office_lookup.csv")
+    ]
+    lookup_file = next((p for p in csv_candidates if os.path.exists(p)), None)
+    if lookup_file:
         try:
-            df_po = pd.read_csv("post_office_lookup.csv", encoding="utf-8-sig")
+            df_po = pd.read_csv(lookup_file, encoding="utf-8-sig", dtype=str).fillna("")
             df_po.columns = [str(c).strip().lower() for c in df_po.columns]
             if "current_post_office" in df_po.columns and "post_office_handle" in df_po.columns:
                 for _, r in df_po.iterrows():
@@ -242,8 +248,8 @@ def extract_total_report_counts(df_detail):
                 "urgent": urgent_cnt,
                 "pickup": hr.get("handle_counts", {}).get("Pickup", 0),
                 "delivery": hr.get("handle_counts", {}).get("Delivery", 0),
-                "transit": hr.get("handle_counts", {}).get("Send Mega", 0),
-                "branch": hr.get("handle_counts", {}).get("Not Assign", 0)
+                "transit": hr.get("handle_counts", {}).get("Handover to Mega", hr.get("handle_counts", {}).get("Send Mega", hr.get("handle_counts", {}).get("Transit", 0))),
+                "branch": hr.get("handle_counts", {}).get("Assign Deliver", hr.get("handle_counts", {}).get("Not Assign", hr.get("handle_counts", {}).get("Branch", 0)))
             }
     except Exception as e:
         pass

@@ -9720,7 +9720,11 @@ def run_bot_in_thread(token: str, proxy_url: str = None, is_primary: bool = True
     while True:
         try:
             app = create_bot_app(token, proxy_url, is_primary=is_primary)
-            app.run_polling(allowed_updates=Update.ALL_TYPES, close_loop=False)
+            # On Linux, python-telegram-bot tries to install signal handlers via set_wakeup_fd
+            # which fails in non-main threads. stop_signals=None prevents this error.
+            is_main_thread = (threading.current_thread() is threading.main_thread())
+            stop_sigs = None if not is_main_thread else None  # safely avoid signal issues across all threads
+            app.run_polling(allowed_updates=Update.ALL_TYPES, close_loop=False, stop_signals=stop_sigs)
             break
         except Exception as e:
             log.error("Bot polling error [%s...]: %s. Restarting polling in 5s...", token[:12], e)

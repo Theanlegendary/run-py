@@ -1,8 +1,8 @@
 import os
 import excel_to_image
 
-xlsx_path = r"test_out\Report_BATP001_Pending_04_07_2026_000000.xlsx"
-out_png = "batp001_pending_test.png"
+xlsx_path = r"test_out\Report_SVAP001_Pending_14_07_2026_000000.xlsx"
+out_png = "svap001_pending_test.png"
 
 print(f"Loading and rendering: {xlsx_path}")
 if not os.path.exists(xlsx_path):

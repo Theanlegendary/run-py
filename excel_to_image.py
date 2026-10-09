@@ -7,9 +7,12 @@ Renders an openpyxl-formatted Excel sheet to a PNG image using Pillow.
 """
 
 import io
+import threading
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from PIL import Image, ImageDraw, ImageFont
+
+_excel_com_lock = threading.Lock()
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 SCALE       = 3             # Increased from 2 to 3 for HD resolution quality
@@ -78,38 +81,106 @@ def _cell_align(cell):
     return 'left'
 
 
-_WIN_FONTS = "C:/Windows/Fonts"
+import os as _os
+
+# ── Font search paths (all confirmed to exist on this machine) ──────────────────
+_WIN_FONTS   = "C:/Windows/Fonts"
+_SCRIPT_DIR  = _os.path.dirname(_os.path.abspath(__file__))
+_LOCAL_FONTS = _os.path.join(_SCRIPT_DIR, "fonts")          # ./fonts/ subfolder
+_PB_FONTS    = _os.path.join(_SCRIPT_DIR, "push_bot", "fonts")  # push_bot/fonts/
+
+# All dirs to search, in priority order
+_FONT_DIRS = [_WIN_FONTS, _LOCAL_FONTS, _PB_FONTS, _SCRIPT_DIR]
+
+# ── Font name lists — ONLY fonts confirmed installed ───────────────────────────
+# Latin/number fonts (confirmed in C:\Windows\Fonts AND ./fonts/)
+_LATIN_NORMAL = ["segoeui.ttf", "arial.ttf",   "calibri.ttf"]
+_LATIN_BOLD   = ["segoeuib.ttf", "arialbd.ttf", "calibrib.ttf"]
+
+# Khmer fonts — KhmerOSbattambang matches the shipment report style (clean, readable)
+# Priority: Battambang → Siemreap → KhmerOS → Content (all confirmed in C:\Windows\Fonts)
+_KHMER_FONTS  = [
+    "KhmerOSbattambang.ttf",   # BEST MATCH for shipment report — in Windows\Fonts, root, fonts/
+    "KhmerOSsiemreap.ttf",     # clean alternative
+    "KhmerOS.ttf",             # base font
+    "KhmerOScontent.ttf",      # last resort
+]
+
+# ── Font cache — avoid repeated disk lookups ───────────────────────────────────
+_font_cache: dict = {}
+
+
+def _find_font(name: str) -> str | None:
+    """Return absolute path to a font file, checking all known directories."""
+    for d in _FONT_DIRS:
+        p = _os.path.join(d, name)
+        if _os.path.isfile(p):
+            return p
+    return None
+
+
+def _load_font(size: int, bold: bool = False):
+    """Load a Latin/numeric font. Never raises — always returns a valid font."""
+    key = ("latin", size, bold)
+    if key in _font_cache:
+        return _font_cache[key]
+    names = _LATIN_BOLD if bold else _LATIN_NORMAL
+    for name in names:
+        path = _find_font(name)
+        if path:
+            try:
+                fnt = ImageFont.truetype(path, size)
+                _font_cache[key] = fnt
+                return fnt
+            except Exception:
+                continue
+    # Final fallback — Pillow built-in bitmap font (always works, no TTF needed)
+    fnt = ImageFont.load_default()
+    _font_cache[key] = fnt
+    return fnt
+
+
+def _load_khmer_font(size: int):
+    """Load a Khmer font. Falls back to Latin font if nothing found."""
+    key = ("khmer", size)
+    if key in _font_cache:
+        return _font_cache[key]
+    for name in _KHMER_FONTS:
+        path = _find_font(name)
+        if path:
+            try:
+                fnt = ImageFont.truetype(path, size)
+                _font_cache[key] = fnt
+                return fnt
+            except Exception:
+                continue
+    # Fall back to Latin font so text is at least readable
+    fnt = _load_font(size, bold=False)
+    _font_cache[key] = fnt
+    return fnt
+
 
 def _has_khmer(text: str) -> bool:
     """Return True if text contains any Khmer Unicode characters (U+1780–U+17FF)."""
     return any('\u1780' <= ch <= '\u17FF' for ch in text)
 
-def _load_font(size, bold=False):
-    # Try system paths first
-    for name in (['arialbd.ttf', 'Arial Bold.ttf', 'DejaVuSans-Bold.ttf'] if bold
-                 else ['arial.ttf', 'Arial.ttf', 'DejaVuSans.ttf']):
-        for prefix in (f"{_WIN_FONTS}/", ""):
-            try:
-                return ImageFont.truetype(prefix + name, size)
-            except Exception:
-                pass
-    return ImageFont.load_default()
 
-def _load_khmer_font(size):
-    """Load Khmer OS Battambang font for Khmer text."""
-    for name in ['KhmerOSbattambang.ttf', 'KhmerOSsiemreap.ttf', 'KhmerOScontent.ttf', 'KhmerOS.ttf']:
-        for prefix in (f"{_WIN_FONTS}/", ""):
-            try:
-                return ImageFont.truetype(prefix + name, size)
-            except Exception:
-                pass
-    return _load_font(size, bold=False)
+def _is_corrupted_khmer(text: str) -> bool:
+    """Detect corrupted/truncated Khmer (1-2 lone chars) that glitch the render."""
+    if not _has_khmer(text):
+        return False
+    khmer_chars = [c for c in text if '\u1780' <= c <= '\u17FF']
+    # 1-2 isolated Khmer chars next to a phone number are usually encoding trash
+    return len(khmer_chars) <= 2 and len(text) < 20
+
 
 def _get_font(text: str, size: int, bold: bool = False):
-    """Return Khmer font if text has Khmer chars, otherwise return normal font."""
+    """Return the best font for this text: Khmer or Latin, never errors."""
+    if _is_corrupted_khmer(text):
+        return _load_font(size, bold)
     if _has_khmer(text):
-        # Khmer fonts are slightly smaller, boost size dynamically based on scale
-        return _load_khmer_font(size + int(1.5 * SCALE))
+        # Khmer fonts render slightly smaller — boost size to compensate
+        return _load_khmer_font(size + int(2.0 * SCALE))
     return _load_font(size, bold)
 
 
@@ -118,116 +189,144 @@ def excel_to_image(xlsx_path: str) -> io.BytesIO:
     try:
         import win32com.client
         import pythoncom
-        try:
-            pythoncom.CoInitialize()
-        except Exception:
-            pass
         import time
         import os
         from PIL import ImageGrab
-        
-        abs_path = os.path.abspath(xlsx_path)
-        excel = win32com.client.Dispatch("Excel.Application")
-        try:
-            excel.Visible = False
-        except Exception:
-            pass
-        try:
-            excel.DisplayAlerts = False
-        except Exception:
-            pass
-        
-        wb = None
-        try:
-            wb = excel.Workbooks.Open(abs_path)
-            ws = wb.ActiveSheet
-            
-            img = None
-            temp_png = None
-            
-            # --- 1. Try High Quality Chart Export Method (Crisp HD 2.0x rendering) ---
+
+        with _excel_com_lock:
             try:
-                rng = ws.UsedRange
-                excel_scale = 2.0  # Scale factor for HD rendering
-                chart_width = rng.Width * excel_scale
-                chart_height = rng.Height * excel_scale
-                
-                # Copy as picture using xlScreen=1, xlPicture=-4147 for maximum vector detail
-                rng.CopyPicture(1, -4147)
-                
-                # Add temporary chart
-                chart_obj = ws.ChartObjects().Add(Left=rng.Left, Top=rng.Top, Width=chart_width, Height=chart_height)
-                chart_obj.Activate()
-                chart = chart_obj.Chart
-                chart.Paste()
-                
-                # Scale the pasted picture shape to fill the chart and position it at top-left (0,0)
-                if chart.Shapes.Count > 0:
-                    shape = chart.Shapes(1)
-                    shape.Left = 0
-                    shape.Top = 0
-                    shape.Width = chart_width
-                    shape.Height = chart_height
-                
-                # Remove chart borders and fill to prevent extra margins/background padding
-                chart.ChartArea.Format.Line.Visible = 0
-                chart.ChartArea.Format.Fill.Visible = 0
-                
-                # Export to temp PNG
-                temp_png = os.path.abspath(os.path.join(os.path.dirname(xlsx_path), f"temp_excel_hd_{int(time.time())}.png"))
-                chart.Export(temp_png, "PNG")
-                chart_obj.Delete()
-                
-                if os.path.exists(temp_png):
-                    img = Image.open(temp_png)
-                    # Load image fully into memory and then close file handle so we can delete it
-                    img.load()
+                pythoncom.CoInitialize()
             except Exception:
-                img = None
+                pass
+
+            abs_path = os.path.abspath(xlsx_path)
+            excel = None
+            wb = None
+            try:
+                excel = win32com.client.Dispatch("Excel.Application")
+                excel.Visible = False
+                excel.DisplayAlerts = False
+
+                wb = excel.Workbooks.Open(abs_path)
+                if wb is not None:
+                    ws = wb.ActiveSheet
+                    if ws is not None:
+                        try:
+                            excel.CalculateFull()
+                        except Exception:
+                            try:
+                                excel.Calculate()
+                            except Exception:
+                                pass
+
+                        img = None
+                        temp_png = None
+
+                        # --- 1. Try High Quality Chart Export Method (Crisp HD 2.0x rendering) ---
+                        try:
+                            try:
+                                excel.ActiveWindow.Zoom = 200
+                            except Exception:
+                                pass
+                            rng = ws.UsedRange
+                            excel_scale = 2.0  # Scale factor for HD rendering
+                            chart_width = rng.Width * excel_scale
+                            chart_height = rng.Height * excel_scale
+
+                            # Copy as picture using xlScreen=1, xlPicture=-4147 for maximum vector detail
+                            rng.CopyPicture(1, -4147)
+
+                            # Add temporary chart
+                            chart_obj = ws.ChartObjects().Add(Left=rng.Left, Top=rng.Top, Width=chart_width, Height=chart_height)
+                            chart_obj.Activate()
+                            chart = chart_obj.Chart
+                            chart.Paste()
+
+                            # Scale the pasted picture shape to fill the chart and position it at top-left (0,0)
+                            if chart.Shapes.Count > 0:
+                                shape = chart.Shapes(1)
+                                shape.Left = 0
+                                shape.Top = 0
+                                shape.Width = chart_width
+                                shape.Height = chart_height
+
+                            # Remove chart borders and fill to prevent extra margins/background padding
+                            chart.ChartArea.Format.Line.Visible = 0
+                            chart.ChartArea.Format.Fill.Visible = 0
+
+                            # Export to temp PNG
+                            temp_png = os.path.abspath(os.path.join(os.path.dirname(xlsx_path), f"temp_excel_hd_{int(time.time())}.png"))
+                            chart.Export(temp_png, "PNG")
+                            chart_obj.Delete()
+
+                            if os.path.exists(temp_png):
+                                img = Image.open(temp_png)
+                                img.load()
+                        except Exception:
+                            img = None
+                        finally:
+                            if temp_png and os.path.exists(temp_png):
+                                try:
+                                    os.remove(temp_png)
+                                except Exception:
+                                    pass
+
+                        # --- 2. Clipboard Fallback Method (if Chart method failed or wasn't used) ---
+                        if img is None:
+                            ws.UsedRange.CopyPicture(1, 2)
+                            time.sleep(0.5) # wait for clipboard
+                            for _ in range(5):
+                                img = ImageGrab.grabclipboard()
+                                if img:
+                                    break
+                                time.sleep(0.5)
+
+                        if img:
+                            # Aspect ratio safety check for Telegram
+                            max_ratio = 18.0
+                            w, h = img.size
+                            new_w, new_h = w, h
+                            if h > 0 and w / h > max_ratio:
+                                new_h = int(w / max_ratio)
+                            elif w > 0 and h / w > max_ratio:
+                                new_w = int(h / max_ratio)
+
+                            if (new_w, new_h) != (w, h):
+                                padded_img = Image.new('RGB', (new_w, new_h), (255, 255, 255))
+                                padded_img.paste(img, (0, 0))
+                                img = padded_img
+
+                            # Dimension safety check for Telegram (Telegram limit: w + h <= 10,000 px, max dimension 10,000 px)
+                            w, h = img.size
+                            if (w + h > 9500) or max(w, h) > 8000:
+                                scale = min(9500.0 / (w + h), 8000.0 / max(w, h))
+                                new_w = max(1, int(w * scale))
+                                new_h = max(1, int(h * scale))
+                                img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+                            buf = io.BytesIO()
+                            img.save(buf, format='PNG', optimize=True)
+                            buf.seek(0)
+                            return buf
             finally:
-                if temp_png and os.path.exists(temp_png):
+                if wb:
                     try:
-                        os.remove(temp_png)
+                        wb.Close(SaveChanges=False)
                     except Exception:
                         pass
-            
-            # --- 2. Clipboard Fallback Method (if Chart method failed or wasn't used) ---
-            if img is None:
-                ws.UsedRange.CopyPicture(1, 2)
-                time.sleep(0.5) # wait for clipboard
-                for _ in range(5):
-                    img = ImageGrab.grabclipboard()
-                    if img:
-                        break
-                    time.sleep(0.5)
-            
-            if img:
-                # Aspect ratio safety check for Telegram
-                max_ratio = 18.0
-                w, h = img.size
-                new_w, new_h = w, h
-                if h > 0 and w / h > max_ratio:
-                    new_h = int(w / max_ratio)
-                elif w > 0 and h / w > max_ratio:
-                    new_w = int(h / max_ratio)
-
-                if (new_w, new_h) != (w, h):
-                    padded_img = Image.new('RGB', (new_w, new_h), (255, 255, 255))
-                    padded_img.paste(img, (0, 0))
-                    img = padded_img
-
-                buf = io.BytesIO()
-                img.save(buf, format='PNG', optimize=True)
-                buf.seek(0)
-                return buf
-        finally:
-            if wb:
-                wb.Close(SaveChanges=False)
-            excel.Quit()
+                if excel:
+                    try:
+                        excel.Quit()
+                    except Exception:
+                        pass
+                try:
+                    pythoncom.CoUninitialize()
+                except Exception:
+                    pass
     except Exception as e:
         # Fall back to Pillow rendering if Excel COM fails or is not available
         import logging
-        logging.warning("Excel COM rendering failed, falling back to Pillow: %s", e, exc_info=True)
+        logging.warning("Excel COM rendering failed (%s), falling back to Pillow", e)
         pass
 
     wb = load_workbook(xlsx_path, data_only=True)
@@ -334,9 +433,6 @@ def excel_to_image(xlsx_path: str) -> io.BytesIO:
                 bold = _cell_bold(ws.cell(r, c))
                 f = _get_font(text, FONT_SIZE, bold)
                 stroke_w = 0
-                if bold and _has_khmer(text):
-                    # Simulate bold for Khmer OS fonts using a stroke outline
-                    stroke_w = max(1, int(0.4 * SCALE))
                 try:
                     bb = d.textbbox((0, 0), text, font=f, stroke_width=stroke_w)
                     w  = bb[2] - bb[0]
@@ -418,9 +514,6 @@ def excel_to_image(xlsx_path: str) -> io.BytesIO:
             if text:
                 f = _get_font(text, FONT_SIZE, bold)
                 stroke_w = 0
-                if bold and _has_khmer(text):
-                    # Simulate bold for Khmer OS fonts using a stroke outline
-                    stroke_w = max(1, int(0.4 * SCALE))
                 try:
                     bb = draw.textbbox((0, 0), text, font=f, stroke_width=stroke_w)
                     tw, th = bb[2] - bb[0], bb[3] - bb[1]
@@ -461,15 +554,52 @@ def excel_to_image(xlsx_path: str) -> io.BytesIO:
         padded_img.paste(img, (0, 0))
         img = padded_img
 
+    # Dimension safety check for Telegram (Telegram limit: w + h <= 10,000 px, max dimension 10,000 px)
+    w, h = img.size
+    if (w + h > 9500) or max(w, h) > 8000:
+        scale = min(9500.0 / (w + h), 8000.0 / max(w, h))
+        new_w = max(1, int(w * scale))
+        new_h = max(1, int(h * scale))
+        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
     buf = io.BytesIO()
     img.save(buf, format='PNG', optimize=True)
     buf.seek(0)
     return buf
 
 
-def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_include=None) -> dict:
+def _apply_khmer_font(ws_range, default_font: str = "Segoe UI", khmer_font: str = "Khmer OS Battambang", khmer_size_offset: int = 1):
+    """
+    Walk every cell in a COM Range and switch Khmer text cells to 'Khmer OS Battambang'.
+    Non-Khmer cells keep default_font unchanged.
+    Boosts Khmer font size by +1pt (minimum 11pt) so Khmer glyphs are crisp, clear, and readable.
+    """
+    try:
+        for row in ws_range.Rows:
+            for cell in row.Cells:
+                try:
+                    val = str(cell.Value) if cell.Value is not None else ""
+                    has_kh = any('\u1780' <= ch <= '\u17FF' for ch in val)
+                    if has_kh:
+                        cell.Font.Name = khmer_font
+                        try:
+                            current_size = cell.Font.Size
+                            if current_size and current_size > 0:
+                                cell.Font.Size = max(11, int(current_size) + khmer_size_offset)
+                        except Exception:
+                            pass
+                    else:
+                        cell.Font.Name = default_font
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
+def render_excel_reports(xlsx_path: str, target_date, out_dir: str) -> dict:
     """
     Renders the required report screenshots from the populated Excel file using Excel COM.
+    Uses 'Khmer UI' for Khmer text (matching shipment report style) via _apply_khmer_font().
     """
     try:
         from exporter import export_5_report_images
@@ -500,11 +630,6 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
     
     try:
         try:
-            import pythoncom
-            pythoncom.CoInitialize()
-        except Exception:
-            pass
-        try:
             excel = win32com.client.DispatchEx("Excel.Application")
         except Exception:
             excel = win32com.client.Dispatch("Excel.Application")
@@ -519,18 +644,12 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
         except Exception:
             pass
             
-        try:
-            wb = excel.Workbooks.Open(abs_path)
-        except Exception:
-            wb = excel.Workbooks.Open(abs_path, 0, False, 5, '', '', True, 1, '', True, False, 0, False, 1, 1)
-        try:
-            excel.Calculation = -4135 # xlCalculationManual: disable re-calculating 37MB file while copying ranges
-        except Exception:
-            pass
+        wb = excel.Workbooks.Open(abs_path)
+        excel.CalculateFull()
         
         # 1. Render Zone Summary (Single tight full-fit table: SẢN LƯỢNG NHẬN - NGÀY)
         try:
-            ws_z = wb.Worksheets("ZONE")
+            ws_z = wb.Worksheets("Zone_Report")
             ws_zs = wb.Worksheets.Add()
             
             # Title Banner: Row 1 (Merged A1:L1 to match exact 12-column table width)
@@ -538,7 +657,7 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             date_val = ws_z.Range("C1").Text
             time_val = ws_z.Range("C2").Text
             ws_zs.Range("A1").Value = f"Báo cáo kết quả sản xuất kinh doanh ngày {date_val} - {time_val}"
-            ws_zs.Range("A1").Font.Name = "Arial"
+            ws_zs.Range("A1").Font.Name = "Segoe UI"
             ws_zs.Range("A1").Font.Bold = True
             ws_zs.Range("A1").Font.Size = 13
             ws_zs.Range("A1").Font.Color = 0xFFFFFF
@@ -552,10 +671,11 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_zs.Range("A2:L10").Value = ws_z.Range("B6:M14").Value
             
             table_rng = ws_zs.Range("A2:L10")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
             ws_zs.Range("A2:L4").Font.Bold = True
             ws_zs.Range("A5:A10").Font.Bold = True
+            _apply_khmer_font(table_rng)  # switch Khmer cells → Khmer UI (shipment report style)
             
             # Explicit solid borders on EVERY cell
             for border_id in [7, 8, 9, 10, 11, 12]:
@@ -566,19 +686,19 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
                 except Exception:
                     pass
                     
-            # AutoFit with generous padding to prevent ###
+            # AutoFit with generous padding to prevent ### and give Khmer text room
             ws_zs.Range("A2:L10").Columns.AutoFit()
             for c in range(1, 13):
                 w = ws_zs.Columns(c).ColumnWidth
-                ws_zs.Columns(c).ColumnWidth = max(w + 2.5, 9.5)
+                ws_zs.Columns(c).ColumnWidth = max(w + 3.5, 11.5)
                 
-            ws_zs.Rows(2).RowHeight = 24
-            ws_zs.Rows(3).RowHeight = 24
-            ws_zs.Rows(4).RowHeight = 22
+            ws_zs.Rows(2).RowHeight = 26
+            ws_zs.Rows(3).RowHeight = 26
+            ws_zs.Rows(4).RowHeight = 24
             for r in range(5, 11):
-                ws_zs.Rows(r).RowHeight = 22
+                ws_zs.Rows(r).RowHeight = 24
             
-            ws_zs.Parent.Windows(1).DisplayGridlines = False
+            ws_zs.Parent.Windows(1).DisplayGridlines = True
             
             rng_zs = ws_zs.Range("A1:L10")
             rng_zs.CopyPicture(1, -4147)
@@ -615,7 +735,7 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
 
         # 1b. Render Customer Report (BÁO CÁO KHÁCH HÀNG PHÁT SINH LẦN ĐẦU: B56:L64)
         try:
-            ws_z = wb.Worksheets("ZONE")
+            ws_z = wb.Worksheets("Zone_Report")
             ws_cr = wb.Worksheets.Add()
             
             ws_z.Range("B56:L64").Copy()
@@ -623,12 +743,13 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_cr.Range("A1:K9").Value = ws_z.Range("B56:L64").Value
             
             table_rng = ws_cr.Range("A1:K9")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
+            _apply_khmer_font(table_rng)  # Khmer UI for Khmer cells (shipment report style)
             
             ws_cr.Range("A1:K1").Merge()
             ws_cr.Range("A1").Value = "BÁO CÁO KHÁCH HÀNG PHÁT SINH LẦN ĐẦU"
-            ws_cr.Range("A1").Font.Name = "Arial"
+            ws_cr.Range("A1").Font.Name = "Segoe UI"
             ws_cr.Range("A1").Font.Bold = True
             ws_cr.Range("A1").Font.Size = 12
             ws_cr.Range("A1").HorizontalAlignment = -4108 # Center
@@ -636,10 +757,10 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             
             ws_cr.Range("A2:K3").Font.Bold = True
             ws_cr.Range("A4:A9").Font.Bold = True
-            ws_cr.Rows(2).RowHeight = 22
-            ws_cr.Rows(3).RowHeight = 22
+            ws_cr.Rows(2).RowHeight = 26
+            ws_cr.Rows(3).RowHeight = 26
             for r in range(4, 10):
-                ws_cr.Rows(r).RowHeight = 21
+                ws_cr.Rows(r).RowHeight = 24
                 
             for border_id in [7, 8, 9, 10, 11, 12]:
                 try:
@@ -652,9 +773,9 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_cr.Range("A1:K9").Columns.AutoFit()
             for c in range(1, 12):
                 w = ws_cr.Columns(c).ColumnWidth
-                ws_cr.Columns(c).ColumnWidth = max(w + 2.0, 9.0)
+                ws_cr.Columns(c).ColumnWidth = max(w + 3.5, 11.5)
                 
-            ws_cr.Parent.Windows(1).DisplayGridlines = False
+            ws_cr.Parent.Windows(1).DisplayGridlines = True
             ws_cr.Activate()
             
             rng_cr = ws_cr.Range("A1:K9")
@@ -708,8 +829,9 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_tmp_dr.Range("A1:Y26").Value = src_rng.Value
             
             table_rng = ws_tmp_dr.Range("A1:Y26")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
+            _apply_khmer_font(table_rng)  # Khmer UI for Khmer cells (shipment report style)
             
             ws_tmp_dr.Range("A1:Y3").Font.Bold = True
             ws_tmp_dr.Range("A4:D26").Font.Bold = True
@@ -719,11 +841,11 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_tmp_dr.Columns("E:E").Hidden = True
             
             # Row heights
-            ws_tmp_dr.Rows(1).RowHeight = 26
-            ws_tmp_dr.Rows(2).RowHeight = 22
-            ws_tmp_dr.Rows(3).RowHeight = 22
+            ws_tmp_dr.Rows(1).RowHeight = 28
+            ws_tmp_dr.Rows(2).RowHeight = 26
+            ws_tmp_dr.Rows(3).RowHeight = 26
             for r in range(4, 27):
-                ws_tmp_dr.Rows(r).RowHeight = 21
+                ws_tmp_dr.Rows(r).RowHeight = 24
                 
             # Explicit solid borders
             for border_id in [7, 8, 9, 10, 11, 12]:
@@ -737,9 +859,9 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_tmp_dr.UsedRange.Columns.AutoFit()
             for c in range(1, ws_tmp_dr.UsedRange.Columns.Count + 1):
                 cur_w = ws_tmp_dr.Columns(c).ColumnWidth
-                ws_tmp_dr.Columns(c).ColumnWidth = max(cur_w + 2.0, 9.5)
+                ws_tmp_dr.Columns(c).ColumnWidth = max(cur_w + 3.5, 11.5)
                 
-            ws_tmp_dr.Parent.Windows(1).DisplayGridlines = False
+            ws_tmp_dr.Parent.Windows(1).DisplayGridlines = True
             
             rng = ws_tmp_dr.Range("A1:Y26")
             rng.CopyPicture(1, -4147)
@@ -785,18 +907,19 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_tmp_sr.Range("A1:R26").Value = src_rng.Value
             
             table_rng = ws_tmp_sr.Range("A1:R26")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
+            _apply_khmer_font(table_rng)  # Khmer UI for Khmer cells (shipment report style)
             
             ws_tmp_sr.Range("A1:R3").Font.Bold = True
             ws_tmp_sr.Range("A4:D26").Font.Bold = True
             
             # Row heights
-            ws_tmp_sr.Rows(1).RowHeight = 26
-            ws_tmp_sr.Rows(2).RowHeight = 22
-            ws_tmp_sr.Rows(3).RowHeight = 22
+            ws_tmp_sr.Rows(1).RowHeight = 28
+            ws_tmp_sr.Rows(2).RowHeight = 26
+            ws_tmp_sr.Rows(3).RowHeight = 26
             for r in range(4, 27):
-                ws_tmp_sr.Rows(r).RowHeight = 21
+                ws_tmp_sr.Rows(r).RowHeight = 24
                 
             # Explicit solid borders
             for border_id in [7, 8, 9, 10, 11, 12]:
@@ -810,9 +933,9 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_tmp_sr.UsedRange.Columns.AutoFit()
             for c in range(1, ws_tmp_sr.UsedRange.Columns.Count + 1):
                 cur_w = ws_tmp_sr.Columns(c).ColumnWidth
-                ws_tmp_sr.Columns(c).ColumnWidth = max(cur_w + 2.0, 9.5)
+                ws_tmp_sr.Columns(c).ColumnWidth = max(cur_w + 3.5, 11.5)
                 
-            ws_tmp_sr.Parent.Windows(1).DisplayGridlines = False
+            ws_tmp_sr.Parent.Windows(1).DisplayGridlines = True
             
             rng = ws_tmp_sr.Range("A1:R26")
             rng.CopyPicture(1, -4147)
@@ -858,18 +981,19 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_tmp_ar.Range("A1:R26").Value = src_rng.Value
             
             table_rng = ws_tmp_ar.Range("A1:R26")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
+            _apply_khmer_font(table_rng)  # Khmer UI for Khmer cells (shipment report style)
             
             ws_tmp_ar.Range("A1:R3").Font.Bold = True
             ws_tmp_ar.Range("A4:D26").Font.Bold = True
             
             # Row heights
-            ws_tmp_ar.Rows(1).RowHeight = 26
-            ws_tmp_ar.Rows(2).RowHeight = 22
-            ws_tmp_ar.Rows(3).RowHeight = 22
+            ws_tmp_ar.Rows(1).RowHeight = 28
+            ws_tmp_ar.Rows(2).RowHeight = 26
+            ws_tmp_ar.Rows(3).RowHeight = 26
             for r in range(4, 27):
-                ws_tmp_ar.Rows(r).RowHeight = 21
+                ws_tmp_ar.Rows(r).RowHeight = 24
                 
             # Explicit solid borders
             for border_id in [7, 8, 9, 10, 11, 12]:
@@ -883,9 +1007,9 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_tmp_ar.UsedRange.Columns.AutoFit()
             for c in range(1, ws_tmp_ar.UsedRange.Columns.Count + 1):
                 cur_w = ws_tmp_ar.Columns(c).ColumnWidth
-                ws_tmp_ar.Columns(c).ColumnWidth = max(cur_w + 2.0, 9.5)
+                ws_tmp_ar.Columns(c).ColumnWidth = max(cur_w + 3.5, 11.5)
                 
-            ws_tmp_ar.Parent.Windows(1).DisplayGridlines = False
+            ws_tmp_ar.Parent.Windows(1).DisplayGridlines = True
             
             rng = ws_tmp_ar.Range("A1:R26")
             co = ws_tmp_ar.ChartObjects().Add(Left=0, Top=0, Width=w, Height=h)
@@ -929,8 +1053,9 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             
             # Apply Modern Clean Arial Font
             table_rng = ws_tmp.Range("A1:W42")
-            table_rng.Font.Name = "Arial"
-            table_rng.Font.Size = 10
+            table_rng.Font.Name = "Segoe UI"
+            table_rng.Font.Size = 11
+            _apply_khmer_font(table_rng)  # Khmer UI for Khmer cells (shipment report style)
             
             ws_tmp.Range("A1:W3").Font.Bold = True
             ws_tmp.Range("A1:W3").Font.Size = 10.5
@@ -938,10 +1063,10 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             
             # Set explicit standard row heights
             ws_tmp.Rows(1).RowHeight = 28
-            ws_tmp.Rows(2).RowHeight = 22
-            ws_tmp.Rows(3).RowHeight = 20
+            ws_tmp.Rows(2).RowHeight = 26
+            ws_tmp.Rows(3).RowHeight = 24
             for r in range(4, 43):
-                ws_tmp.Rows(r).RowHeight = 21
+                ws_tmp.Rows(r).RowHeight = 24
             
             # Hide column D (Zone) as shown in reference images
             ws_tmp.Columns("D:D").Hidden = True
@@ -958,9 +1083,9 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_tmp.UsedRange.Columns.AutoFit()
             for c in range(1, ws_tmp.UsedRange.Columns.Count + 1):
                 cur_w = ws_tmp.Columns(c).ColumnWidth
-                ws_tmp.Columns(c).ColumnWidth = max(cur_w + 2.0, 9.5)
+                ws_tmp.Columns(c).ColumnWidth = max(cur_w + 3.5, 11.5)
                 
-            ws_tmp.Parent.Windows(1).DisplayGridlines = False
+            ws_tmp.Parent.Windows(1).DisplayGridlines = True
             
             rng = ws_tmp.Range("A1:W42")
             rng.CopyPicture(1, -4147)
@@ -1011,7 +1136,7 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
                 # Title Banner: Row 1 (Merged A1:W1)
                 ws_tmp.Range("A1:W1").Merge()
                 ws_tmp.Range("A1").Value = "[SERVICE POINT]-REPORT OF ORDER EXPRESS"
-                ws_tmp.Range("A1").Font.Name = "Arial"
+                ws_tmp.Range("A1").Font.Name = "Segoe UI"
                 ws_tmp.Range("A1").Font.Bold = True
                 ws_tmp.Range("A1").Font.Size = 13
                 ws_tmp.Range("A1").Font.Color = 0xFFFFFF
@@ -1037,17 +1162,18 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
                 
                 total_rows = 3 + num_rows
                 table_rng = ws_tmp.Range(f"A1:W{total_rows}")
-                table_rng.Font.Name = "Arial"
-                table_rng.Font.Size = 10
+                table_rng.Font.Name = "Segoe UI"
+                table_rng.Font.Size = 11
+                _apply_khmer_font(table_rng)  # Khmer UI for Khmer cells (shipment report style)
                 
                 ws_tmp.Range("A2:W3").Font.Bold = True
                 ws_tmp.Range(f"A4:B{total_rows}").Font.Bold = True
                 
                 # Set explicit standard row heights
-                ws_tmp.Rows(2).RowHeight = 22
-                ws_tmp.Rows(3).RowHeight = 20
+                ws_tmp.Rows(2).RowHeight = 26
+                ws_tmp.Rows(3).RowHeight = 24
                 for r in range(4, 4 + num_rows):
-                    ws_tmp.Rows(r).RowHeight = 22
+                    ws_tmp.Rows(r).RowHeight = 24
                 
                 # Set explicit solid borders on EVERY cell
                 for border_id in [7, 8, 9, 10, 11, 12]:
@@ -1062,9 +1188,9 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
                 ws_tmp.UsedRange.Columns.AutoFit()
                 for c in range(1, ws_tmp.UsedRange.Columns.Count + 1):
                     cur_w = ws_tmp.Columns(c).ColumnWidth
-                    ws_tmp.Columns(c).ColumnWidth = max(cur_w + 2.0, 9.5)
+                    ws_tmp.Columns(c).ColumnWidth = max(cur_w + 3.5, 11.5)
                     
-                ws_tmp.Parent.Windows(1).DisplayGridlines = False
+                ws_tmp.Parent.Windows(1).DisplayGridlines = True
                 
                 rng = ws_tmp.Range(f"A1:W{total_rows}")
                 time.sleep(0.1)
@@ -1114,7 +1240,7 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             # Title Header
             ws_cd.Range("A1:Q1").Merge()
             ws_cd.Range("A1").Value = "[SERVICE POINT]-REPORT OF CUSTOMER DEVELOPMENT"
-            ws_cd.Range("A1").Font.Name = "Arial"
+            ws_cd.Range("A1").Font.Name = "Segoe UI"
             ws_cd.Range("A1").Font.Bold = True
             ws_cd.Range("A1").Font.Size = 13
             ws_cd.Range("A1").Font.Color = 0xFFFFFF
@@ -1175,20 +1301,12 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
                 "STUP001": (103, 23, 7, 183)
             }
             
-            def _to_f(val):
-                try:
-                    return float(val or 0)
-                except Exception:
-                    return 0.0
-
             matrix = []
             r0 = raw_data[0]
-            v17_0, v18_0, v19_0, v20_0, v21_0 = _to_f(r0[17]), _to_f(r0[18]), _to_f(r0[19]), _to_f(r0[20]), _to_f(r0[21])
-            matrix.append(["MEC", "", "", "", 9346, v17_0, v17_0/9346, 2066, v18_0, v18_0/2066, 658, v19_0, v19_0/658, 7836, v20_0, v20_0/7836, v21_0])
+            matrix.append(["MEC", "", "", "", 9346, r0[17], (r0[17] or 0)/9346, 2066, r0[18], (r0[18] or 0)/2066, 658, r0[19], (r0[19] or 0)/658, 7836, r0[20], (r0[20] or 0)/7836, r0[21] or 0])
             
             r1 = raw_data[1]
-            v17_1, v18_1, v19_1, v20_1, v21_1 = _to_f(r1[17]), _to_f(r1[18]), _to_f(r1[19]), _to_f(r1[20]), _to_f(r1[21])
-            matrix.append(["I", "Phnompenh", "", "", 4312, v17_1, v17_1/4312, 952, v18_1, v18_1/952, 308, v19_1, v19_1/308, 3019, v20_1, v20_1/3019, v21_1])
+            matrix.append(["I", "Phnompenh", "", "", 4312, r1[17], (r1[17] or 0)/4312, 952, r1[18], (r1[18] or 0)/952, 308, r1[19], (r1[19] or 0)/308, 3019, r1[20], (r1[20] or 0)/3019, r1[21] or 0])
             
             for r in raw_data[2:]:
                 no_val = r[0]
@@ -1205,11 +1323,11 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
                 zone_val = r[3]
                 
                 tg = station_targets.get(code_val, (257, 57, 18, 200))
-                c_res = _to_f(r[17])
-                c5_res = _to_f(r[18])
-                c20_res = _to_f(r[19])
-                new_res = _to_f(r[20])
-                new_day = _to_f(r[21])
+                c_res = r[17] or 0
+                c5_res = r[18] or 0
+                c20_res = r[19] or 0
+                new_res = r[20] or 0
+                new_day = r[21] or 0
                 
                 matrix.append([
                     no_val, code_val, name_val, zone_val,
@@ -1224,7 +1342,7 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             full_cd_rng = ws_cd.Range(f"A4:Q{3 + num_data_rows}")
             full_cd_rng.Value = matrix
             
-            ws_cd.Range(f"A1:Q{3 + num_data_rows}").Font.Name = "Arial"
+            ws_cd.Range(f"A1:Q{3 + num_data_rows}").Font.Name = "Segoe UI"
             ws_cd.Range(f"A4:Q{3 + num_data_rows}").Font.Size = 10
             ws_cd.Range("A2:Q3").Font.Size = 10.5
             
@@ -1234,7 +1352,7 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
             ws_cd.Range(f"A6:B{3 + num_data_rows}").Font.Bold = True
             
             for r in range(4, 4 + num_data_rows):
-                ws_cd.Rows(r).RowHeight = 21
+                ws_cd.Rows(r).RowHeight = 24
             
             ws_cd.Range(f"G4:G{3+num_data_rows},J4:J{3+num_data_rows},M4:M{3+num_data_rows},P4:P{3+num_data_rows}").NumberFormat = "0.0%"
             ws_cd.Range(f"E4:F{3+num_data_rows},H4:I{3+num_data_rows},K4:L{3+num_data_rows},N4:O{3+num_data_rows},Q4:Q{3+num_data_rows}").NumberFormat = "#,##0"
@@ -1281,7 +1399,7 @@ def render_excel_reports(xlsx_path: str, target_date, out_dir: str, reports_to_i
                 cur_w = ws_cd.Columns(col_idx).ColumnWidth
                 ws_cd.Columns(col_idx).ColumnWidth = max(cur_w + 1.8, min_w)
                 
-            ws_cd.Parent.Windows(1).DisplayGridlines = False
+            ws_cd.Parent.Windows(1).DisplayGridlines = True
             ws_cd.Activate()
             
             rng_cd = ws_cd.Range(f"A1:Q{3+num_data_rows}")

@@ -2,19 +2,21 @@
 """
 province_flow_report.py
 Analyzes and compares RECEIVE PROVINCE (Origin) vs DELIVERY PROVINCE (Destination)
-for all September 2026 bills in Metfone TMS data.
+for Metfone TMS data.
+Supports generating reports for October 2026 (current month), September 2026, and full period.
 """
 
 import os
 import sys
 import json
 import pandas as pd
+from datetime import datetime
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-INPUT_FILE = os.path.join(HERE, "cache", "latest_detail.xlsx")
+INPUT_FILE = os.path.join(HERE, "cache", "detail_master_until_today.xlsx")
 
 PROVINCE_NAMES = {
     "PNP": "Phnom Penh",
@@ -44,7 +46,7 @@ PROVINCE_NAMES = {
     "PAI": "Pailin"
 }
 
-def generate_province_report(input_xlsx, output_xlsx):
+def generate_province_report(input_xlsx, output_xlsx, target_month=None, title_label=None):
     print(f"[INFO] Reading detail file: {input_xlsx}...")
     try:
         df = pd.read_excel(input_xlsx, engine="calamine")
@@ -58,10 +60,21 @@ def generate_province_report(input_xlsx, output_xlsx):
     cur_col = next((c for c in df.columns if "CURRENT PROVINCE" in c), "CURRENT PROVINCE")
     st_col  = next((c for c in df.columns if "CURRENT STATUS" in c), "CURRENT STATUS")
     oid_col = next((c for c in df.columns if "ORDER ID" in c), "ORDER ID")
+    time_col = next((c for c in df.columns if "CURRENT TIME" in c), None)
+    cdate_col = next((c for c in df.columns if "CREATED DATE" in c), None)
 
     # Filter invalid/test rows
     df_clean = df.dropna(subset=[oid_col]).copy()
     
+    # Optional month filter
+    if target_month is not None:
+        df_clean["_dt_created"] = pd.to_datetime(df_clean[cdate_col], dayfirst=True, errors='coerce') if cdate_col else None
+        df_clean["_dt_cur"] = pd.to_datetime(df_clean[time_col], dayfirst=True, errors='coerce') if time_col else None
+        
+        m_created = df_clean["_dt_created"].dt.month == target_month if cdate_col else False
+        m_cur = df_clean["_dt_cur"].dt.month == target_month if time_col else False
+        df_clean = df_clean[m_created | m_cur].copy()
+
     # Extract province codes
     df_clean["REC_PROV"] = df_clean[rec_col].astype(str).str.strip().str.upper()
     df_clean["DEL_PROV"] = df_clean[del_col].astype(str).str.strip().str.upper()
@@ -143,8 +156,9 @@ def generate_province_report(input_xlsx, output_xlsx):
         "DELIVERED SUCCESS (410)", "PENDING / IN TRANSIT", "NET VOLUME (RECEIVED - DELIVERY)"
     ]
 
+    report_title = title_label or f"PROVINCE RECEIVE VS DELIVERY REPORT ({len(df_clean):,} Total Bills)"
     ws_sum.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers_sum))
-    t_cell = ws_sum.cell(1, 1, f"PROVINCE RECEIVE VS DELIVERY ANALYSIS REPORT — SEPTEMBER 2026 ({len(df_clean):,} Total Bills)")
+    t_cell = ws_sum.cell(1, 1, report_title)
     t_cell.font = f_title
     t_cell.fill = fill_title
     t_cell.alignment = align_c
@@ -217,13 +231,13 @@ def generate_province_report(input_xlsx, output_xlsx):
         ws_sum.column_dimensions[col_letter].width = max(max_len + 4, 15)
 
     # 2. Route Flow Matrix Sheet
-    ws_mat = wb.create_sheet(title="Route Flow Grid (Origin x Dest)")
+    ws_mat = wb.create_sheet(title="Route Flow Grid")
     ws_mat.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(route_matrix.columns) + 1)
     t_mat = ws_mat.cell(1, 1, "ORIGIN (RECEIVE PROVINCE) TO DESTINATION (DELIVERY PROVINCE) VOLUME MATRIX")
     t_mat.font = f_title; t_mat.fill = fill_title; t_mat.alignment = align_c
     ws_mat.row_dimensions[1].height = 30
 
-    # Headers (Destination Provinces)
+    # Headers
     ws_mat.cell(3, 1, "ORIGIN \\ DEST").font = f_header
     ws_mat.cell(3, 1).fill = fill_hdr1
     ws_mat.cell(3, 1).border = border
@@ -254,11 +268,20 @@ def generate_province_report(input_xlsx, output_xlsx):
     ws_mat.freeze_panes = "B4"
 
     wb.save(output_xlsx)
-    print(f"[SUCCESS] Saved Province Receive vs Delivery Report: {output_xlsx}")
+    print(f"[SUCCESS] Saved: {output_xlsx}")
     return df_summary
 
 if __name__ == "__main__":
-    out_file = r"C:\Users\DELL\Desktop\Province_Receive_vs_Delivery_Sep2026.xlsx"
-    df_sum = generate_province_report(INPUT_FILE, out_file)
-    print("\n--- PROVINCE VOLUME TOP SUMMARY ---")
-    print(df_sum.head(15).to_string(index=False))
+    src_file = os.path.join(HERE, "cache", "detail_master_until_today.xlsx")
+    
+    # 1. October 2026 (Current Month)
+    out_oct = r"C:\Users\DELL\Desktop\Province_Receive_vs_Delivery_Oct2026.xlsx"
+    print("\n--- GENERATING OCTOBER 2026 (THIS MONTH) REPORT ---")
+    df_oct = generate_province_report(src_file, out_oct, target_month=10, title_label="PROVINCE RECEIVE VS DELIVERY — OCTOBER 2026 (THIS MONTH)")
+    print("\nOCTOBER 2026 (THIS MONTH) TOP PROVINCES:")
+    print(df_oct.head(15).to_string(index=False))
+
+    # 2. Total Period (September + October 2026 until today)
+    out_total = r"C:\Users\DELL\Desktop\Province_Receive_vs_Delivery_Total_Sep_Oct2026.xlsx"
+    print("\n--- GENERATING TOTAL PERIOD (SEP + OCT UNTIL TODAY) REPORT ---")
+    df_total = generate_province_report(src_file, out_total, target_month=None, title_label="PROVINCE RECEIVE VS DELIVERY — TOTAL UNTIL TODAY (SEP + OCT 2026)")

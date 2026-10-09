@@ -72,10 +72,6 @@
     "title": "PUR - Metfone Express"
   },
   {
-    "chat_id": -1003950095969,
-    "title": "BAN - Metfone Express Zone 3"
-  },
-  {
     "chat_id": -1004390650725,
     "title": "Zone 1- Pickup & Delivery"
   },
@@ -170,5 +166,13 @@
   {
     "chat_id": -1004493373354,
     "title": "MEGA HUB"
+  },
+  {
+    "chat_id": -5511531949,
+    "title": "BAN Express Operation"
+  },
+  {
+    "chat_id": -5538163632,
+    "title": "PNPP015 - operations"
   }
 ]

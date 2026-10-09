@@ -32,37 +32,63 @@ _REALTIME_DONE_STATUSES = {
     'S201', '201',   # Cancelled pickup
 }
 
+_TXT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shipped_bills.txt")
+
 _memory_cache: set[str] = set()
 _cache_loaded = False
 
 
 def load_confirmed_shipped_ids() -> set[str]:
-    """Load confirmed shipped bill IDs from persistent disk storage."""
+    """Load confirmed shipped bill IDs from persistent disk storage (both JSON cache & shipped_bills.txt)."""
     global _memory_cache, _cache_loaded
     with _LOCK:
         if _cache_loaded and _memory_cache:
             return set(_memory_cache)
 
+        _memory_cache = set()
+
+        # 1. Load from JSON cache
         if os.path.exists(_CACHE_FILE):
             try:
                 with open(_CACHE_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 if isinstance(data, list):
-                    _memory_cache = set(str(x).strip() for x in data if str(x).strip())
+                    _memory_cache.update(str(x).strip() for x in data if str(x).strip())
                 elif isinstance(data, dict):
-                    _memory_cache = set(str(k).strip() for k in data.keys() if str(k).strip())
+                    _memory_cache.update(str(k).strip() for k in data.keys() if str(k).strip())
             except Exception as e:
                 print(f"[SHIPPED_FILTER] Warning: Failed reading cache file: {e}")
-                _memory_cache = set()
-        else:
-            _memory_cache = set()
+
+        # 2. Also load from shipped_bills.txt (plain-text, one per line like test_bills.txt)
+        base_dirs = [
+            os.path.dirname(os.path.abspath(__file__)),
+            os.getcwd(),
+        ]
+        for d in base_dirs:
+            t_path = os.path.join(d, "shipped_bills.txt")
+            if os.path.exists(t_path):
+                try:
+                    with open(t_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            val = line.strip()
+                            if val and not val.startswith("#"):
+                                clean_val = re.sub(r'\.0$', '', val).strip()
+                                if clean_val:
+                                    _memory_cache.add(clean_val)
+                except Exception as e:
+                    print(f"[SHIPPED_FILTER] Warning: Failed reading shipped_bills.txt: {e}")
 
         _cache_loaded = True
         return set(_memory_cache)
 
 
+def load_shipped_bills() -> set[str]:
+    """Convenience alias matching penalty_report.load_test_bills()."""
+    return load_confirmed_shipped_ids()
+
+
 def save_confirmed_shipped_ids(new_ids: set[str] | list[str]) -> None:
-    """Save newly confirmed shipped bill IDs to persistent disk storage."""
+    """Save newly confirmed shipped bill IDs to persistent disk storage (both JSON cache & shipped_bills.txt)."""
     global _memory_cache
     if not new_ids:
         return
@@ -72,12 +98,24 @@ def save_confirmed_shipped_ids(new_ids: set[str] | list[str]) -> None:
 
     with _LOCK:
         _memory_cache.update(clean_new)
+        sorted_ids = sorted(list(_memory_cache))
+
+        # 1. Save JSON cache
         os.makedirs(os.path.dirname(_CACHE_FILE), exist_ok=True)
         try:
             with open(_CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump(sorted(list(_memory_cache)), f, indent=2)
+                json.dump(sorted_ids, f, indent=2)
         except Exception as e:
-            print(f"[SHIPPED_FILTER] Warning: Failed saving cache file: {e}")
+            print(f"[SHIPPED_FILTER] Warning: Failed saving JSON cache file: {e}")
+
+        # 2. Save shipped_bills.txt (like test_bills.txt)
+        try:
+            with open(_TXT_FILE, "w", encoding="utf-8") as f:
+                f.write("# Confirmed Shipped / Delivered Bills (Excluded from Pending & Push Reports)\n")
+                for oid in sorted_ids:
+                    f.write(f"{oid}\n")
+        except Exception as e:
+            print(f"[SHIPPED_FILTER] Warning: Failed saving shipped_bills.txt: {e}")
 
 
 def _load_api_cfg() -> dict:

@@ -100,10 +100,11 @@ def compute_kpi_info(row):
 CLASSIFY_LABEL = {'Pickup': 'Pickup', 'Delivery': 'Delivery', 'Pending': 'Pending', 'Transit': 'Transit', 'Branch': 'Branch'}
 
 # All active report tabs (internal keys)
-ALL_TABS = ['Pickup', 'Delivery', 'Transit', 'Branch']
+# Note: Assign and Deliver are combined into 'Delivery' per boss instructions
+ALL_TABS = ['Delivery', 'Pickup', 'Transit']
 
 # CEO Sheet Order for Excel Workbook
-CEO_SHEET_ORDER = ['Delivery', 'Branch', 'Pickup', 'Transit']
+CEO_SHEET_ORDER = ['Delivery', 'Pickup', 'Transit']
 
 # CEO Display Titles for Excel Tabs & Headers
 CEO_DISPLAY_TITLES = {
@@ -163,6 +164,9 @@ PENDING_REMARK_MAP = {
 }
 
 DELIVERY_ACTION_MAP = {
+    '306': ('ដឹកជញ្ជូន', 'ចាត់អ្នកដឹក'),
+    '309': ('ដឹកជញ្ជូន', 'ចាត់អ្នកដឹក'),
+    '311': ('ដឹកជញ្ជូន', 'ចាត់អ្នកដឹក'),
     '400': ('ដឹកជញ្ជូន', 'ចាត់អ្នកដឹក'),
     '401': ('ដឹកជញ្ជូន', 'ដឹកជូនថ្ងៃនេះ'),
     '402': ('ដឹកជញ្ជូន', 'ដឹកជូនឡើងវិញ'),
@@ -174,6 +178,10 @@ DELIVERY_ACTION_MAP = {
     '472': ('ពិនិត្យ', 'ដោះស្រាយបញ្ហា'),
     '480': ('ពិនិត្យ', 'បញ្ជាក់អាសយដ្ឋានថ្មី'),
     '500': ('ត្រឡប់', 'ផ្ញើត្រឡប់ទៅហាងផ្ញើ'),
+    '510': ('ត្រឡប់', 'បញ្ជូនត្រឡប់ទៅហាងផ្ញើ'),
+    '511': ('ត្រឡប់', 'បញ្ជូនត្រឡប់ទៅហាងផ្ញើ'),
+    '512': ('ត្រឡប់', 'បញ្ជូនត្រឡប់ទៅហាងផ្ញើ'),
+    '540': ('ត្រឡប់', 'បញ្ជូនត្រឡប់ទៅហាងផ្ញើ'),
 }
 
 # Transit (Send Mega) — next step is always "Send to Mega" regardless of status
@@ -381,8 +389,10 @@ def map_to_post_office(current_office, zone_mapping):
     if len(current_office) >= 3:
         prefix = current_office[:3]
         
-        # NEVER blindly map Phnom Penh agencies to PNPP001! (PNP has 14 separate hubs)
-        if prefix == 'PNP':
+        # NEVER blindly map Phnom Penh or Kandal agencies!
+        # PNP has 14 separate hubs (PNPP001-PNPP014).
+        # KAN agencies are split across PNPP004, PNPP005, PNPP010, PNPP012, PNPP014, and KANP001.
+        if prefix in ('PNP', 'KAN'):
             return current_office
 
         # Look for matching post office with that prefix (for single-hub provinces like CHA, PRE, BAT, etc.)
@@ -1151,6 +1161,7 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
 
     # Scrape all excluded/completed status bills UPFRONT before report generation & comparison
     # Excluded: 99=Cancelled, 100=Cancelled confirmed, 201=Pickup cancelled, 410=Delivered, 520=Returned to Hub
+    # NOTE: 310 is Handover to truck (Send Mega) per boss instructions
     # NOTE: 420 (Rescheduled/Customer Appointment) is INCLUDED — still active, needs follow-up
     excluded_codes = {'99', '100', '201', '410', '520'}
     excluded_keywords = ['410', '520', 'GIAO THÀNH CÔNG', 'DELIVERED', 'COMPLETED', 'ĐÃ GIAO', 'DA GIAO', 'RETURN COMPLETED', 'FINISH', 'SUCCESS']
@@ -1399,13 +1410,29 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
         'Send Mega': 'Transit',
         'Send To MEGA': 'Transit',
         'Send To Mega': 'Transit',
-        'Not Assign': 'Branch',
-        'Not Assigned': 'Branch',
+        'Not Assign': 'Delivery',
+        'Not Assigned': 'Delivery',
+        'Branch': 'Delivery',
     }
     if classify_col:
         dm["_report_class"] = dm[classify_col].astype(str).str.strip().replace(norm_class_map)
     else:
         dm["_report_class"] = dm['STATUS_CODE'].map(status_map).fillna("Unknown")
+
+    # Strict explicit classification per boss directive:
+    # 0/ Pickup: 110, 120, 200
+    # 1/ Handover to truck (Transit): 210, 230, 300, 302, 310
+    # 2/ Deliver (combine assign + deliver in 1 table): 306, 309, 311, 400, 401, 402, 420, 430, 460, 470, 471, 472, 480, 500, 510, 511, 512, 540
+    if 'STATUS_CODE' in dm.columns:
+        pickup_mask = dm['STATUS_CODE'].isin(['110', '120', '200'])
+        transit_mask = dm['STATUS_CODE'].isin(['210', '230', '300', '302', '310'])
+        deliver_mask = dm['STATUS_CODE'].isin([
+            '306', '309', '311', '400', '401', '402', '420', '430',
+            '460', '470', '471', '472', '480', '500', '510', '511', '512', '530', '540'
+        ])
+        dm.loc[pickup_mask, "_report_class"] = 'Pickup'
+        dm.loc[transit_mask, "_report_class"] = 'Transit'
+        dm.loc[deliver_mask, "_report_class"] = 'Delivery'
 
     if target_handles:
         target_handles = [h.upper() for h in target_handles if h]
@@ -1427,7 +1454,7 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
         # Exclude bills physically still at MEGA/HUB/DVC hubs from Branch and Transit tabs.
         # These bills are still in transit and belong to /total mega, NOT to branch reports.
         # We check CURRENT POST OFFICE (where the bill is NOW) — not the destination.
-        if rn in ('Transit', 'Branch') and 'CURRENT POST OFFICE' in df_t.columns:
+        if rn in ('Delivery', 'Transit', 'Branch') and 'CURRENT POST OFFICE' in df_t.columns:
             hub_pattern = r'MEGA|HUB|DVC'
             mega_mask = df_t['CURRENT POST OFFICE'].str.contains(hub_pattern, case=False, na=False)
             df_t = df_t[~mega_mask].copy()
@@ -1459,6 +1486,9 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
             df_t['Age'] = [r[0] for r in kpi_res]
             df_t['10H KPI'] = [r[1] for r in kpi_res]
         type_data[rn] = df_t
+
+    if 'Branch' not in type_data:
+        type_data['Branch'] = pd.DataFrame(columns=REPORT_COLS['Branch'])
 
     today_d = datetime.now().date()
     for rn in ALL_TABS:
@@ -1529,6 +1559,7 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
     handle_results = []
     all_handle_sections = []
     overall = {rn: 0 for rn in ALL_TABS}
+    overall['Branch'] = 0
     day_date_counts = {}
     urgent_counts = {}
     vip_counts = {}

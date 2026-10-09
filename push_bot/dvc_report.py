@@ -54,6 +54,21 @@ for z_label, provs in ZONE_PROVINCES.items():
     for p in provs:
         PROV_TO_ZONE[p] = z_label
 
+CENTRAL_HUBS = [
+    ("MEGA1", "Central Mega Hub (Phnom Penh Central)"),
+    ("DVCMEGA1", "Central Mega Sorting Hub"),
+]
+
+ZONE_HUBS = [
+    ("DVCZ1", "Zone 1 Transit Hub (Phnom Penh, Kandal, Prey Veng, Svay Rieng)"),
+    ("DVCZ2", "Zone 2 Transit Hub (Kampot, Kep, Sihanoukville, Koh Kong, Kampong Speu, Takeo)"),
+    ("DVCZ3", "Zone 3 Transit Hub (Battambang, Banteay Meanchey, Pursat, Kampong Chhnang)"),
+    ("DVCZ4", "Zone 4 Transit Hub (Siem Reap, Oddar Meanchey, Preah Vihear, Kampong Thom)"),
+    ("DVCZ5", "Zone 5 Transit Hub (Kampong Cham, Kratie, Mondulkiri, Ratanakiri, Stung Treng, Tboung Khmum)"),
+]
+
+ALL_DVC_HUBS = {code: name for code, name in CENTRAL_HUBS + ZONE_HUBS}
+
 
 def read_source(path):
     """Fast Excel reader using calamine engine with openpyxl fallback."""
@@ -280,7 +295,7 @@ def export_dvc_zone_pivot(tree, day_keys, out_path, extra_data=None):
     # 1. Top Banner Row 1
     stamp_str = datetime.now().strftime("%d/%m/%Y %H:%M")
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=urg_col)
-    top_cell = ws.cell(1, 1, f"📊 EXECUTIVE DVC HUB BY ZONE REPORT  |  {stamp_str}")
+    top_cell = ws.cell(1, 1, f"EXECUTIVE DVC HUB BY ZONE REPORT  |  {stamp_str}")
     top_cell.font = banner_font
     top_cell.fill = banner_fill
     top_cell.alignment = _LEFT
@@ -354,7 +369,7 @@ def export_dvc_zone_pivot(tree, day_keys, out_path, extra_data=None):
 
         # Zone Section Header
         ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=urg_col)
-        z_cell = ws.cell(r, 1, f"🔷 {z_label.upper()}")
+        z_cell = ws.cell(r, 1, z_label.upper())
         z_cell.font = zone_hdr_fnt
         z_cell.fill = zone_hdr_fill
         z_cell.alignment = _LEFT
@@ -620,3 +635,458 @@ def build_dvc_zone_detail(dvc_rows, out_xlsx, cfg=None):
     ws.views.sheetView[0].showGridLines = True
     wb.save(out_xlsx)
     return len(dvc_rows), urgent_count
+
+
+def build_dvc_2tables_data(rows, target_zone=None, exclude_test=True, test_keywords=None):
+    """
+    Extracts orders currently located AT Central Mega Hubs and Regional Zone Transit Hubs.
+    Returns: stats, dvc_rows, c_tot_1, c_tot_2, grand_total
+    """
+    if test_keywords is None:
+        test_keywords = ["test"]
+
+    latest_row_by_order = {}
+    exclude_statuses = {"201", "520", "99", "100", "-99"}
+
+    for row in rows:
+        if not row or len(row) <= COL_CURRENT_PO:
+            continue
+        if row[COL_ORDER_ID] in (None, ""):
+            continue
+
+        status_code = _status_code(row[COL_CURRENT_STATUS])
+        if status_code in exclude_statuses:
+            continue
+
+        po = str(row[COL_CURRENT_PO] or "").strip().upper()
+        if po not in ALL_DVC_HUBS:
+            continue
+
+        if exclude_test:
+            blob = " ".join(str(row[c] or "") for c in (COL_SENDER, COL_RECEIVER) if len(row) > c).lower()
+            if any(k.lower() in blob for k in test_keywords):
+                continue
+
+        oid = str(row[COL_ORDER_ID]).strip()
+        ts = _parse_ts(row)
+        existing = latest_row_by_order.get(oid)
+        if existing is None or ts > _parse_ts(existing):
+            latest_row_by_order[oid] = row
+
+    today = datetime.now().date()
+    stats = {}
+    for code, name in CENTRAL_HUBS + ZONE_HUBS:
+        stats[code] = {
+            "code": code,
+            "name": name,
+            "total": 0,
+            "correct": 0,
+            "wrong": 0,
+            "pct_correct": 100.0,
+            "pct_wrong": 0.0,
+            "lt_30m": 0,
+            "gt_30m": 0,
+            "d0": 0,
+            "d1_2": 0,
+            "d3plus": 0,
+            "fee": 0.0,
+            "cod": 0.0,
+        }
+
+    HUB_TO_ZONE = {
+        "DVCZ1": "Zone 1 (DVCZ1)",
+        "DVCZ2": "Zone 2 (DVCZ2)",
+        "DVCZ3": "Zone 3 (DVCZ3)",
+        "DVCZ4": "Zone 4 (DVCZ4)",
+        "DVCZ5": "Zone 5 (DVCZ5)",
+    }
+
+    now_dt = datetime.now()
+    dvc_rows = list(latest_row_by_order.values())
+    for row in dvc_rows:
+        po = str(row[COL_CURRENT_PO] or "").strip().upper()
+        if po not in stats:
+            continue
+
+        stats[po]["total"] += 1
+
+        prov = str(row[COL_DELIVERY_PROV] if len(row) > COL_DELIVERY_PROV and row[COL_DELIVERY_PROV] else "").strip().upper()
+        dest_zone = PROV_TO_ZONE.get(prov, "Other")
+
+        # Routing correctness
+        if po in HUB_TO_ZONE:
+            is_correct = (dest_zone == HUB_TO_ZONE[po])
+        else:
+            # Central Hubs (MEGA1, DVCMEGA1) receive & sort for all provinces
+            is_correct = True
+
+        if is_correct:
+            stats[po]["correct"] += 1
+        else:
+            stats[po]["wrong"] += 1
+
+        ts = _parse_ts(row)
+        if ts != datetime.min:
+            diff_m = (now_dt - ts).total_seconds() / 60.0
+            order_date = ts.date()
+        else:
+            diff_m = 9999
+            order_date = today
+
+        if diff_m <= 30:
+            stats[po]["lt_30m"] += 1
+        else:
+            stats[po]["gt_30m"] += 1
+
+        days_old = (today - order_date).days
+        if days_old <= 0:
+            stats[po]["d0"] += 1
+        elif 1 <= days_old < 3:
+            stats[po]["d1_2"] += 1
+        else:
+            stats[po]["d3plus"] += 1
+
+        try:
+            stats[po]["fee"] += float(row[COL_TOTAL_FEE] or 0)
+        except (ValueError, TypeError):
+            pass
+
+        try:
+            stats[po]["cod"] += float(row[COL_COD] or 0)
+        except (ValueError, TypeError):
+            pass
+
+    for code in stats:
+        tot = stats[code]["total"]
+        stats[code]["pct_correct"] = (stats[code]["correct"] / tot * 100) if tot > 0 else 100.0
+        stats[code]["pct_wrong"] = (stats[code]["wrong"] / tot * 100) if tot > 0 else 0.0
+
+    c_tot_1 = sum(stats[code]["total"] for code, _ in CENTRAL_HUBS)
+    c_tot_2 = sum(stats[code]["total"] for code, _ in ZONE_HUBS)
+    grand_total = c_tot_1 + c_tot_2
+
+    return stats, dvc_rows, c_tot_1, c_tot_2, grand_total
+
+
+def export_dvc_2tables_workbook(stats, dvc_rows, out_xlsx):
+    """
+    Renders an Executive 2-Table DVC & Mega Hub Distribution Dashboard:
+      - Sheet 1: Dashboard with Table 1 (Central Mega Hubs) and Table 2 (Regional Zone Transit Hubs)
+      - Sheet 2: Order Details with all individual order rows
+    """
+    wb = openpyxl.Workbook()
+
+    # ── Sheet 1: Dashboard ──
+    ws1 = wb.active
+    ws1.title = "Dashboard"
+    ws1.views.sheetView[0].showGridLines = True
+
+    fn = "Segoe UI"
+    title_font = Font(name=fn, size=11, bold=True, color="FFFFFF")
+    sec_font = Font(name=fn, size=10, bold=True, color="FFFFFF")
+    col_hdr_font = Font(name=fn, size=9, bold=True, color="FFFFFF")
+    badge_font = Font(name=fn, size=9, bold=True, color="991B1B")
+    name_font = Font(name=fn, size=9, color="1E293B")
+    count_font = Font(name=fn, size=9, bold=True, color="0F172A")
+    correct_font = Font(name=fn, size=9, bold=True, color="047857")
+    lt30_font = Font(name=fn, size=9, color="2563EB")
+    gt30_font = Font(name=fn, size=9, bold=True, color="D97706")
+    urg_font = Font(name=fn, size=9, bold=True, color="DC2626")
+    subtot_font = Font(name=fn, size=9, bold=True, color="1E3A8A")
+    gt_font = Font(name=fn, size=10, bold=True, color="FFFFFF")
+
+    title_fill = PatternFill("solid", fgColor="0F172A")
+    sec1_fill = PatternFill("solid", fgColor="1E293B")
+    sec2_fill = PatternFill("solid", fgColor="1E3A8A")
+    hdr_fill = PatternFill("solid", fgColor="334155")
+    badge_fill = PatternFill("solid", fgColor="FEE2E2")
+    row_even = PatternFill("solid", fgColor="F8FAFC")
+    row_odd = PatternFill("solid", fgColor="FFFFFF")
+    subtot_fill = PatternFill("solid", fgColor="EFF6FF")
+    gt_fill = PatternFill("solid", fgColor="0F172A")
+
+    border_thin = Side(style="thin", color="CBD5E1")
+    border = Border(left=border_thin, right=border_thin, top=border_thin, bottom=border_thin)
+
+    # Banner
+    ws1.merge_cells("A1:G1")
+    c = ws1["A1"]
+    c.value = "📦 DVC & MEGA HUB DISTRIBUTION & TRUCK ACCURACY DASHBOARD"
+    c.font = title_font
+    c.fill = title_fill
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    ws1.row_dimensions[1].height = 26
+
+    r = 2
+    # Table 1: Central Mega Hubs
+    ws1.merge_cells(f"A{r}:G{r}")
+    c = ws1[f"A{r}"]
+    c.value = "🏢 CENTRAL MEGA HUBS"
+    c.font = sec_font
+    c.fill = sec1_fill
+    c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws1.row_dimensions[r].height = 22
+    r += 1
+
+    headers = ["HUB CODE", "TRANSIT HUB NAME & DESCRIPTION", "TOTAL BILLS", "% CORRECT", "< 30p", "> 30p", "≥ 1 DAY"]
+    for c_idx, h in enumerate(headers, 1):
+        cell = ws1.cell(r, c_idx, h)
+        cell.font = col_hdr_font
+        cell.fill = hdr_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+    ws1.row_dimensions[r].height = 20
+    r += 1
+
+    c_tot_1 = 0
+    c_cor_1 = 0
+    c_lt30_1 = 0
+    c_gt30_1 = 0
+    c_d1p_1 = 0
+
+    for idx, (code, name) in enumerate(CENTRAL_HUBS, 1):
+        s = stats.get(code, {"total": 0, "correct": 0, "pct_correct": 100.0, "lt_30m": 0, "gt_30m": 0, "d1_2": 0, "d3plus": 0})
+        c_tot_1 += s["total"]
+        c_cor_1 += s.get("correct", s["total"])
+        c_lt30_1 += s.get("lt_30m", 0)
+        c_gt30_1 += s.get("gt_30m", 0)
+        d1p = s.get("d1_2", 0) + s.get("d3plus", 0)
+        c_d1p_1 += d1p
+
+        bg = row_even if idx % 2 == 0 else row_odd
+
+        c1 = ws1.cell(r, 1, code)
+        c1.font = badge_font; c1.fill = badge_fill; c1.alignment = Alignment(horizontal="center", vertical="center"); c1.border = border
+        c2 = ws1.cell(r, 2, name)
+        c2.font = name_font; c2.fill = bg; c2.alignment = Alignment(horizontal="left", vertical="center", indent=1); c2.border = border
+        c3 = ws1.cell(r, 3, f"{s['total']} bills")
+        c3.font = count_font; c3.fill = bg; c3.alignment = Alignment(horizontal="right", vertical="center"); c3.border = border
+        c4 = ws1.cell(r, 4, f"{s.get('pct_correct', 100.0):.1f}%")
+        c4.font = correct_font; c4.fill = bg; c4.alignment = Alignment(horizontal="center", vertical="center"); c4.border = border
+        c5 = ws1.cell(r, 5, s.get("lt_30m", 0) if s.get("lt_30m", 0) > 0 else "-")
+        c5.font = lt30_font; c5.fill = bg; c5.alignment = Alignment(horizontal="center", vertical="center"); c5.border = border
+        c6 = ws1.cell(r, 6, s.get("gt_30m", 0) if s.get("gt_30m", 0) > 0 else "-")
+        c6.font = gt30_font if s.get("gt_30m", 0) > 0 else count_font; c6.fill = bg; c6.alignment = Alignment(horizontal="center", vertical="center"); c6.border = border
+        c7 = ws1.cell(r, 7, d1p if d1p > 0 else "-")
+        c7.font = urg_font if d1p > 0 else count_font; c7.fill = bg; c7.alignment = Alignment(horizontal="center", vertical="center"); c7.border = border
+
+        ws1.row_dimensions[r].height = 22
+        r += 1
+
+    # Subtotal 1
+    pct1 = (c_cor_1 / c_tot_1 * 100) if c_tot_1 > 0 else 100.0
+    for ci, (val, alg, fnt) in enumerate([
+        ("", "center", subtot_font),
+        ("Subtotal Central Mega Hubs", "right", subtot_font),
+        (f"{c_tot_1} bills", "right", subtot_font),
+        (f"{pct1:.1f}%", "center", subtot_font),
+        (c_lt30_1 if c_lt30_1 > 0 else "-", "center", subtot_font),
+        (c_gt30_1 if c_gt30_1 > 0 else "-", "center", subtot_font),
+        (c_d1p_1 if c_d1p_1 > 0 else "-", "center", subtot_font),
+    ], 1):
+        cell = ws1.cell(r, ci, val)
+        cell.font = fnt; cell.fill = subtot_fill; cell.alignment = Alignment(horizontal=alg, vertical="center"); cell.border = border
+    ws1.row_dimensions[r].height = 22
+    r += 1
+
+    # Clean divider row
+    ws1.row_dimensions[r].height = 10
+    r += 1
+
+    # Table 2: Zone Transit Hubs
+    ws1.merge_cells(f"A{r}:G{r}")
+    c = ws1[f"A{r}"]
+    c.value = "🚚 REGIONAL ZONE TRANSIT HUBS"
+    c.font = sec_font
+    c.fill = sec2_fill
+    c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws1.row_dimensions[r].height = 22
+    r += 1
+
+    for c_idx, h in enumerate(headers, 1):
+        cell = ws1.cell(r, c_idx, h)
+        cell.font = col_hdr_font
+        cell.fill = hdr_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+    ws1.row_dimensions[r].height = 20
+    r += 1
+
+    c_tot_2 = 0
+    c_cor_2 = 0
+    c_lt30_2 = 0
+    c_gt30_2 = 0
+    c_d1p_2 = 0
+
+    for idx, (code, name) in enumerate(ZONE_HUBS, 1):
+        s = stats.get(code, {"total": 0, "correct": 0, "pct_correct": 100.0, "lt_30m": 0, "gt_30m": 0, "d1_2": 0, "d3plus": 0})
+        c_tot_2 += s["total"]
+        c_cor_2 += s.get("correct", s["total"])
+        c_lt30_2 += s.get("lt_30m", 0)
+        c_gt30_2 += s.get("gt_30m", 0)
+        d1p = s.get("d1_2", 0) + s.get("d3plus", 0)
+        c_d1p_2 += d1p
+
+        bg = row_even if idx % 2 == 0 else row_odd
+
+        c1 = ws1.cell(r, 1, code)
+        c1.font = badge_font; c1.fill = badge_fill; c1.alignment = Alignment(horizontal="center", vertical="center"); c1.border = border
+        c2 = ws1.cell(r, 2, name)
+        c2.font = name_font; c2.fill = bg; c2.alignment = Alignment(horizontal="left", vertical="center", indent=1); c2.border = border
+        c3 = ws1.cell(r, 3, f"{s['total']} bills")
+        c3.font = count_font; c3.fill = bg; c3.alignment = Alignment(horizontal="right", vertical="center"); c3.border = border
+        c4 = ws1.cell(r, 4, f"{s.get('pct_correct', 100.0):.1f}%")
+        c4.font = correct_font; c4.fill = bg; c4.alignment = Alignment(horizontal="center", vertical="center"); c4.border = border
+        c5 = ws1.cell(r, 5, s.get("lt_30m", 0) if s.get("lt_30m", 0) > 0 else "-")
+        c5.font = lt30_font; c5.fill = bg; c5.alignment = Alignment(horizontal="center", vertical="center"); c5.border = border
+        c6 = ws1.cell(r, 6, s.get("gt_30m", 0) if s.get("gt_30m", 0) > 0 else "-")
+        c6.font = gt30_font if s.get("gt_30m", 0) > 0 else count_font; c6.fill = bg; c6.alignment = Alignment(horizontal="center", vertical="center"); c6.border = border
+        c7 = ws1.cell(r, 7, d1p if d1p > 0 else "-")
+        c7.font = urg_font if d1p > 0 else count_font; c7.fill = bg; c7.alignment = Alignment(horizontal="center", vertical="center"); c7.border = border
+
+        ws1.row_dimensions[r].height = 22
+        r += 1
+
+    # Subtotal 2
+    pct2 = (c_cor_2 / c_tot_2 * 100) if c_tot_2 > 0 else 100.0
+    for ci, (val, alg, fnt) in enumerate([
+        ("", "center", subtot_font),
+        ("Subtotal Regional Zone Transit Hubs", "right", subtot_font),
+        (f"{c_tot_2} bills", "right", subtot_font),
+        (f"{pct2:.1f}%", "center", subtot_font),
+        (c_lt30_2 if c_lt30_2 > 0 else "-", "center", subtot_font),
+        (c_gt30_2 if c_gt30_2 > 0 else "-", "center", subtot_font),
+        (c_d1p_2 if c_d1p_2 > 0 else "-", "center", subtot_font),
+    ], 1):
+        cell = ws1.cell(r, ci, val)
+        cell.font = fnt; cell.fill = subtot_fill; cell.alignment = Alignment(horizontal=alg, vertical="center"); cell.border = border
+    ws1.row_dimensions[r].height = 22
+    r += 1
+
+    # Grand Total Footer
+    grand_total = c_tot_1 + c_tot_2
+    gt_cor = c_cor_1 + c_cor_2
+    gt_pct = (gt_cor / grand_total * 100) if grand_total > 0 else 100.0
+    gt_lt30 = c_lt30_1 + c_lt30_2
+    gt_gt30 = c_gt30_1 + c_gt30_2
+    gt_d1p = c_d1p_1 + c_d1p_2
+
+    for ci, (val, alg, fnt) in enumerate([
+        ("GRAND TOTAL", "center", gt_font),
+        ("All 7 Hubs Combined", "left", gt_font),
+        (f"{grand_total} bills", "right", gt_font),
+        (f"{gt_pct:.1f}%", "center", gt_font),
+        (gt_lt30 if gt_lt30 > 0 else "-", "center", gt_font),
+        (gt_gt30 if gt_gt30 > 0 else "-", "center", gt_font),
+        (gt_d1p if gt_d1p > 0 else "-", "center", gt_font),
+    ], 1):
+        cell = ws1.cell(r, ci, val)
+        cell.font = fnt; cell.fill = gt_fill; cell.alignment = Alignment(horizontal=alg, vertical="center"); cell.border = border
+    ws1.row_dimensions[r].height = 24
+
+    ws1.column_dimensions["A"].width = 14
+    ws1.column_dimensions["B"].width = 84
+    ws1.column_dimensions["C"].width = 13
+    ws1.column_dimensions["D"].width = 12
+    ws1.column_dimensions["E"].width = 11
+    ws1.column_dimensions["F"].width = 11
+    ws1.column_dimensions["G"].width = 11
+
+    # ── Sheet 2: Order Details ──
+    ws2 = wb.create_sheet(title="Order Details")
+    ws2.views.sheetView[0].showGridLines = True
+
+    detail_hdr_fill = PatternFill("solid", fgColor="1E293B")
+    detail_headers = [
+        "NO", "HUB CODE", "CATEGORY", "DELIVERY PROVINCE", "ORDER ID",
+        "CURRENT STATUS", "CURRENT TIME", "ROUTING", "HOLD TIME",
+        "SENDER", "RECEIVER", "FEE ($)", "COD ($)", "ACTION USER"
+    ]
+    for c_idx, h in enumerate(detail_headers, 1):
+        cell = ws2.cell(1, c_idx, h)
+        cell.font = Font(name=fn, size=10, bold=True, color="FFFFFF")
+        cell.fill = detail_hdr_fill
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+    ws2.row_dimensions[1].height = 24
+
+    hub_sort_order = {c: i for i, (c, _) in enumerate(CENTRAL_HUBS + ZONE_HUBS)}
+    sorted_dvc_rows = sorted(
+        dvc_rows,
+        key=lambda row_item: (
+            hub_sort_order.get(str(row_item[COL_CURRENT_PO] or "").strip().upper(), 99),
+            _parse_ts(row_item)
+        )
+    )
+
+    HUB_TO_ZONE = {
+        "DVCZ1": "Zone 1 (DVCZ1)",
+        "DVCZ2": "Zone 2 (DVCZ2)",
+        "DVCZ3": "Zone 3 (DVCZ3)",
+        "DVCZ4": "Zone 4 (DVCZ4)",
+        "DVCZ5": "Zone 5 (DVCZ5)",
+    }
+    now_dt = datetime.now()
+
+    r_idx = 2
+    for idx, row in enumerate(sorted_dvc_rows, 1):
+        po = str(row[COL_CURRENT_PO] or "").strip().upper()
+        cat = "Central Mega Hub" if po in ("MEGA1", "DVCMEGA1") else "Regional Zone Hub"
+        prov = str(row[COL_DELIVERY_PROV] if len(row) > COL_DELIVERY_PROV and row[COL_DELIVERY_PROV] else "").strip().upper()
+        dest_zone = PROV_TO_ZONE.get(prov, "Other")
+        oid = str(row[COL_ORDER_ID] or "").strip()
+        status = str(row[COL_CURRENT_STATUS] or "").strip()
+        cur_time = str(row[COL_CURRENT_TIME] or "").strip()
+        sender = str(row[COL_SENDER] or "").strip() if len(row) > COL_SENDER else ""
+        receiver = str(row[COL_RECEIVER] or "").strip() if len(row) > COL_RECEIVER else ""
+        action_user = str(row[COL_ACTION_USER] or "").strip() if len(row) > COL_ACTION_USER else ""
+
+        # Route correctness
+        if po in HUB_TO_ZONE:
+            is_cor = (dest_zone == HUB_TO_ZONE[po])
+            route_str = "Correct" if is_cor else "Misrouted"
+        else:
+            route_str = "Central Transit"
+
+        # Hold time
+        ts = _parse_ts(row)
+        if ts != datetime.min:
+            diff_m = int((now_dt - ts).total_seconds() / 60.0)
+            if diff_m < 60:
+                hold_str = f"{diff_m}m"
+            elif diff_m < 1440:
+                hold_str = f"{diff_m // 60}h {diff_m % 60}m"
+            else:
+                hold_str = f"{diff_m // 1440}d {(diff_m % 1440) // 60}h"
+        else:
+            hold_str = "-"
+
+        fee = float(row[COL_TOTAL_FEE] or 0) if len(row) > COL_TOTAL_FEE and row[COL_TOTAL_FEE] is not None else 0.0
+        cod = float(row[COL_COD] or 0) if len(row) > COL_COD and row[COL_COD] is not None else 0.0
+
+        bg = row_even if idx % 2 == 0 else row_odd
+        vals = [idx, po, cat, prov, oid, status, cur_time, route_str, hold_str, sender, receiver, fee, cod, action_user]
+
+        for c_idx, v in enumerate(vals, 1):
+            c = ws2.cell(r_idx, c_idx, v)
+            c.fill = bg
+            c.border = border
+            c.font = Font(name=fn, size=9)
+            if c_idx in (1, 2, 3, 4, 5, 7, 8, 9):
+                c.alignment = Alignment(horizontal="center", vertical="center")
+            elif c_idx in (12, 13):
+                c.alignment = Alignment(horizontal="right", vertical="center")
+                c.number_format = "$#,##0.00"
+            else:
+                c.alignment = Alignment(horizontal="left", vertical="center")
+        r_idx += 1
+
+    for col in ws2.columns:
+        max_len = max(len(str(cell.value or "")) for cell in col)
+        col_letter = get_column_letter(col[0].column)
+        ws2.column_dimensions[col_letter].width = max(max_len + 3, 10)
+
+    # Ensure Sheet 1 (Dashboard) is active for excel_to_image rendering
+    wb.active = ws1
+    wb.save(out_xlsx)
+    return grand_total, c_tot_1, c_tot_2

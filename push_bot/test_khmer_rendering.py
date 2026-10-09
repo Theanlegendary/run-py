@@ -46,7 +46,7 @@ try:
     out_png = "khmer_render_test.png"
     with open(out_png, "wb") as f_img:
         f_img.write(img_buf.getvalue())
-    print(f"✓ Rendered test image successfully saved to {out_png}")
+    print(f"SUCCESS: Rendered test image successfully saved to {out_png}")
 except Exception as e:
     print(f"Error occurred: {e}")
     import traceback

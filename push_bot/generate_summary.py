@@ -35,24 +35,24 @@ SUMMARY_HEADER_KHMER = {
 }
 
 # ── Palette ────────────────────────────────────────────────────────────────────
-C_TITLE_BG    = ( 10,  15,  35)   # near-black navy
+C_TITLE_BG    = ( 27,  54,  93)   # Executive Steel Navy (#1B365D)
 C_TITLE_FG    = (255, 255, 255)
-C_MONTH_BG    = ( 22,  34,  64)   # deep indigo for month row
-C_MONTH_FG    = (180, 200, 255)   # soft blue-white
-C_HEADER_BG   = ( 30,  45,  80)   # dark slate-blue
+C_MONTH_BG    = ( 15,  23,  42)   # Dark Slate Navy (#0F172A)
+C_MONTH_FG    = (224, 242, 254)   # Soft Ice Blue
+C_HEADER_BG   = ( 27,  54,  93)   # Executive Steel Navy (#1B365D)
 C_HEADER_FG   = (255, 255, 255)
-C_URGENT_HDR  = (180,  20,  20)   # dark red header for URGENT col
+C_URGENT_HDR  = (192,   0,   0)   # Executive Deep Red (#C00000)
 C_ROW_BG      = (255, 255, 255)
-C_ROW_ALT     = (245, 248, 255)   # very light blue stripe
-C_TOTAL_BG    = (232, 238, 250)   # soft blue-grey footer
-C_TOTAL_FG    = (200,  30,  30)   # strong red
-C_NUM_FG      = ( 30,  30, 160)   # deep blue for Pickup/Delivery/Pending counts
-C_PENDING_FG  = (180,  80,   0)   # amber for Pending counts
-C_DATE_FG     = ( 30,  30, 160)   # blue for date counts
-C_URGENT_FG   = (210,  30,  30)   # red for urgent counts
-C_HANDLE_FG   = ( 10,  15,  40)   # near-black for branch name
-C_BORDER      = (180, 195, 220)
-C_BORDER_DARK = ( 80, 100, 140)   # darker border for section separators
+C_ROW_ALT     = (248, 250, 252)   # Very light slate stripe
+C_TOTAL_BG    = (224, 242, 254)   # Soft Ice Blue (#E0F2FE)
+C_TOTAL_FG    = ( 15,  23,  42)   # Dark Navy
+C_NUM_FG      = ( 15,  23,  42)   # Dark Navy
+C_PENDING_FG  = ( 15,  23,  42)
+C_DATE_FG     = ( 15,  23,  42)
+C_URGENT_FG   = (192,   0,   0)   # Executive Red (#C00000)
+C_HANDLE_FG   = ( 15,  23,  42)   # Dark Navy
+C_BORDER      = (203, 213, 225)   # Light slate border (#CBD5E1)
+C_BORDER_DARK = ( 71,  85, 105)
 
 _WIN_FONTS = "C:/Windows/Fonts"
 
@@ -217,7 +217,7 @@ def build_summary_image(
         elif p3 in ["CHA", "KRA", "TBK", "ROT", "MON", "STU"]: return "Zone 5"
         return "Zone ?"
 
-    show_zone_col = bool(zone_label and ("ZONE" in zone_label.upper() or "ALL" in zone_label.upper()))
+    show_zone_col = False
 
     if show_zone_col:
         def _sort_key(hr):
@@ -242,8 +242,10 @@ def build_summary_image(
     W_URGENT_3 = max(_tw(draw, "> 3 Days", fn_sm) + PAD * 2, 56 * sc)
     W_U_COL  = max(_tw(draw, "U.Delivery", fn_sm) + PAD * 2, 48 * sc)
 
-    # Column order: [ZONE] | Handle | Pickup | Delivery | Transit | Branch | [VIP] | [dates…] | TOTAL | [Fee | COD] | > 1 Day | > 3 Days
-    fixed_cols  = (["ZONE"] if show_zone_col else []) + ["HANDLE", "Pickup", "Delivery", "Transit", "Branch"]
+    # Column order: [ZONE] | Handle | Pickup | Delivery | Transit | [Branch if > 0] | [VIP] | [dates…] | TOTAL | [Fee | COD] | > 1 Day | > 3 Days
+    fixed_cols  = (["ZONE"] if show_zone_col else []) + ["HANDLE", "Pickup", "Delivery", "Transit"]
+    if overall and (overall.get("Branch", 0) > 0 or any(hr.get("handle_counts", {}).get("Branch", 0) > 0 for hr in handle_results)):
+        fixed_cols.append("Branch")
     if vip_counts is not None:
         fixed_cols.append("VIP")
     date_labels = [f"{d.day:02d}" for d in all_dates]
@@ -394,8 +396,8 @@ def build_summary_image(
         handle   = hr["handle"]
         pickup   = counts.get("Pickup",   0)
         delivery = counts.get("Delivery", 0)
-        transit  = counts.get("Transit",  0)
-        branch   = counts.get("Branch",   0)
+        transit  = counts.get("Transit",  0) or counts.get("Send Mega", 0)
+        branch   = counts.get("Branch",   0) or counts.get("Not Assign", 0)
         total    = pickup + delivery + transit + branch
         urgent   = (urgent_counts or {}).get(handle, 0)
 
@@ -502,15 +504,15 @@ def build_summary_image(
              border_col=C_BORDER)
         y += ROW_H
 
-    # ── Grand Total row ───────────────────────────────────────────────────────
-    g_pickup   = overall.get("Pickup",   0) or sum(hr["handle_counts"].get("Pickup", 0) for hr in handle_results)
-    g_delivery = overall.get("Delivery", 0) or sum(hr["handle_counts"].get("Delivery", 0) for hr in handle_results)
-    g_transit  = overall.get("Transit",  0) or sum(hr["handle_counts"].get("Transit", 0) for hr in handle_results)
-    g_branch   = overall.get("Branch",   0) or sum(hr["handle_counts"].get("Branch", 0) for hr in handle_results)
+    # ── Total row ─────────────────────────────────────────────────────────────
+    g_pickup   = sum(hr["handle_counts"].get("Pickup", 0) for hr in handle_results)
+    g_delivery = sum(hr["handle_counts"].get("Delivery", 0) for hr in handle_results)
+    g_transit  = sum((hr["handle_counts"].get("Transit", 0) or hr["handle_counts"].get("Send Mega", 0)) for hr in handle_results)
+    g_branch   = sum((hr["handle_counts"].get("Branch", 0) or hr["handle_counts"].get("Not Assign", 0)) for hr in handle_results)
     g_total    = g_pickup + g_delivery + g_transit + g_branch
 
     gt_cells  = ([""] if show_zone_col else []) + [
-                 "GRAND TOTAL",
+                 "TOTAL",
                  str(g_pickup)   if g_pickup   else "",
                  str(g_delivery) if g_delivery else "",
                  str(g_transit)  if g_transit  else "",
@@ -740,6 +742,8 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
         else:
             ws = wb.create_sheet(title=rn)
         ws.views.sheetView[0].showGridLines = True
+        ws.freeze_panes = "A4"
+        ws.sheet_view.zoomScale = 90
         current_row = 1
 
         internal_key_map = {
@@ -765,7 +769,13 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
             if col not in df.columns:
                 df[col] = ''
 
-        if date_col in df.columns:
+        # The date columns in every push report represent the latest action on
+        # the order.  Prefer the canonical _scan_date built by generate_report
+        # so Zone and normal Push files cannot drift to CREATED DATE.
+        if "_scan_date" in df.columns and df["_scan_date"].notna().any():
+            df = df.copy()
+            df['_date'] = pd.to_datetime(df['_scan_date'], errors='coerce').dt.date
+        elif date_col in df.columns:
             parsed = pd.to_datetime(df[date_col], dayfirst=True, format='mixed', errors='coerce')
             df = df.copy()
             df['_date'] = parsed.dt.date
@@ -867,8 +877,10 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
         title_row = current_row
         ws.row_dimensions[title_row].height = 22
         today_str = datetime.now().strftime('%d/%m/%Y %H:%M')
-        tc = ws.cell(title_row, 1, f"{rn.upper()} REPORT — {today_str}")
-        tc.font      = Font(name=fn, color='FFFFFF', bold=True, size=12)
+        report_label = str(result.get('report_label', '') or '').strip()
+        title = f"{rn.upper()} REPORT — {report_label} — {today_str}" if report_label else f"{rn.upper()} REPORT — {today_str}"
+        tc = ws.cell(title_row, 1, title)
+        tc.font      = Font(name=fn, color='FFFFFF', bold=True, size=13)
         tc.fill      = PatternFill(start_color=NAVY, end_color=NAVY, fill_type='solid')
         tc.alignment = Alignment(horizontal='center', vertical='center')
         tc.border    = bdr
@@ -889,7 +901,7 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
             for ri in (month_row, header_row):
                 cell = ws.cell(ri, ci, '')
                 cell.fill      = PatternFill(start_color=SLATE, end_color=SLATE, fill_type='solid')
-                cell.font      = Font(name=fn, color='FFFFFF', bold=True, size=10)
+                cell.font      = Font(name=fn, color='FFFFFF', bold=True, size=11)
                 cell.alignment = Alignment(horizontal='center', vertical='center')
                 cell.border    = bdr
 
@@ -936,7 +948,7 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
 
         for ri, row in agg.iterrows():
             r = data_start + ri
-            ws.row_dimensions[r].height = 15
+            ws.row_dimensions[r].height = 22
             gt_val = int(row.get('Grand Total', 0))
             grand_total += gt_val
 
@@ -971,8 +983,10 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
                 cell = ws.cell(r, ci, val if val != '' else None)
                 cell.border = bdr
                 
-                cell_fill = row_fill
-                cell_font = Font(name=_excel_font_name(val, fn), size=10)
+                # A subtle alternating fill makes long rows readable without
+                # hiding the existing overdue / status highlights.
+                cell_fill = row_fill or (PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid') if ri % 2 else None)
+                cell_font = Font(name=_excel_font_name(val, fn), size=11)
 
                 # AGE Column (2 Status Colors: 🟢 Green 0-10h, 🔴 Red >10h - no yellow)
                 if col == 'Age':
@@ -983,13 +997,13 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
                         m_val = int(match.group(2)) if match.group(2) else 0
                         t_mins = h_val * 60 + m_val
                         if status_code in ('420', '472'):
-                            cell_font = Font(name=_excel_font_name(val, fn), size=10, bold=True, color='065F46')
+                            cell_font = Font(name=_excel_font_name(val, fn), size=11, bold=True, color='065F46')
                         elif t_mins <= 600:  # 0-10h = Green
-                            cell_font = Font(name=_excel_font_name(val, fn), size=10, bold=True, color='065F46')
+                            cell_font = Font(name=_excel_font_name(val, fn), size=11, bold=True, color='065F46')
                         else:  # >10h = Red (no yellow)
-                            cell_font = Font(name=_excel_font_name(val, fn), size=10, bold=True, color='991B1B')
+                            cell_font = Font(name=_excel_font_name(val, fn), size=11, bold=True, color='991B1B')
                     else:
-                        cell_font = Font(name=_excel_font_name(val, fn), size=10, bold=True)
+                        cell_font = Font(name=_excel_font_name(val, fn), size=11, bold=True)
 
                 if cell_fill:
                     cell.fill = cell_fill
@@ -1000,16 +1014,17 @@ def build_total_excel(result, out_path, lang='kh', age_adjust_hours=0):
                     if isinstance(val, (int, float)) and val:
                         day_totals[col] = day_totals.get(col, 0) + int(val)
                 elif col == 'Grand Total':
-                    cell.font      = Font(name=fn, color=RED, bold=True, size=10)
+                    cell.font      = Font(name=fn, color=RED, bold=True, size=11)
                     cell.alignment = Alignment(horizontal='center', vertical='center')
                 else:
-                    cell.alignment = Alignment(horizontal='left', vertical='center')
+                    wrap = col in ('CURRENT POST OFFICE', 'RECEIVER', 'Cus name', 'NEXT_STEP')
+                    cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=wrap)
 
         gt_row = data_start + len(agg)
         ws.row_dimensions[gt_row].height = 17
         for ci, col in enumerate(all_cols, start=1):
             cell = ws.cell(gt_row, ci)
-            cell.font      = Font(name=fn, color=RED, bold=True, size=10)
+            cell.font      = Font(name=fn, color=RED, bold=True, size=11)
             cell.fill      = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
             cell.border    = bdr
             cell.alignment = Alignment(horizontal='center', vertical='center')

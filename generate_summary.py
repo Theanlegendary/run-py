@@ -242,8 +242,10 @@ def build_summary_image(
     W_URGENT_3 = max(_tw(draw, "> 3 Days", fn_sm) + PAD * 2, 56 * sc)
     W_U_COL  = max(_tw(draw, "U.Delivery", fn_sm) + PAD * 2, 48 * sc)
 
-    # Column order: [ZONE] | Handle | Pickup | Delivery | Transit | Branch | [VIP] | [dates…] | TOTAL | [Fee | COD] | > 1 Day | > 3 Days
-    fixed_cols  = (["ZONE"] if show_zone_col else []) + ["HANDLE", "Pickup", "Delivery", "Transit", "Branch"]
+    # Column order: [ZONE] | Handle | Pickup | Delivery | Transit | [Branch if > 0] | [VIP] | [dates…] | TOTAL | [Fee | COD] | > 1 Day | > 3 Days
+    fixed_cols  = (["ZONE"] if show_zone_col else []) + ["HANDLE", "Pickup", "Delivery", "Transit"]
+    if overall and (overall.get("Branch", 0) > 0 or any(hr.get("handle_counts", {}).get("Branch", 0) > 0 for hr in handle_results)):
+        fixed_cols.append("Branch")
     if vip_counts is not None:
         fixed_cols.append("VIP")
     date_labels = [f"{d.day:02d}" for d in all_dates]
