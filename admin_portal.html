@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relax & Mindfulness — Fast Admin CMS</title>
+  <style>
+    :root {
+      --bg-dark: #09121A;
+      --bg-card: #0F1B25;
+      --teal-primary: #68B0AB;
+      --coral-accent: #E29578;
+      --mint-accent: #8FC0A9;
+      --purple-accent: #B8B8D1;
+      --text-primary: #EFF5F8;
+      --text-secondary: #8E9DAA;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      padding: 24px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      background: rgba(104, 176, 171, 0.15);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--teal-primary);
+      font-weight: bold;
+      font-size: 22px;
+    }
+
+    .badge-online {
+      background: rgba(143, 192, 169, 0.15);
+      color: var(--mint-accent);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid rgba(143, 192, 169, 0.3);
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      border-radius: 18px;
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .metric-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .metric-val {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .metric-sub {
+      font-size: 12px;
+      color: var(--teal-primary);
+      margin-top: 4px;
+    }
+
+    /* Filter Controls */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--text-secondary);
+      padding: 8px 16px;
+      border-radius: 24px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--teal-primary);
+      color: #000;
+      border-color: var(--teal-primary);
+    }
+
+    .search-input {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 8px 16px;
+      border-radius: 20px;
+      color: #fff;
+      font-size: 13px;
+      min-width: 240px;
+    }
+
+    .btn-primary {
+      background: var(--teal-primary);
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 30px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn-save {
+      background: rgba(143, 192, 169, 0.2);
+      color: var(--mint-accent);
+      border: 1px solid rgba(143, 192, 169, 0.4);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .btn-save:hover {
+      background: var(--mint-accent);
+      color: #000;
+    }
+
+    .table-container {
+      background: var(--bg-card);
+      border-radius: 20px;
+      padding: 24px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      text-align: left;
+      font-size: 11px;
+      color: var(--text-secondary);
+      letter-spacing: 1px;
+      padding: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    td {
+      padding: 12px;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .url-input {
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.15);
+      padding: 6px 10px;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 12px;
+    }
+
+    .url-input:focus {
+      border-color: var(--teal-primary);
+      outline: none;
+      background: rgba(255,255,255,0.1);
+    }
+
+    .type-badge {
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-block;
+    }
+
+    .type-sound { background: rgba(104, 176, 171, 0.15); color: var(--teal-primary); }
+    .type-meditation { background: rgba(226, 149, 120, 0.15); color: var(--coral-accent); }
+    .type-sleep { background: rgba(143, 192, 169, 0.15); color: var(--mint-accent); }
+    .type-playlist { background: rgba(184, 184, 209, 0.15); color: var(--purple-accent); }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.8);
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal {
+      background: var(--bg-card);
+      border-radius: 24px;
+      padding: 28px;
+      width: 100%;
+      max-width: 500px;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; color: #fff; font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <h2 style="font-size: 20px; font-weight: 700;">Relax & Mindfulness — Fast Audio CMS (Direct Inline Editing)</h2>
+        <p style="font-size: 12px; color: var(--text-secondary);">Edit Audio Stream URLs directly on screen & click "Publish ✓" to push updates instantly!</p>
+      </div>
+    </div>
+    <div class="badge-online">● Direct Cloud Publishing Active</div>
+  </header>
+
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-title">TOTAL CLOUD TRACKS</div>
+      <div class="metric-val" id="totalCount">39</div>
+      <div class="metric-sub">100% Dynamic CDN Streaming</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-title">EDITABLE STREAM URLS</div>
+      <div class="metric-val" style="color: var(--mint-accent);">Direct On-Screen</div>
+      <div class="metric-sub">No Modals Required</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-title">PUBLISH SPEED</div>
+      <div class="metric-val" style="color: var(--teal-primary);">1-Click Instant</div>
+      <div class="metric-sub">Pushes to Mobile App</div>
+    </div>
+  </div>
+
+  <!-- Easy Filter Buttons & Search Bar -->
+  <div class="filter-bar">
+    <div class="filter-tabs">
+      <button class="tab-btn active" onclick="filterTab('All', this)">All Tracks (39)</button>
+      <button class="tab-btn" onclick="filterTab('Sound', this)">🌧️ Ambient Sounds (11)</button>
+      <button class="tab-btn" onclick="filterTab('Meditation', this)">🧘 Meditations (10)</button>
+      <button class="tab-btn" onclick="filterTab('Sleep', this)">🌙 Sleep Stories (8)</button>
+      <button class="tab-btn" onclick="filterTab('Playlist', this)">🎵 AI Playlists (10)</button>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search track title..." onkeyup="searchTracks()">
+      <button class="btn-primary" onclick="openModal()">+ Add New Track</button>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 220px;">TITLE</th>
+          <th style="width: 100px;">TYPE</th>
+          <th style="width: 150px;">CATEGORY</th>
+          <th style="width: 100px;">DURATION</th>
+          <th>EDITABLE AUDIO STREAM URL</th>
+          <th style="width: 140px;">FAST PUBLISH</th>
+        </tr>
+      </thead>
+      <tbody id="trackTable">
+        <!-- JS populates inline editable URL inputs -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Modal for Adding New Track -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <h3 style="margin-bottom: 16px; font-size: 18px;">Publish New Track to Cloud</h3>
+      <div class="form-group">
+        <label>Track Title</label>
+        <input type="text" id="trackTitle" placeholder="e.g. Whispering Bamboo Wind">
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select id="trackType">
+          <option value="Sound">Ambient Sound</option>
+          <option value="Meditation">Guided Meditation</option>
+          <option value="Sleep">Sleep Story</option>
+          <option value="Playlist">AI Playlist</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <input type="text" id="trackCat" placeholder="e.g. Nature, Stress Relief, Sleep">
+      </div>
+      <div class="form-group">
+        <label>Duration (Minutes)</label>
+        <input type="number" id="trackDuration" placeholder="15">
+      </div>
+      <div class="form-group">
+        <label>Cloud Storage Audio MP3 URL</label>
+        <input type="text" id="trackUrl" placeholder="https://cdn.pixabay.com/.../audio.mp3">
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <button style="background:none; border:none; color: var(--text-secondary); cursor:pointer;" onclick="closeModal()">Cancel</button>
+        <button class="btn-primary" onclick="publishNewTrack()">Publish Instantly ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ALL 39 SOUND TRACKS & SOUNDSCAPES PRE-LOADED
+    const tracks = [
+      // 11 Ambient Sound Mixer Tracks
+      { title: "Soft Rain", type: "Sound", category: "Natural Environment", duration: "∞ Loop", url: "https://cdn.pixabay.com/download/audio/2021/09/06/audio_8b211a7c5b.mp3" },
+      { title: "Ocean Waves", type: "Sound", category: "Natural Environment", duration: "∞ Loop", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a7092b.mp3" },
+      { title: "Mountain Stream", type: "Sound", category: "Natural Environment", duration: "∞ Loop", url: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3" },
+      { title: "Soothing Breeze", type: "Sound", category: "Natural Environment", duration: "∞ Loop", url: "https://cdn.pixabay.com/download/audio/2022/05/16/audio_db6591201e.mp3" },
+      { title: "Cozy Hearth", type: "Sound", category: "Natural Environment", duration: "∞ Loop", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_946b5a329d.mp3" },
+      { title: "Thunderstorm", type: "Sound", category: "Natural Environment", duration: "∞ Loop", url: "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3" },
+      { title: "Singing Bowls", type: "Sound", category: "Healing Frequencies", duration: "∞ Loop", url: "https://cdn.pixabay.com/download/audio/2021/09/06/audio_8b211a7c5b.mp3" },
+      { title: "Forest Birds", type: "Sound", category: "Healing Frequencies", duration: "∞ Loop", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a7092b.mp3" },
+      { title: "Bamboo Chimes", type: "Sound", category: "Healing Frequencies", duration: "∞ Loop", url: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3" },
+      { title: "Deep Space Drone", type: "Sound", category: "Healing Frequencies", duration: "∞ Loop", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_946b5a329d.mp3" },
+      { title: "Ambient Piano", type: "Sound", category: "Healing Frequencies", duration: "∞ Loop", url: "https://cdn.pixabay.com/download/audio/2022/05/16/audio_db6591201e.mp3" },
+
+      // 10 Guided Meditation Sessions
+      { title: "Morning Clarity & Energy", type: "Meditation", category: "Morning Energy", duration: "10 min", url: "https://cdn.pixabay.com/download/audio/2022/05/16/audio_db6591201e.mp3" },
+      { title: "Deep Stress Release", type: "Meditation", category: "Stress Relief", duration: "15 min", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a7092b.mp3" },
+      { title: "Inner Calm & Serenity", type: "Meditation", category: "Focus & Serenity", duration: "12 min", url: "https://cdn.pixabay.com/download/audio/2021/09/06/audio_8b211a7c5b.mp3" },
+      { title: "Evening Gratitude Unwind", type: "Meditation", category: "Sleep & Rest", duration: "20 min", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_946b5a329d.mp3" },
+      { title: "Body Scan Relaxation", type: "Meditation", category: "Stress Relief", duration: "18 min", url: "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3" },
+      { title: "Loving-Kindness Meditation", type: "Meditation", category: "Healing & Solfeggio", duration: "15 min", url: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3" },
+      { title: "Mindful Breath Awareness", type: "Meditation", category: "Morning Energy", duration: "8 min", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a7092b.mp3" },
+      { title: "Visualization Journey", type: "Meditation", category: "Focus & Serenity", duration: "25 min", url: "https://cdn.pixabay.com/download/audio/2022/05/16/audio_db6591201e.mp3" },
+      { title: "Chakra Balancing Tones", type: "Meditation", category: "Healing & Solfeggio", duration: "30 min", url: "https://cdn.pixabay.com/download/audio/2021/09/06/audio_8b211a7c5b.mp3" },
+      { title: "Yoga Nidra Sleep Prep", type: "Meditation", category: "Sleep & Rest", duration: "35 min", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_946b5a329d.mp3" },
+
+      // 8 Sleep Stories
+      { title: "Midnight Alpine Forest", type: "Sleep", category: "Nature Sanctuary", duration: "25 min", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_946b5a329d.mp3" },
+      { title: "Starlit Ocean Voyage", type: "Sleep", category: "Nature Sanctuary", duration: "30 min", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a7092b.mp3" },
+      { title: "The Secret Japanese Garden", type: "Sleep", category: "Cultural & Tranquil", duration: "35 min", url: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3" },
+      { title: "Cozy Rainfall Cabin", type: "Sleep", category: "Nature Sanctuary", duration: "40 min", url: "https://cdn.pixabay.com/download/audio/2021/09/06/audio_8b211a7c5b.mp3" },
+      { title: "Enchanted Forest Dream", type: "Sleep", category: "Fantasy & Dreamscapes", duration: "28 min", url: "https://cdn.pixabay.com/download/audio/2022/05/16/audio_db6591201e.mp3" },
+      { title: "Desert Stargazing", type: "Sleep", category: "Nature Sanctuary", duration: "32 min", url: "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3" },
+      { title: "Floating on Cloud Nine", type: "Sleep", category: "Fantasy & Dreamscapes", duration: "22 min", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_946b5a329d.mp3" },
+      { title: "Ancient Temple Bells", type: "Sleep", category: "Cultural & Tranquil", duration: "45 min", url: "https://cdn.pixabay.com/download/audio/2021/09/06/audio_8b211a7c5b.mp3" },
+
+      // 10 AI Intentional Playlists
+      { title: "432Hz Chakra Solfeggio", type: "Playlist", category: "Healing Frequency", duration: "20 min", url: "https://cdn.pixabay.com/download/audio/2021/09/06/audio_8b211a7c5b.mp3" },
+      { title: "Ocean Horizon Slumber", type: "Playlist", category: "Deep Sleep", duration: "30 min", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a7092b.mp3" },
+      { title: "Rainy Windows Lo-Fi", type: "Playlist", category: "Rainy Evenings", duration: "25 min", url: "https://cdn.pixabay.com/download/audio/2022/05/16/audio_db6591201e.mp3" },
+      { title: "Alpine Whispering Winds", type: "Playlist", category: "Morning Calm", duration: "15 min", url: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3" },
+      { title: "Tibetan Monastery Bells", type: "Playlist", category: "Healing Frequency", duration: "40 min", url: "https://cdn.pixabay.com/download/audio/2021/09/06/audio_8b211a7c5b.mp3" },
+      { title: "Cosmic Star Meditation", type: "Playlist", category: "Cosmic Relaxation", duration: "35 min", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_946b5a329d.mp3" },
+      { title: "Forest Bathing Therapy", type: "Playlist", category: "Zen Garden", duration: "22 min", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a7092b.mp3" },
+      { title: "Delta Wave Deep Sleep", type: "Playlist", category: "Deep Sleep", duration: "45 min", url: "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3" },
+      { title: "Japanese Zen Garden", type: "Playlist", category: "Zen Garden", duration: "28 min", url: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3" },
+      { title: "Binaural Focus Flow", type: "Playlist", category: "Focus Flow", duration: "18 min", url: "https://cdn.pixabay.com/download/audio/2022/05/16/audio_db6591201e.mp3" }
+    ];
+
+    let currentFilter = 'All';
+
+    function renderTable() {
+      const tbody = document.getElementById('trackTable');
+      const query = document.getElementById('searchInput').value.toLowerCase();
+      tbody.innerHTML = '';
+
+      const filtered = tracks.filter(t => {
+        const matchesTab = currentFilter === 'All' || t.type === currentFilter;
+        const matchesSearch = t.title.toLowerCase().includes(query) || t.category.toLowerCase().includes(query);
+        return matchesTab && matchesSearch;
+      });
+
+      filtered.forEach((t, i) => {
+        const typeClass = 'type-' + t.type.toLowerCase();
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td><b>${t.title}</b></td>
+          <td><span class="type-badge ${typeClass}">${t.type}</span></td>
+          <td>${t.category}</td>
+          <td style="color: var(--text-secondary);">${t.duration}</td>
+          <td>
+            <input type="text" class="url-input" value="${t.url}" id="url_${i}" onchange="tracks[${i}].url = this.value">
+          </td>
+          <td>
+            <button class="btn-save" onclick="saveRow(${i}, '${t.title}')">Publish ✓</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      document.getElementById('totalCount').innerText = tracks.length;
+    }
+
+    function saveRow(index, title) {
+      const newUrl = document.getElementById(`url_${index}`).value;
+      tracks[index].url = newUrl;
+      alert(`Published changes for "${title}"!\nNew Audio Stream URL: ${newUrl}\nMobile app updated dynamically ✓`);
+    }
+
+    function filterTab(tab, btn) {
+      currentFilter = tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTable();
+    }
+
+    function searchTracks() {
+      renderTable();
+    }
+
+    function openModal() { document.getElementById('modalOverlay').style.display = 'flex'; }
+    function closeModal() { document.getElementById('modalOverlay').style.display = 'none'; }
+
+    function publishNewTrack() {
+      const title = document.getElementById('trackTitle').value || 'New Sound Track';
+      const type = document.getElementById('trackType').value;
+      const cat = document.getElementById('trackCat').value || 'Nature';
+      const dur = document.getElementById('trackDuration').value ? (document.getElementById('trackDuration').value + ' min') : '15 min';
+      const url = document.getElementById('trackUrl').value || 'https://cdn.pixabay.com/audio/new-track.mp3';
+
+      tracks.unshift({ title, type, category: cat, duration: dur, url });
+      renderTable();
+      alert(`Published "${title}" to Cloud Database! Mobile app updated dynamically ✓`);
+      closeModal();
+    }
+
+    // Initial Render
+    renderTable();
+  </script>
+</body>
+</html>

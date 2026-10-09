@@ -1,0 +1,14 @@
+# Sanctuary: Relax & Meditate – robots.txt
+# https://theanlegendary.github.io/allinone/
+
+User-agent: *
+Allow: /
+Disallow: /canvaskit/
+Disallow: /assets/shaders/
+Disallow: /assets/packages/
+
+# Sitemap
+Sitemap: https://theanlegendary.github.io/allinone/sitemap.xml
+
+# Crawl-delay (be gentle on GitHub Pages)
+Crawl-delay: 2

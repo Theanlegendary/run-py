@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neumorphism (Soft UI) Theme Showcase — Sanctuary</title>
+  <style>
+    /* Color Variables */
+    :root {
+      --surface: #e0e5ec;
+      --accent: #6c757d;
+      --text: #3d3d3d;
+      --subtext: #888888;
+      --shadow-dark: #a3b1c6;
+      --shadow-light: #ffffff;
+      --teal-accent: #52b788;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--surface);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+    }
+
+    .device-container {
+      width: 100%;
+      max-width: 440px;
+      background: var(--surface);
+      border-radius: 36px;
+      padding: 28px;
+      box-shadow: 18px 18px 36px var(--shadow-dark), -18px -18px 36px var(--shadow-light);
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.5px;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      padding: 6px 12px;
+      border-radius: 20px;
+      background: var(--surface);
+      box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
+    }
+
+    /* Neumorphic Card */
+    .neumorphism-card {
+      background: var(--surface);
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: 9px 9px 16px var(--shadow-dark), -9px -9px 16px var(--shadow-light);
+      margin-bottom: 20px;
+      transition: all 0.25s ease;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .card-subtext {
+      font-size: 13px;
+      color: var(--subtext);
+      line-height: 1.4;
+    }
+
+    /* Neumorphic Extruded Button */
+    .neumorphism-button {
+      width: 100%;
+      padding: 16px;
+      background: var(--surface);
+      border: none;
+      border-radius: 16px;
+      box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
+      color: var(--text);
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.15s ease;
+      outline: none;
+    }
+
+    .neumorphism-button:active, .neumorphism-button.pressed {
+      box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);
+      color: var(--accent);
+    }
+
+    /* Breathing Orb */
+    .orb-container {
+      display: flex;
+      justify-content: center;
+      margin: 24px 0;
+    }
+
+    .orb-outer {
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: var(--surface);
+      box-shadow: 12px 12px 24px var(--shadow-dark), -12px -12px 24px var(--shadow-light);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .orb-inner {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: var(--surface);
+      box-shadow: inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .orb-icon { font-size: 24px; }
+    .orb-label { font-size: 10px; font-weight: 800; color: var(--accent); letter-spacing: 1px; margin-top: 4px; }
+
+    /* Slider Container */
+    .slider-box {
+      margin-top: 14px;
+    }
+
+    .slider-track {
+      width: 100%;
+      height: 12px;
+      border-radius: 10px;
+      background: var(--surface);
+      box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+      position: relative;
+    }
+
+    .slider-fill {
+      height: 100%;
+      width: 65%;
+      background: var(--accent);
+      border-radius: 10px;
+    }
+
+    /* Verdict Box */
+    .verdict {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
+      font-size: 12px;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .verdict strong { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <div class="device-container">
+    <div class="header">
+      <div class="title">Sanctuary</div>
+      <div class="badge">SOFT UI 2020</div>
+    </div>
+
+    <!-- Extruded Card -->
+    <div class="neumorphism-card">
+      <div class="card-title">🌸 Gentle Relief & Comfort</div>
+      <div class="card-subtext">Soft wind chimes and gentle rain to soothe your heart & mind</div>
+    </div>
+
+    <!-- Breathing Orb -->
+    <div class="orb-container">
+      <div class="orb-outer">
+        <div class="orb-inner">
+          <span class="orb-icon">💨</span>
+          <span class="orb-label">INHALE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive Button -->
+    <div class="neumorphism-card">
+      <div style="margin-bottom: 12px;" class="card-title">Interactive Neumorphism Test</div>
+      <button class="neumorphism-button" id="testBtn">
+        <span>▶</span>
+        <span id="btnText">Tap to Test Inset State</span>
+      </button>
+
+      <div class="slider-box" style="margin-top: 18px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom: 6px; font-size: 12px;">
+          <span style="color: var(--text); font-weight:600;">Volume Level</span>
+          <span style="color: var(--accent); font-weight:700;">65%</span>
+        </div>
+        <div class="slider-track">
+          <div class="slider-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Verdict -->
+    <div class="verdict">
+      <strong>Design Verdict:</strong> Neumorphism feels tactile & relaxing for quiet, ambient apps. However, it requires a light background (<code>#E0E5EC</code>) and has lower contrast outdoors compared to dark Glassmorphism.
+    </div>
+  </div>
+
+  <script>
+    const btn = document.getElementById('testBtn');
+    const text = document.getElementById('btnText');
+    let pressed = false;
+
+    btn.addEventListener('click', () => {
+      pressed = !pressed;
+      btn.classList.toggle('pressed', pressed);
+      text.textContent = pressed ? 'INSET SHADOW (PRESSED)' : 'EXTRUDED SHADOW (OUTWARD)';
+    });
+  </script>
+</body>
+</html>

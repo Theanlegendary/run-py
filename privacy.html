@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Sanctuary: Relax & Mindfulness</title>
+  <meta name="description" content="Privacy Policy for Sanctuary: Relax & Mindfulness mobile app." />
+  <style>
+    :root {
+      --teal: #2DD4BF;
+      --bg: #050D15;
+      --surface: #0A1622;
+      --text: #E8EDF2;
+      --muted: #7A8B99;
+      --border: rgba(255,255,255,0.08);
+      --radius: 16px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+    .hero {
+      background: linear-gradient(135deg, #0A1F1C 0%, var(--bg) 60%);
+      padding: 60px 24px 40px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo { font-size: 52px; display: block; margin-bottom: 16px; }
+    .hero h1 {
+      font-size: clamp(24px, 5vw, 36px);
+      font-weight: 800;
+      color: white;
+      letter-spacing: -0.5px;
+    }
+    .hero p {
+      color: var(--muted);
+      margin-top: 8px;
+      font-size: 15px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(45,212,191,0.12);
+      border: 1px solid rgba(45,212,191,0.3);
+      color: var(--teal);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 16px;
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2 .icon { font-size: 22px; }
+    p { color: var(--muted); font-size: 15px; margin-bottom: 10px; }
+    p:last-child { margin-bottom: 0; }
+    ul {
+      color: var(--muted);
+      font-size: 15px;
+      padding-left: 20px;
+      margin-top: 8px;
+    }
+    li { margin-bottom: 6px; }
+    a { color: var(--teal); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .highlight {
+      background: rgba(45,212,191,0.06);
+      border-left: 3px solid var(--teal);
+      border-radius: 0 10px 10px 0;
+      padding: 14px 18px;
+      margin: 12px 0;
+      color: var(--text);
+      font-size: 14px;
+    }
+    footer {
+      text-align: center;
+      padding: 32px 24px;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+    .footer-logo { font-size: 32px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <span class="logo">🪷</span>
+    <h1>Privacy Policy</h1>
+    <p>Sanctuary: Relax &amp; Mindfulness</p>
+    <span class="badge">✅ We Respect Your Privacy</span>
+  </div>
+
+  <main>
+    <section>
+      <h2><span class="icon">📅</span> Last Updated</h2>
+      <p>This Privacy Policy was last updated on <strong>July 30, 2026</strong>. We will update this page whenever our practices change and notify you via the app.</p>
+    </section>
+
+    <section>
+      <h2><span class="icon">🔍</span> Overview</h2>
+      <p>Sanctuary: Relax &amp; Mindfulness ("Sanctuary", "we", "our", or "the App") is committed to protecting your privacy. This policy explains what data we collect, how we use it, and your rights.</p>
+      <div class="highlight">
+        <strong>Short version:</strong> We collect almost no data. Your meditation sessions, preferences, and streaks are stored only on your own device. We do not sell your data. Ever.
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="icon">📦</span> Information We Collect</h2>
+      <p>We collect <strong>minimal information</strong> necessary to provide the app experience:</p>
+
+      <h3 style="color:white;font-size:15px;margin:14px 0 6px;">Data Stored Locally on Your Device</h3>
+      <ul>
+        <li>Meditation session history (session title, duration, mood rating)</li>
+        <li>Daily streak count and practice minutes</li>
+        <li>App settings and theme preferences</li>
+        <li>Custom sound mixer presets and favourite sounds</li>
+        <li>Onboarding completion status</li>
+        <li>Premium subscription status</li>
+      </ul>
+      <p style="margin-top:10px;">This data is stored using Flutter's <code>SharedPreferences</code> package and <strong>never leaves your device</strong>.</p>
+
+      <h3 style="color:white;font-size:15px;margin:14px 0 6px;">Audio Streaming</h3>
+      <p>The App streams ambient sounds and guided meditation audio from <strong>GitHub's CDN</strong> (raw.githubusercontent.com). These are public, royalty-free CC0 audio files. No personal data is transmitted during streaming.</p>
+
+      <h3 style="color:white;font-size:15px;margin:14px 0 6px;">Images</h3>
+      <p>Some artwork is loaded from <strong>Unsplash</strong> (images.unsplash.com). No tracking pixels or user identification is involved.</p>
+    </section>
+
+    <section>
+      <h2><span class="icon">🚫</span> What We Do NOT Collect</h2>
+      <ul>
+        <li>❌ Name, email address, or any account information</li>
+        <li>❌ Location data or GPS coordinates</li>
+        <li>❌ Device identifiers or advertising IDs</li>
+        <li>❌ Browsing history or cross-app tracking</li>
+        <li>❌ Camera or microphone data</li>
+        <li>❌ Contacts or phone data</li>
+        <li>❌ Any analytics or crash reporting data (no Firebase, no Sentry)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2><span class="icon">💳</span> In-App Purchases &amp; Subscriptions</h2>
+      <p>Sanctuary offers an optional Premium subscription. All payment processing is handled entirely by <strong>Apple App Store</strong> or <strong>Google Play Store</strong>. We never see, store, or process your payment card details.</p>
+      <p>Subscription status is verified through the platform's native receipt validation. We store only a local boolean flag indicating whether you have an active subscription.</p>
+    </section>
+
+    <section>
+      <h2><span class="icon">🌐</span> Third-Party Services</h2>
+      <p>The App connects to the following third-party services solely to stream content:</p>
+      <ul>
+        <li><strong>GitHub CDN</strong> (raw.githubusercontent.com) — ambient audio streaming</li>
+        <li><strong>Unsplash</strong> (images.unsplash.com) — meditation artwork images</li>
+      </ul>
+      <p>These services have their own privacy policies. We encourage you to review them. Neither service receives your personal information from us.</p>
+    </section>
+
+    <section>
+      <h2><span class="icon">🔒</span> Data Security</h2>
+      <p>Since virtually all data is stored locally on your device, security is managed by your device's operating system (iOS/Android). We recommend:</p>
+      <ul>
+        <li>Keeping your device OS updated</li>
+        <li>Using a device PIN or biometric lock</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2><span class="icon">👶</span> Children's Privacy</h2>
+      <p>Sanctuary is not directed at children under 13 years of age. We do not knowingly collect personal information from children. If you believe a child under 13 has used the App and shared personal information, please contact us immediately.</p>
+    </section>
+
+    <section>
+      <h2><span class="icon">⚖️</span> Your Rights</h2>
+      <p>Since we store data only locally on your device, you have full control:</p>
+      <ul>
+        <li><strong>Access:</strong> All your data is visible within the app (Stats, History screens)</li>
+        <li><strong>Delete:</strong> Uninstalling the app permanently deletes all local data</li>
+        <li><strong>Export:</strong> Not currently supported (planned for future update)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2><span class="icon">✉️</span> Contact Us</h2>
+      <p>If you have any questions about this Privacy Policy or our data practices, please contact us:</p>
+      <div class="highlight">
+        📧 <a href="mailto:privacy@sanctuary-app.com">privacy@sanctuary-app.com</a><br/>
+        🌐 <a href="https://theanlegendary.github.io/allinone/" target="_blank">https://theanlegendary.github.io/allinone/</a>
+      </div>
+      <p>We aim to respond to all inquiries within 5 business days.</p>
+    </section>
+
+    <section>
+      <h2><span class="icon">📝</span> Changes to This Policy</h2>
+      <p>We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated "Last Updated" date. Continued use of the App after changes constitutes your acceptance of the updated policy.</p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-logo">🪷</div>
+    <p><strong>Sanctuary: Relax &amp; Mindfulness</strong></p>
+    <p style="margin-top:4px;">Your daily calm companion · Version 1.1.0</p>
+    <p style="margin-top:12px;">
+      <a href="https://theanlegendary.github.io/allinone/">Home</a> ·
+      <a href="mailto:privacy@sanctuary-app.com">Contact</a>
+    </p>
+  </footer>
+</body>
+</html>
