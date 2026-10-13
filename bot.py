@@ -904,6 +904,10 @@ async def forward_result_to_groups(context: ContextTypes.DEFAULT_TYPE = None, pa
                 except Exception as e:
                     log.warning(f"Pre-render failed {fpath}: {e}")
                     image_cache[fpath] = None  # mark failed so we skip per-group
+    try:
+        excel_to_image.close_shared_excel_app()
+    except Exception:
+        pass
 
     # ── Pre-cache all Excel files in memory (shared across all groups) ─────────
     excel_cache = {}

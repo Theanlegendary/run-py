@@ -184,150 +184,168 @@ def _get_font(text: str, size: int, bold: bool = False):
     return _load_font(size, bold)
 
 
-def excel_to_image(xlsx_path: str) -> io.BytesIO:
-    # ── Try Excel COM rendering first (for perfect Khmer text shaping and native styling on Windows) ──
+_shared_excel_app = None
+
+def get_shared_excel_app():
+    global _shared_excel_app
+    if _shared_excel_app is not None:
+        try:
+            _ = _shared_excel_app.Visible
+            return _shared_excel_app
+        except Exception:
+            _shared_excel_app = None
     try:
         import win32com.client
-        import pythoncom
-        import time
-        import os
-        from PIL import ImageGrab
+        app = win32com.client.Dispatch("Excel.Application")
+        app.Visible = False
+        app.DisplayAlerts = False
+        app.AskToUpdateLinks = False
+        app.EnableEvents = False
+        _shared_excel_app = app
+        return _shared_excel_app
+    except Exception:
+        return None
 
-        with _excel_com_lock:
+def close_shared_excel_app():
+    global _shared_excel_app
+    if _shared_excel_app is not None:
+        try:
+            _shared_excel_app.Quit()
+        except Exception:
+            pass
+        _shared_excel_app = None
+
+
+def excel_to_image(xlsx_path: str) -> io.BytesIO:
+    # ── Try Excel COM rendering first (for perfect Khmer text shaping and native styling on Windows) ──
+    acquired = _excel_com_lock.acquire(timeout=6.0)
+    if acquired:
+        try:
+            import win32com.client
+            import pythoncom
+            import time
+            import os
+            from PIL import ImageGrab
+
             try:
                 pythoncom.CoInitialize()
             except Exception:
                 pass
 
             abs_path = os.path.abspath(xlsx_path)
-            excel = None
+            excel = get_shared_excel_app()
             wb = None
-            try:
-                excel = win32com.client.Dispatch("Excel.Application")
-                excel.Visible = False
-                excel.DisplayAlerts = False
-
-                wb = excel.Workbooks.Open(abs_path)
-                if wb is not None:
-                    ws = wb.ActiveSheet
-                    if ws is not None:
-                        try:
-                            excel.CalculateFull()
-                        except Exception:
+            if excel is not None:
+                try:
+                    wb = excel.Workbooks.Open(abs_path, ReadOnly=True, UpdateLinks=False)
+                    if wb is not None:
+                        ws = wb.ActiveSheet
+                        if ws is not None:
                             try:
-                                excel.Calculate()
+                                excel.CalculateFull()
                             except Exception:
-                                pass
-
-                        img = None
-                        temp_png = None
-
-                        # --- 1. Try High Quality Chart Export Method (Crisp HD 2.0x rendering) ---
-                        try:
-                            try:
-                                excel.ActiveWindow.Zoom = 200
-                            except Exception:
-                                pass
-                            rng = ws.UsedRange
-                            excel_scale = 2.0  # Scale factor for HD rendering
-                            chart_width = rng.Width * excel_scale
-                            chart_height = rng.Height * excel_scale
-
-                            # Copy as picture using xlScreen=1, xlPicture=-4147 for maximum vector detail
-                            rng.CopyPicture(1, -4147)
-
-                            # Add temporary chart
-                            chart_obj = ws.ChartObjects().Add(Left=rng.Left, Top=rng.Top, Width=chart_width, Height=chart_height)
-                            chart_obj.Activate()
-                            chart = chart_obj.Chart
-                            chart.Paste()
-
-                            # Scale the pasted picture shape to fill the chart and position it at top-left (0,0)
-                            if chart.Shapes.Count > 0:
-                                shape = chart.Shapes(1)
-                                shape.Left = 0
-                                shape.Top = 0
-                                shape.Width = chart_width
-                                shape.Height = chart_height
-
-                            # Remove chart borders and fill to prevent extra margins/background padding
-                            chart.ChartArea.Format.Line.Visible = 0
-                            chart.ChartArea.Format.Fill.Visible = 0
-
-                            # Export to temp PNG
-                            temp_png = os.path.abspath(os.path.join(os.path.dirname(xlsx_path), f"temp_excel_hd_{int(time.time())}.png"))
-                            chart.Export(temp_png, "PNG")
-                            chart_obj.Delete()
-
-                            if os.path.exists(temp_png):
-                                img = Image.open(temp_png)
-                                img.load()
-                        except Exception:
-                            img = None
-                        finally:
-                            if temp_png and os.path.exists(temp_png):
                                 try:
-                                    os.remove(temp_png)
+                                    excel.Calculate()
                                 except Exception:
                                     pass
 
-                        # --- 2. Clipboard Fallback Method (if Chart method failed or wasn't used) ---
-                        if img is None:
-                            ws.UsedRange.CopyPicture(1, 2)
-                            time.sleep(0.5) # wait for clipboard
-                            for _ in range(5):
-                                img = ImageGrab.grabclipboard()
-                                if img:
-                                    break
-                                time.sleep(0.5)
+                            img = None
+                            temp_png = None
 
-                        if img:
-                            # Aspect ratio safety check for Telegram
-                            max_ratio = 18.0
-                            w, h = img.size
-                            new_w, new_h = w, h
-                            if h > 0 and w / h > max_ratio:
-                                new_h = int(w / max_ratio)
-                            elif w > 0 and h / w > max_ratio:
-                                new_w = int(h / max_ratio)
+                            # --- 1. Try High Quality Chart Export Method (Crisp HD 2.0x rendering) ---
+                            try:
+                                rng = ws.UsedRange
+                                excel_scale = 2.0  # Scale factor for HD rendering
+                                chart_width = rng.Width * excel_scale
+                                chart_height = rng.Height * excel_scale
 
-                            if (new_w, new_h) != (w, h):
-                                padded_img = Image.new('RGB', (new_w, new_h), (255, 255, 255))
-                                padded_img.paste(img, (0, 0))
-                                img = padded_img
+                                # Copy as picture using xlScreen=1, xlPicture=-4147 for maximum vector detail
+                                rng.CopyPicture(1, -4147)
 
-                            # Dimension safety check for Telegram (Telegram limit: w + h <= 10,000 px, max dimension 10,000 px)
-                            w, h = img.size
-                            if (w + h > 9500) or max(w, h) > 8000:
-                                scale = min(9500.0 / (w + h), 8000.0 / max(w, h))
-                                new_w = max(1, int(w * scale))
-                                new_h = max(1, int(h * scale))
-                                img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                                # Add temporary chart
+                                chart_obj = ws.ChartObjects().Add(Left=rng.Left, Top=rng.Top, Width=chart_width, Height=chart_height)
+                                chart_obj.Activate()
+                                chart = chart_obj.Chart
+                                chart.Paste()
 
-                            buf = io.BytesIO()
-                            img.save(buf, format='PNG', optimize=True)
-                            buf.seek(0)
-                            return buf
-            finally:
-                if wb:
-                    try:
-                        wb.Close(SaveChanges=False)
-                    except Exception:
-                        pass
-                if excel:
-                    try:
-                        excel.Quit()
-                    except Exception:
-                        pass
-                try:
-                    pythoncom.CoUninitialize()
-                except Exception:
-                    pass
-    except Exception as e:
-        # Fall back to Pillow rendering if Excel COM fails or is not available
-        import logging
-        logging.warning("Excel COM rendering failed (%s), falling back to Pillow", e)
-        pass
+                                # Scale the pasted picture shape to fill the chart and position it at top-left (0,0)
+                                if chart.Shapes.Count > 0:
+                                    shape = chart.Shapes(1)
+                                    shape.Left = 0
+                                    shape.Top = 0
+                                    shape.Width = chart_width
+                                    shape.Height = chart_height
+
+                                # Remove chart borders and fill to prevent extra margins/background padding
+                                chart.ChartArea.Format.Line.Visible = 0
+                                chart.ChartArea.Format.Fill.Visible = 0
+
+                                # Export to temp PNG
+                                temp_png = os.path.abspath(os.path.join(os.path.dirname(xlsx_path), f"temp_excel_hd_{int(time.time() * 1000)}.png"))
+                                chart.Export(temp_png, "PNG")
+                                chart_obj.Delete()
+
+                                if os.path.exists(temp_png):
+                                    img = Image.open(temp_png)
+                                    img.load()
+                            except Exception:
+                                img = None
+                            finally:
+                                if temp_png and os.path.exists(temp_png):
+                                    try:
+                                        os.remove(temp_png)
+                                    except Exception:
+                                        pass
+
+                            # --- 2. Clipboard Fallback Method (if Chart method failed or wasn't used) ---
+                            if img is None:
+                                ws.UsedRange.CopyPicture(1, 2)
+                                time.sleep(0.3)
+                                for _ in range(4):
+                                    img = ImageGrab.grabclipboard()
+                                    if img:
+                                        break
+                                    time.sleep(0.3)
+
+                            if img:
+                                # Aspect ratio safety check for Telegram
+                                max_ratio = 18.0
+                                w, h = img.size
+                                new_w, new_h = w, h
+                                if h > 0 and w / h > max_ratio:
+                                    new_h = int(w / max_ratio)
+                                elif w > 0 and h / w > max_ratio:
+                                    new_w = int(h / max_ratio)
+
+                                if (new_w, new_h) != (w, h):
+                                    padded_img = Image.new('RGB', (new_w, new_h), (255, 255, 255))
+                                    padded_img.paste(img, (0, 0))
+                                    img = padded_img
+
+                                # Dimension safety check for Telegram
+                                w, h = img.size
+                                if (w + h > 9500) or max(w, h) > 8000:
+                                    scale = min(9500.0 / (w + h), 8000.0 / max(w, h))
+                                    new_w = max(1, int(w * scale))
+                                    new_h = max(1, int(h * scale))
+                                    img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+                                buf = io.BytesIO()
+                                img.save(buf, format='PNG', optimize=True)
+                                buf.seek(0)
+                                return buf
+                finally:
+                    if wb:
+                        try:
+                            wb.Close(SaveChanges=False)
+                        except Exception:
+                            pass
+        except Exception as e:
+            import logging
+            logging.warning("Excel COM rendering failed (%s), falling back to Pillow", e)
+            close_shared_excel_app()
+        finally:
+            _excel_com_lock.release()
 
     wb = load_workbook(xlsx_path, data_only=True)
     ws = wb.active

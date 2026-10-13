@@ -55,21 +55,22 @@ def compute_kpi_info(row):
     if status_code and ' ' in status_code:
         status_code = status_code.split()[0].strip()
 
-    scan_time = None
-    for col in [
-        'CURRENT TIME',
-        'STATUS 306 AT STORE / AGENT (LAST TIME)',
-        'STATUS 306 AT STORE / AGENT FROM HUB (FIRST TIME)',
-        'STATUS 302/310 AT RECEIVING STORE / RECEIVING AGENT (FIRST TIME)',
-        'STATUS 306  AT ORIGIN HUB (FIRST TIME)',
-        'CREATED DATE'
-    ]:
-        val = row.get(col)
-        if pd.notna(val) and str(val).strip() and str(val).strip().lower() != 'nan':
-            parsed_dt = pd.to_datetime(val, dayfirst=True, format='mixed', errors='coerce')
-            if pd.notna(parsed_dt):
-                scan_time = parsed_dt
-                break
+    scan_time = row.get('_latest_action_dt') if pd.notna(row.get('_latest_action_dt')) else None
+    if scan_time is None:
+        for col in [
+            'CURRENT TIME',
+            'STATUS 306 AT STORE / AGENT (LAST TIME)',
+            'STATUS 306 AT STORE / AGENT FROM HUB (FIRST TIME)',
+            'STATUS 302/310 AT RECEIVING STORE / RECEIVING AGENT (FIRST TIME)',
+            'STATUS 306  AT ORIGIN HUB (FIRST TIME)',
+            'CREATED DATE'
+        ]:
+            val = row.get(col)
+            if pd.notna(val) and str(val).strip() and str(val).strip().lower() != 'nan':
+                parsed_dt = pd.to_datetime(val, dayfirst=True, format='mixed', errors='coerce')
+                if pd.notna(parsed_dt):
+                    scan_time = parsed_dt
+                    break
 
     if scan_time is None:
         return '', '10h'
@@ -974,21 +975,30 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
 
     if resolved_rev:
         try:
-            rev_df = pd.read_excel(resolved_rev)
+            try:
+                xl_rev = pd.ExcelFile(resolved_rev, engine='calamine')
+            except Exception:
+                xl_rev = pd.ExcelFile(resolved_rev)
+            
+            # Detect header row in first 10 rows
+            sheet_name = xl_rev.sheet_names[0]
+            df_sample = xl_rev.parse(sheet_name, nrows=10)
+            skip_rows = 0
+            for idx, r_vals in enumerate(df_sample.values):
+                row_str = ' '.join(str(v).upper() for v in r_vals if pd.notna(v))
+                if 'ORDER_NUMBER' in row_str or 'ORDER ID' in row_str or 'MÃ ĐƠN' in row_str:
+                    skip_rows = idx + 1
+                    break
+            
+            rev_df = xl_rev.parse(sheet_name, skiprows=skip_rows)
             rev_order_col = next((c for c in rev_df.columns if str(c).strip().upper() in ['ORDER ID', 'ORDER_NUMBER', 'MÃ ĐƠN HÀNG', 'BILL', 'MÃ ĐƠN']), None)
-            if not rev_order_col:
-                for skiprows in range(1, 5):
-                    rev_df_tmp = pd.read_excel(resolved_rev, skiprows=skiprows)
-                    rev_order_col = next((c for c in rev_df_tmp.columns if str(c).strip().upper() in ['ORDER ID', 'ORDER_NUMBER', 'MÃ ĐƠN HÀNG', 'BILL', 'MÃ ĐƠN']), None)
-                    if rev_order_col:
-                        rev_df = rev_df_tmp
-                        break
             if rev_order_col and 'VAS_SERVICE' in rev_df.columns:
-                for _, row in rev_df.dropna(subset=[rev_order_col]).iterrows():
-                    oid = str(row[rev_order_col]).strip()
-                    vas = str(row['VAS_SERVICE']).strip()
-                    if vas.lower() not in ['nan', 'none', '']:
-                        vas_mapping[oid] = vas
+                valid_rev = rev_df.dropna(subset=[rev_order_col, 'VAS_SERVICE'])
+                for oid, vas in zip(valid_rev[rev_order_col], valid_rev['VAS_SERVICE']):
+                    oid_s = str(oid).strip()
+                    vas_s = str(vas).strip()
+                    if vas_s.lower() not in ['nan', 'none', '']:
+                        vas_mapping[oid_s] = vas_s
         except Exception as e:
             print(f"Failed to load revenue data for VAS mapping: {e}")
 
@@ -1052,6 +1062,7 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
         created_dates = pd.to_datetime(df['CREATED DATE'], dayfirst=True, format='mixed', errors='coerce')
         latest_action = latest_action.fillna(created_dates)
     df['_scan_date'] = latest_action.dt.date
+    df['_latest_action_dt'] = latest_action
 
     date_col = next(
         (c for c in df.columns if 'current time' in str(c).lower() or 'thời gian' in str(c).lower() or 'created date' in str(c).lower()), None
