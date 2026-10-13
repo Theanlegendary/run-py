@@ -1339,6 +1339,13 @@ async def run_pending_auto_scheduler(app: Application):
             "hours": ["08:30", "14:00"],
             "reports": ["push"],
         },
+        {
+            "chat_id": -5205920813,
+            "title": "VIP_Lengkimsan",
+            "hours": ["09:00", "12:00", "15:00", "17:00"],
+            "reports": ["vip"],
+            "query": "06020333",
+        },
     ]
     state_file = os.path.join(HERE, "pending_schedule_state.json")
 
@@ -1369,7 +1376,7 @@ async def run_pending_auto_scheduler(app: Application):
                 continue
 
             SCHEDULED_TARGETS = cfg.get("scheduled_targets") or DEFAULT_SCHEDULED_TARGETS
-            ALL_SCHEDULED_HOURS = sorted(list(set(["08:00", "08:30", "11:00", "14:00", "15:00", "16:00"]).union(*(t.get("hours", []) for t in SCHEDULED_TARGETS))))
+            ALL_SCHEDULED_HOURS = sorted(list(set(["08:00", "08:30", "09:00", "11:00", "12:00", "14:00", "15:00", "16:00", "17:00"]).union(*(t.get("hours", []) for t in SCHEDULED_TARGETS))))
 
             now = datetime.now()
             date_str = now.strftime("%Y-%m-%d")
@@ -1377,6 +1384,7 @@ async def run_pending_auto_scheduler(app: Application):
             is_forced = bool(state.get("force_run", False))
             is_forced_speed = bool(state.get("force_speed", False))
             is_forced_push = bool(state.get("force_push", False))
+            is_forced_vip = bool(state.get("force_vip", False))
             completed_slots = set(state.get("completed_slots", []))
 
             # Determine all slots whose scheduled time has arrived today
@@ -1388,7 +1396,7 @@ async def run_pending_auto_scheduler(app: Application):
                     slot_key = f"{date_str}_{slot.replace(':', '')}"
                     # Auto-expire slots that passed more than 30 minutes ago (avoid late morning catch-up runs)
                     age_secs = (now - slot_time_today).total_seconds()
-                    if age_secs > 30 * 60 and not (is_forced or is_forced_speed or is_forced_push):
+                    if age_secs > 30 * 60 and not (is_forced or is_forced_speed or is_forced_push or is_forced_vip):
                         if slot_key not in completed_slots:
                             completed_slots.add(slot_key)
                             state.setdefault("completed_slots", []).append(slot_key)
@@ -1397,7 +1405,7 @@ async def run_pending_auto_scheduler(app: Application):
                     else:
                         past_slots.append(slot)
 
-            if not past_slots and not is_forced and not is_forced_speed and not is_forced_push:
+            if not past_slots and not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip:
                 # No scheduled slot reached yet today (e.g. before 08:00 or all past expired)
                 await asyncio.sleep(15)
                 continue
@@ -1408,7 +1416,7 @@ async def run_pending_auto_scheduler(app: Application):
                 if f"{date_str}_{s.replace(':', '')}" not in completed_slots
             ]
 
-            if not pending_past_slots and not is_forced and not is_forced_speed and not is_forced_push:
+            if not pending_past_slots and not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip:
                 # All past slots for today have already completed
                 await asyncio.sleep(15)
                 continue
@@ -1417,12 +1425,12 @@ async def run_pending_auto_scheduler(app: Application):
             slot_time = pending_past_slots[0] if pending_past_slots else (past_slots[-1] if past_slots else ALL_SCHEDULED_HOURS[0])
             current_slot = f"{date_str}_{slot_time.replace(':', '')}"
 
-            if not is_forced and not is_forced_speed and not is_forced_push and (state.get("last_run_slot") == current_slot or current_slot in completed_slots):
+            if not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip and (state.get("last_run_slot") == current_slot or current_slot in completed_slots):
                 await asyncio.sleep(15)
                 continue
 
             # Cooldown if this slot failed very recently (avoid tight error loop)
-            if not is_forced and not is_forced_speed and not is_forced_push and state.get("failed_slot") == current_slot:
+            if not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip and state.get("failed_slot") == current_slot:
                 last_fail = state.get("last_fail_ts", 0)
                 if (now.timestamp() - last_fail) < 120:
                     await asyncio.sleep(15)
@@ -1432,8 +1440,10 @@ async def run_pending_auto_scheduler(app: Application):
                 active_targets = [t for t in SCHEDULED_TARGETS if any("push" in r for r in t.get("reports", []))]
             elif is_forced_speed:
                 active_targets = [t for t in SCHEDULED_TARGETS if any("speed" in r for r in t.get("reports", []))]
+            elif is_forced_vip:
+                active_targets = [t for t in SCHEDULED_TARGETS if any("vip" in r for r in t.get("reports", []))]
             elif is_forced:
-                active_targets = [t for t in SCHEDULED_TARGETS if not any("speed" in r or "push" in r for r in t.get("reports", []))]
+                active_targets = [t for t in SCHEDULED_TARGETS if not any("speed" in r or "push" in r or "vip" in r for r in t.get("reports", []))]
             else:
                 active_targets = [t for t in SCHEDULED_TARGETS if slot_time in t.get("hours", [])]
 
@@ -1458,6 +1468,7 @@ async def run_pending_auto_scheduler(app: Application):
 
                 is_speed_slot = (slot_time in ("11:00", "15:00")) or is_forced_speed
                 is_push_slot = (slot_time in ("08:30", "14:00")) or is_forced_push
+                is_vip_slot = (slot_time in ("09:00", "12:00", "15:00", "17:00")) or is_forced_vip
                 needs_speed = any(
                     "speed_all" in t.get("reports", []) or "speed" in t.get("reports", [])
                     for t in active_targets
@@ -1467,6 +1478,11 @@ async def run_pending_auto_scheduler(app: Application):
                     "push" in t.get("reports", [])
                     for t in active_targets
                 ) or is_push_slot
+
+                needs_vip = any(
+                    "vip" in t.get("reports", [])
+                    for t in active_targets
+                ) or is_forced_vip
 
                 needs_total = not is_speed_slot and any(
                     "total" in t.get("reports", [])
@@ -9951,9 +9967,25 @@ async def _run_bot_coroutine(token: str, proxy_url: str = None, is_primary: bool
             log.exception("Error in on_post_init: %s", e_init)
     await app.start()
     await app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-    # Run indefinitely
-    while True:
-        await asyncio.sleep(3600)
+    try:
+        while app.updater and app.updater.running:
+            await asyncio.sleep(2)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        try:
+            if app.updater and app.updater.running:
+                await app.updater.stop()
+        except Exception:
+            pass
+        try:
+            await app.stop()
+        except Exception:
+            pass
+        try:
+            await app.shutdown()
+        except Exception:
+            pass
 
 
 def run_bot_in_thread(token: str, proxy_url: str = None, is_primary: bool = True):

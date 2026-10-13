@@ -831,6 +831,20 @@
       "reports": [
         "push"
       ]
+    },
+    {
+      "chat_id": -5205920813,
+      "title": "VIP_Lengkimsan",
+      "hours": [
+        "09:00",
+        "12:00",
+        "15:00",
+        "17:00"
+      ],
+      "reports": [
+        "vip"
+      ],
+      "query": "06020333"
     }
   ]
 }
