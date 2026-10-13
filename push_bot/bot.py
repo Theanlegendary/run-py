@@ -891,6 +891,8 @@ async def forward_result_to_groups(context: ContextTypes.DEFAULT_TYPE = None, pa
     forward_groups = payload["forward_groups"]
     forward_mapping = payload["forward_mapping"]
     import io
+    import excel_to_image, importlib
+    importlib.reload(excel_to_image)
 
     # ── Pre-render all images ONCE (shared across all groups) ────────────────
     image_cache = {}
