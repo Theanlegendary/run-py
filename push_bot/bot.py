@@ -1373,6 +1373,11 @@ async def run_pending_auto_scheduler(app: Application):
 
             now = datetime.now()
             date_str = now.strftime("%Y-%m-%d")
+            state = _load_state()
+            is_forced = bool(state.get("force_run", False))
+            is_forced_speed = bool(state.get("force_speed", False))
+            is_forced_push = bool(state.get("force_push", False))
+            completed_slots = set(state.get("completed_slots", []))
 
             # Determine all slots whose scheduled time has arrived today
             past_slots = []
@@ -1380,23 +1385,38 @@ async def run_pending_auto_scheduler(app: Application):
                 sh, sm = map(int, slot.split(":"))
                 slot_time_today = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
                 if now >= slot_time_today:
-                    past_slots.append(slot)
-
-            state = _load_state()
-            is_forced = bool(state.get("force_run", False))
-            is_forced_speed = bool(state.get("force_speed", False))
-            is_forced_push = bool(state.get("force_push", False))
+                    slot_key = f"{date_str}_{slot.replace(':', '')}"
+                    # Auto-expire slots that passed more than 30 minutes ago (avoid late morning catch-up runs)
+                    age_secs = (now - slot_time_today).total_seconds()
+                    if age_secs > 30 * 60 and not (is_forced or is_forced_speed or is_forced_push):
+                        if slot_key not in completed_slots:
+                            completed_slots.add(slot_key)
+                            state.setdefault("completed_slots", []).append(slot_key)
+                            _save_state(state)
+                            log.info("Auto-schedule: Slot %s is >30m in the past (%s). Expired & skipped catch-up.", slot, now.strftime('%H:%M:%S'))
+                    else:
+                        past_slots.append(slot)
 
             if not past_slots and not is_forced and not is_forced_speed and not is_forced_push:
-                # No scheduled slot reached yet today (e.g. before 08:00)
+                # No scheduled slot reached yet today (e.g. before 08:00 or all past expired)
                 await asyncio.sleep(15)
                 continue
 
-            # The latest scheduled slot that has been reached today (or default to first if forced)
-            slot_time = past_slots[-1] if past_slots else ALL_SCHEDULED_HOURS[0]
+            # Find all past slots whose time arrived today but have not yet completed
+            pending_past_slots = [
+                s for s in past_slots
+                if f"{date_str}_{s.replace(':', '')}" not in completed_slots
+            ]
+
+            if not pending_past_slots and not is_forced and not is_forced_speed and not is_forced_push:
+                # All past slots for today have already completed
+                await asyncio.sleep(15)
+                continue
+
+            # Pick the earliest pending slot so reports execute in chronological order
+            slot_time = pending_past_slots[0] if pending_past_slots else (past_slots[-1] if past_slots else ALL_SCHEDULED_HOURS[0])
             current_slot = f"{date_str}_{slot_time.replace(':', '')}"
 
-            completed_slots = set(state.get("completed_slots", []))
             if not is_forced and not is_forced_speed and not is_forced_push and (state.get("last_run_slot") == current_slot or current_slot in completed_slots):
                 await asyncio.sleep(15)
                 continue
@@ -2136,6 +2156,17 @@ async def run_daily_report_auto_scheduler(app: Application):
         await asyncio.sleep(20)
 
 
+_auto_scheduler_task = None
+
+def ensure_scheduler_running(app: Application):
+    """Ensure the background pending auto-scheduler task is actively running."""
+    global _auto_scheduler_task
+    if _auto_scheduler_task is None or _auto_scheduler_task.done():
+        log.info("▶ Spawning background auto-scheduler task (run_pending_auto_scheduler)...")
+        _auto_scheduler_task = asyncio.create_task(run_pending_auto_scheduler(app))
+    return _auto_scheduler_task
+
+
 async def on_post_init(app: Application):
     """Start background tasks on bot startup."""
     cfg = load_config()
@@ -2147,7 +2178,7 @@ async def on_post_init(app: Application):
     else:
         log.info("✅ Auto-Schedule is ACTIVE on startup.")
 
-    asyncio.create_task(run_pending_auto_scheduler(app))
+    ensure_scheduler_running(app)
     sched_cfg = cfg.get("daily_report_schedule") or cfg.get("telegram", {}).get("daily_report_schedule", {})
     if sched_cfg.get("enabled", False):
         asyncio.create_task(run_daily_report_auto_scheduler(app))
@@ -2173,6 +2204,7 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if sub in ("on", "enable", "resume", "start"):
         cfg["telegram"]["paused"] = False
         save_config(cfg)
+        ensure_scheduler_running(context.application)
         msg = (
             "✅ *Auto-Schedule ENABLED (6 Slots / Day)*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -2203,6 +2235,7 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Use `/schedule on` or `/resume` to re-enable."
         )
     elif sub in ("run", "now", "force", "speed", "speedall", "speed_all", "push"):
+        ensure_scheduler_running(context.application)
         force_speed = sub in ("speed", "speedall", "speed_all") or any(a.lower() in ("speed", "speed_all", "speedall") for a in args[1:])
         force_push = sub == "push" or any(a.lower() == "push" for a in args[1:])
         # Reset state so scheduler triggers current slot immediately
@@ -2639,6 +2672,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔎 *Search & Explorer*\n"
         "`/app` — Open interactive Data Explorer app 📱\n"
         "`/find <phone/order>` — Search order tracking by phone number or ID\n"
+        "`/vip <phone/name> [date]` — Track VIP customer bills by date with live statuses 👑\n"
         "`/ask <order_id>` — Show status, next steps & responsible scanning office\n"
         "`/statues [code]` — Show status flow/app action details\n"
         "`/qr <order_id>` — Generate a scanable QR code image for direct scanning\n"
@@ -4373,6 +4407,35 @@ def _classify_facility(code: str, type_label: str = "") -> str:
     return "Post Office"
 
 
+def _format_updated_date(val):
+    if not val or pd.isna(val):
+        return ""
+    s = str(val).strip()
+    if not s or s.lower() == "nan":
+        return ""
+    if "T" in s:
+        t_idx = s.index("T")
+        date_part = s[:t_idx]
+        time_part = s[t_idx + 1:].split("+")[0].split("Z")[0]
+        if "-" not in date_part and len(date_part) == 8:
+            clean_time = time_part.replace(":", "")
+            if len(clean_time) >= 6:
+                try:
+                    dt = datetime.strptime(f"{date_part}T{clean_time[:6]}", "%Y%m%dT%H%M%S")
+                    return dt.strftime("%d/%m/%Y")
+                except Exception:
+                    pass
+        else:
+            try:
+                dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                return dt.strftime("%d/%m/%Y")
+            except Exception:
+                pass
+    elif "/" in s and len(s) > 10:
+        return s.split(" ")[0]
+    return s
+
+
 def _post_office_export_row(item, fallback_branch=""):
     branch = item.get("branch") if isinstance(item.get("branch"), dict) else {}
     code = str(item.get("code") or item.get("Pickup Branch") or item.get("Post code") or "").strip().upper()
@@ -4398,7 +4461,18 @@ def _post_office_export_row(item, fallback_branch=""):
     phone = _clean_export_phone(item.get("Phone Number") or item.get("Phone") or item.get("phone") or item.get("phone_detail") or item.get("hpoUsername")) or _get_fallback_location_phone(code, branch_code)
 
     level = str(item.get("Post Office Level") or item.get("type") or item.get("Category") or item.get("typeLabel") or "AGENT").strip()
-    status = str(item.get("Status") or item.get("status") or item.get("statusLabel") or "ACTIVE").strip()
+    
+    # Map status to friendly statusLabel like "In effect" / "Out of effect" (matching TMS web UI screenshot)
+    status_label = item.get("statusLabel") or item.get("Status") or item.get("status") or "In effect"
+    status_str = str(status_label).strip()
+    if status_str.upper() == "ACTIVE":
+        status_str = "In effect"
+    elif status_str.upper() == "INACTIVE":
+        status_str = "Out of effect"
+    status = status_str
+
+    raw_updated = item.get("Updated date") or item.get("Updated Date") or item.get("updatedAt") or item.get("updated_at") or ""
+    updated_date = _format_updated_date(raw_updated)
 
     address = f"{commune_en}, {dist_en}, {province_en}, Cambodia"
 
@@ -4423,18 +4497,21 @@ def _post_office_export_row(item, fallback_branch=""):
         province_en,
         dist_en,
         level,
+        status,
     ]
 
     return {
         "Post Code": code,
         "Post Office Name": po_name,
         "Post Office Level": level,
+        "Status": status,
+        "Updated date": updated_date,
+        "Updated Date": updated_date,
         "Phone": phone,
         "Province": province_en,
         "District": dist_en,
         "Commune": commune_en,
         "Address": address,
-        "Status": status,
         "Branch": branch_code,
 
         # Backward compatibility fields
@@ -4638,12 +4715,13 @@ def _write_post_office_export_excel(df, out_path, sheet_label, title):
         "Post Code",
         "Post Office Name",
         "Post Office Level",
+        "Status",
+        "Updated date",
         "Phone",
         "Province",
         "District",
         "Commune",
         "Address",
-        "Status",
         "Branch"
     ]
     
@@ -4659,13 +4737,14 @@ def _write_post_office_export_excel(df, out_path, sheet_label, title):
         "A": 16,
         "B": 26,
         "C": 20,
-        "D": 16,
-        "E": 22,
-        "F": 22,
+        "D": 14,
+        "E": 20,
+        "F": 16,
         "G": 22,
-        "H": 65,
-        "I": 14,
-        "J": 12,
+        "H": 22,
+        "I": 22,
+        "J": 65,
+        "K": 12,
     }
     for col_letter, width in col_widths.items():
         ws.column_dimensions[col_letter].width = width
@@ -4673,11 +4752,11 @@ def _write_post_office_export_excel(df, out_path, sheet_label, title):
     for idx, row in df.iterrows():
         row_idx = idx + 2
         for col_idx, col_name in enumerate(data_headers, 1):
-            val = row.get(col_name, "")
+            val = row.get(col_name) if col_name in row else (row.get("Updated Date", "") if col_name == "Updated date" else "")
             cell = ws.cell(row=row_idx, column=col_idx, value="" if pd.isna(val) else str(val))
             cell.font = Font(name="Calibri", size=10)
             cell.border = thin_border
-            if col_name in ("Post Code", "Post Office Level", "Status", "Branch"):
+            if col_name in ("Post Code", "Post Office Level", "Status", "Updated date", "Updated Date", "Branch"):
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             elif col_name == "Phone":
                 cell.alignment = Alignment(horizontal="left", vertical="center")
@@ -4686,7 +4765,7 @@ def _write_post_office_export_excel(df, out_path, sheet_label, title):
                 cell.alignment = Alignment(horizontal="left", vertical="center")
 
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:J{len(df)+1}"
+    ws.auto_filter.ref = f"A1:K{len(df)+1}"
     
     wb.save(out_path)
 
@@ -4845,6 +4924,15 @@ async def send_pickup_branch_export(update, context, cfg, raw_args):
         title = f"Pickup Branch Search Export - {description} ({len(df)} offices)"
 
         _write_post_office_export_excel(df, out_path, label, title)
+
+        # Save a copy directly in project root folder for easy user access
+        try:
+            import shutil
+            root_copy = os.path.join(HERE, filename)
+            shutil.copy2(out_path, root_copy)
+            log.info("Saved local copy of export to: %s", root_copy)
+        except Exception as e_copy:
+            log.warning("Could not save root export copy: %s", e_copy)
 
         with open(out_path, "rb") as f:
             await send_requester_document(update, context, f, filename)
@@ -5089,6 +5177,15 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             df = pd.DataFrame(post_offices)
 
+        # Ensure status and updatedAt are present if available under alternative keys
+        if 'status' not in df.columns and 'statusLabel' in df.columns:
+            df['status'] = df['statusLabel']
+        elif 'status' in df.columns:
+            df['status'] = df['status'].replace({'ACTIVE': 'In effect', 'INACTIVE': 'Out of effect'})
+
+        if 'updatedAt' not in df.columns and 'updated_at' in df.columns:
+            df['updatedAt'] = df['updated_at']
+
         # Select and rename useful columns to match management page
         col_map = {
             'code': 'Department Code',
@@ -5096,11 +5193,16 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'parentDepartmentCode': 'Branch Code',
             'branch_name': 'Branch Name',
             'type': 'Type',
+            'status': 'Status',
+            'updatedAt': 'Updated date',
             'phone': 'Phone',
         }
         # Only keep columns that exist
         keep = [c for c in col_map if c in df.columns]
         df = df[keep].rename(columns=col_map)
+
+        if 'Updated date' in df.columns:
+            df['Updated date'] = df['Updated date'].apply(_format_updated_date)
 
         # Strip code prefix from Department Name (e.g. "KAMA001 - Chamnaom" → "Chamnaom")
         if 'Department Name' in df.columns:
@@ -5195,6 +5297,15 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ws.auto_filter.ref = f"A2:{ws.cell(row=2, column=len(df.columns)).column_letter}2"
 
         wb.save(out_path)
+
+        # Save a copy directly in project root folder for easy user access
+        try:
+            import shutil
+            root_copy = os.path.join(HERE, filename)
+            shutil.copy2(out_path, root_copy)
+            log.info("Saved local copy of export to: %s", root_copy)
+        except Exception as e_copy:
+            log.warning("Could not save root export copy: %s", e_copy)
 
         with open(out_path, "rb") as f:
             await send_requester_document(
@@ -5321,6 +5432,201 @@ async def cmd_find(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await edit_or_send_requester_text(
             msg, update, context,
             f"❌ Search failed: {e}"
+        )
+
+
+@pm_required_handler
+async def cmd_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/vip <phone/name> [date] — track all bills for VIP customer with real-time status."""
+    await delete_group_command(update, context)
+    raw_args = [a.strip() for a in (context.args or []) if a.strip()]
+    if not raw_args:
+        await private_or_current_reply(
+            update,
+            context,
+            "👑 *VIP Customer Tracker*\n\n"
+            "Usage:\n"
+            "• `/vip <phone>` — Track recent bills (e.g. `/vip 06020333` or `/vip 060203333`)\n"
+            "• `/vip <phone> <DD/MM/YYYY>` — Track specific date (e.g. `/vip 06020333 08/10/2026`)\n"
+            "• `/vip <phone> all` — Track all historical dates in cache\n"
+            "• `/vip <name>` — Search by customer name (e.g. `/vip lengkimsan`)\n"
+            "• `/vip <phone> force` — Re-download fresh export data first\n\n"
+            "Example:\n"
+            "`/vip 06020333`",
+            parse_mode="Markdown",
+        )
+        return
+
+    force_refresh = any(a.lower() == "force" for a in raw_args)
+    clean_args = [a for a in raw_args if a.lower() != "force"]
+
+    if not clean_args:
+        await private_or_current_reply(
+            update, context, "Please specify a VIP phone number or name."
+        )
+        return
+
+    query = clean_args[0]
+    date_filter = clean_args[1] if len(clean_args) > 1 else None
+
+    # Status notification
+    msg = await send_requester_text(
+        update, context,
+        f"👑 Searching VIP orders for `{query}`...\nChecking live tracking statuses, please wait a moment."
+    )
+
+    try:
+        if force_refresh:
+            cfg = load_config()
+            tmpdir = _make_run_cache("vip_run")
+            stamp = datetime.now().strftime("%d.%m_%HH%M")
+            src = os.path.join(tmpdir, f"export_{stamp}.xlsx")
+            import downloader
+            downloader.download_detail(cfg["api"], src, force_refresh=True)
+
+        import vip_tracker
+        res = await asyncio.to_thread(
+            vip_tracker.track_vip_customer,
+            query=query,
+            date_filter=date_filter,
+            days_back=7
+        )
+
+        if not res.get("found"):
+            err_msg = res.get("error", f"No bills found for '{query}'.")
+            await edit_or_send_requester_text(
+                msg, update, context, f"❌ {err_msg}"
+            )
+            return
+
+        header_text = "⭐ *VIP CUSTOMER TRACKING*\n"
+        if res.get("customer_name"):
+            header_text += f"👤 *Customer:* `{res['customer_name']}`\n"
+        if res.get("customer_phone"):
+            header_text += f"📞 *Phone:* `{res['customer_phone']}`\n"
+        if res.get("customer_address"):
+            header_text += f"📍 *Location:* {res['customer_address']}\n"
+        header_text += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+        chunks = []
+        current_chunk = header_text
+
+        for dg in res["daily_groups"]:
+            dt = dg["date_str"]
+            c_cnt = dg["complete_count"]
+            r_cnt = dg["remain_count"]
+            rem_str = "1 Bill" if r_cnt == 1 else f"{r_cnt} Bills"
+
+            day_block = f"📅 *Bills on {dt}*\n"
+            for b in dg["bills"]:
+                oid = b["order_id"]
+                br = b["branch"]
+                st = b["status"]
+                br_str = f"`{br}` " if br else ""
+                day_block += f"`{oid}`  {br_str}{st}\n"
+            day_block += f"👉 *Complete {c_cnt}  Remain {rem_str}*\n\n"
+
+            if len(current_chunk) + len(day_block) > 3800:
+                chunks.append(current_chunk)
+                current_chunk = day_block
+            else:
+                current_chunk += day_block
+
+        total_summary = "━━━━━━━━━━━━━━━━━━━━━━\n"
+        total_summary += f"📊 *TOTAL:* `{res['total_bills']}` Bills | ✅ Complete: `{res['total_complete']}` | ⏳ Remain: `{res['total_remain']}`\n"
+
+        if len(current_chunk) + len(total_summary) > 3800:
+            chunks.append(current_chunk)
+            chunks.append(total_summary)
+        else:
+            current_chunk += total_summary
+            chunks.append(current_chunk)
+
+        # Send first chunk (editing the initial status message)
+        if chunks:
+            await edit_or_send_requester_text(
+                msg, update, context, chunks[0], parse_mode="Markdown"
+            )
+            # Send subsequent chunks
+            for ch in chunks[1:]:
+                await send_requester_text(update, context, ch, parse_mode="Markdown")
+
+        # Send Excel file if available
+        excel_path = res.get("excel_path")
+        if excel_path and os.path.exists(excel_path):
+            with open(excel_path, "rb") as f_excel:
+                cap = (
+                    f"📊 *VIP Shipment Report: {res.get('customer_name') or query}*\n"
+                    f"Total: {res['total_bills']} | Complete: {res['total_complete']} | Remain: {res['total_remain']}"
+                )
+                await send_requester_document(
+                    update,
+                    context,
+                    f_excel,
+                    filename=os.path.basename(excel_path),
+                    caption=cap
+                )
+
+        # Forward to registered VIP group (e.g. VIP_Lengkimsan: -5205920813)
+        target_group_id = res.get("group_id")
+        group_title = res.get("group_title", "")
+        if not target_group_id:
+            cfg = load_config()
+            vip_fwd_map = cfg.get("telegram", {}).get("vip_forward_mapping", {})
+            for k, gid in vip_fwd_map.items():
+                if k in query.lower() or query.lower() in k or k.endswith(query) or query.endswith(k):
+                    target_group_id = int(gid)
+                    break
+
+        # Fallback for 06020333 / Shop Leng Kim San
+        if not target_group_id and ("6020333" in query or "lengkimsan" in query.lower()):
+            target_group_id = -5205920813
+            group_title = "VIP_Lengkimsan"
+
+        curr_chat_id = update.effective_chat.id if update.effective_chat else None
+        no_fwd = any(a.lower() in ("nofwd", "no_fwd", "silent") for a in raw_args)
+
+        if target_group_id and not no_fwd and curr_chat_id != target_group_id:
+            sender_bot = get_group_sender_bot(context) or context.bot
+            try:
+                log.info("Forwarding VIP report to group %s (%s)...", target_group_id, group_title)
+                for ch in chunks:
+                    await safe_api_call(
+                        sender_bot.send_message,
+                        chat_id=target_group_id,
+                        text=ch,
+                        parse_mode="Markdown"
+                    )
+                    await asyncio.sleep(0.4)
+
+                if excel_path and os.path.exists(excel_path):
+                    with open(excel_path, "rb") as f_excel_fwd:
+                        cap = (
+                            f"📊 *VIP Shipment Report: {res.get('customer_name') or query}*\n"
+                            f"Total: {res['total_bills']} | Complete: {res['total_complete']} | Remain: {res['total_remain']}"
+                        )
+                        await safe_api_call(
+                            sender_bot.send_document,
+                            chat_id=target_group_id,
+                            document=f_excel_fwd,
+                            filename=os.path.basename(excel_path),
+                            caption=cap,
+                            parse_mode="Markdown"
+                        )
+
+                g_name = group_title or str(target_group_id)
+                await send_requester_text(
+                    update, context,
+                    f"✅ *Forwarded to VIP group:* `{g_name}` (`{target_group_id}`)",
+                    parse_mode="Markdown"
+                )
+            except Exception as e_fwd:
+                log.warning("Could not forward VIP report to group %s: %s", target_group_id, e_fwd)
+
+    except Exception as e:
+        log.exception("Error in /vip command: %s", e)
+        await edit_or_send_requester_text(
+            msg, update, context, f"❌ Error tracking VIP customer: {e}"
         )
 
 
@@ -9602,6 +9908,7 @@ def create_bot_app(token: str, proxy_url: str = None, is_primary: bool = True) -
     app.add_handler(CommandHandler("agents",       cmd_export_agent))
     app.add_handler(CommandHandler("exportagent",  cmd_export_agent))
     app.add_handler(CommandHandler("find",         cmd_find))
+    app.add_handler(CommandHandler("vip",          cmd_vip))
     app.add_handler(CommandHandler("assist",       cmd_assist))
     app.add_handler(CommandHandler("action",       cmd_assist))
     app.add_handler(CommandHandler("deliveryhelp", cmd_assist))
@@ -9634,6 +9941,21 @@ def create_bot_app(token: str, proxy_url: str = None, is_primary: bool = True) -
     return app
 
 
+async def _run_bot_coroutine(token: str, proxy_url: str = None, is_primary: bool = True):
+    app = create_bot_app(token, proxy_url, is_primary=is_primary)
+    await app.initialize()
+    if is_primary:
+        try:
+            await on_post_init(app)
+        except Exception as e_init:
+            log.exception("Error in on_post_init: %s", e_init)
+    await app.start()
+    await app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    # Run indefinitely
+    while True:
+        await asyncio.sleep(3600)
+
+
 def run_bot_in_thread(token: str, proxy_url: str = None, is_primary: bool = True):
     """Run a single bot instance in its own event loop thread."""
     import time
@@ -9642,11 +9964,10 @@ def run_bot_in_thread(token: str, proxy_url: str = None, is_primary: bool = True
     log.info("Bot instance running for token: %s... (primary=%s)", token[:12], is_primary)
     while True:
         try:
-            app = create_bot_app(token, proxy_url, is_primary=is_primary)
-            app.run_polling(allowed_updates=Update.ALL_TYPES, close_loop=False)
+            loop.run_until_complete(_run_bot_coroutine(token, proxy_url, is_primary))
             break
         except Exception as e:
-            log.error("Bot polling error [%s...]: %s. Restarting polling in 5s...", token[:12], e)
+            log.error("Bot polling error [%s...]: %s. Restarting in 5s...", token[:12], e)
             time.sleep(5)
 
 

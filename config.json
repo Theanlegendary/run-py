@@ -18,6 +18,11 @@
         -1004391592278
       ]
     },
+    "vip_forward_mapping": {
+      "060203333": -5205920813,
+      "06020333": -5205920813,
+      "lengkimsan": -5205920813
+    },
     "forward_mapping": {
       "-1003929665530": [
         "PNPP001"
@@ -785,7 +790,8 @@
       "title": "🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT",
       "hours": [
         "08:00",
-        "14:00"
+        "14:00",
+        "16:00"
       ],
       "reports": [
         "total_pending"
@@ -796,7 +802,8 @@
       "title": "🔴 QUALITY - METFONE EXPRESS",
       "hours": [
         "08:00",
-        "14:00"
+        "14:00",
+        "16:00"
       ],
       "reports": [
         "total_pending"
@@ -807,7 +814,8 @@
       "title": "MEGA HUB",
       "hours": [
         "08:00",
-        "14:00"
+        "14:00",
+        "16:00"
       ],
       "reports": [
         "total_mega"
@@ -817,7 +825,7 @@
       "chat_id": 0,
       "title": "All Branches & Zones (Operational Push)",
       "hours": [
-        "08:00",
+        "08:30",
         "14:00"
       ],
       "reports": [

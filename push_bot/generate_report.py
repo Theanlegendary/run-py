@@ -1152,7 +1152,8 @@ def generate_reports_from_data(export_path, ref_path, output_dir,
     completed_from_sync = set()
     try:
         from shipped_filter import filter_shipped_bills_from_df
-        df, removed_shipped = filter_shipped_bills_from_df(df, verify_live=True)
+        # verify_live=False uses fast cached shipped bills and explicit status filtering (0.1s instead of 15+ mins)
+        df, removed_shipped = filter_shipped_bills_from_df(df, verify_live=False)
         if removed_shipped:
             completed_from_sync.update(removed_shipped)
     except Exception as e_shipped:

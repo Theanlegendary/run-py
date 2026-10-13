@@ -18,6 +18,11 @@
         -1004391592278
       ]
     },
+    "vip_forward_mapping": {
+      "060203333": -5205920813,
+      "06020333": -5205920813,
+      "lengkimsan": -5205920813
+    },
     "forward_mapping": {
       "-1003929665530": [
         "PNPP001"
@@ -816,7 +821,6 @@
         "total_mega"
       ]
     },
-
     {
       "chat_id": 0,
       "title": "All Branches & Zones (Operational Push)",

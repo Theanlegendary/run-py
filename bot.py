@@ -1317,26 +1317,26 @@ async def run_pending_auto_scheduler(app: Application):
         {
             "chat_id": -1003964504795,
             "title": "🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT",
-            "hours": ["08:00", "14:00"],
+            "hours": ["08:00", "14:00", "16:00"],
             "reports": ["total_pending"],
         },
         {
             "chat_id": -5481716194,
             "title": "🔴 QUALITY - METFONE EXPRESS",
-            "hours": ["08:00", "14:00"],
+            "hours": ["08:00", "14:00", "16:00"],
             "reports": ["total_pending"],
         },
         {
             "chat_id": -1004493373354,
             "title": "MEGA HUB",
-            "hours": ["08:00", "14:00"],
+            "hours": ["08:00", "14:00", "16:00"],
             "reports": ["total_mega"],
         },
 
         {
             "chat_id": 0,
             "title": "All Branches & Zones (Operational Push)",
-            "hours": ["08:00", "14:00"],
+            "hours": ["08:30", "14:00"],
             "reports": ["push"],
         },
     ]
@@ -1369,10 +1369,15 @@ async def run_pending_auto_scheduler(app: Application):
                 continue
 
             SCHEDULED_TARGETS = cfg.get("scheduled_targets") or DEFAULT_SCHEDULED_TARGETS
-            ALL_SCHEDULED_HOURS = sorted(list(set(["08:00", "14:00"]).union(*(t.get("hours", []) for t in SCHEDULED_TARGETS))))
+            ALL_SCHEDULED_HOURS = sorted(list(set(["08:00", "08:30", "11:00", "14:00", "15:00", "16:00"]).union(*(t.get("hours", []) for t in SCHEDULED_TARGETS))))
 
             now = datetime.now()
             date_str = now.strftime("%Y-%m-%d")
+            state = _load_state()
+            is_forced = bool(state.get("force_run", False))
+            is_forced_speed = bool(state.get("force_speed", False))
+            is_forced_push = bool(state.get("force_push", False))
+            completed_slots = set(state.get("completed_slots", []))
 
             # Determine all slots whose scheduled time has arrived today
             past_slots = []
@@ -1380,23 +1385,38 @@ async def run_pending_auto_scheduler(app: Application):
                 sh, sm = map(int, slot.split(":"))
                 slot_time_today = now.replace(hour=sh, minute=sm, second=0, microsecond=0)
                 if now >= slot_time_today:
-                    past_slots.append(slot)
-
-            state = _load_state()
-            is_forced = bool(state.get("force_run", False))
-            is_forced_speed = bool(state.get("force_speed", False))
-            is_forced_push = bool(state.get("force_push", False))
+                    slot_key = f"{date_str}_{slot.replace(':', '')}"
+                    # Auto-expire slots that passed more than 30 minutes ago (avoid late morning catch-up runs)
+                    age_secs = (now - slot_time_today).total_seconds()
+                    if age_secs > 30 * 60 and not (is_forced or is_forced_speed or is_forced_push):
+                        if slot_key not in completed_slots:
+                            completed_slots.add(slot_key)
+                            state.setdefault("completed_slots", []).append(slot_key)
+                            _save_state(state)
+                            log.info("Auto-schedule: Slot %s is >30m in the past (%s). Expired & skipped catch-up.", slot, now.strftime('%H:%M:%S'))
+                    else:
+                        past_slots.append(slot)
 
             if not past_slots and not is_forced and not is_forced_speed and not is_forced_push:
-                # No scheduled slot reached yet today (e.g. before 08:00)
+                # No scheduled slot reached yet today (e.g. before 08:00 or all past expired)
                 await asyncio.sleep(15)
                 continue
 
-            # The latest scheduled slot that has been reached today (or default to first if forced)
-            slot_time = past_slots[-1] if past_slots else ALL_SCHEDULED_HOURS[0]
+            # Find all past slots whose time arrived today but have not yet completed
+            pending_past_slots = [
+                s for s in past_slots
+                if f"{date_str}_{s.replace(':', '')}" not in completed_slots
+            ]
+
+            if not pending_past_slots and not is_forced and not is_forced_speed and not is_forced_push:
+                # All past slots for today have already completed
+                await asyncio.sleep(15)
+                continue
+
+            # Pick the earliest pending slot so reports execute in chronological order
+            slot_time = pending_past_slots[0] if pending_past_slots else (past_slots[-1] if past_slots else ALL_SCHEDULED_HOURS[0])
             current_slot = f"{date_str}_{slot_time.replace(':', '')}"
 
-            completed_slots = set(state.get("completed_slots", []))
             if not is_forced and not is_forced_speed and not is_forced_push and (state.get("last_run_slot") == current_slot or current_slot in completed_slots):
                 await asyncio.sleep(15)
                 continue
@@ -1417,9 +1437,9 @@ async def run_pending_auto_scheduler(app: Application):
             else:
                 active_targets = [t for t in SCHEDULED_TARGETS if slot_time in t.get("hours", [])]
 
-            if not active_targets and (slot_time in ("08:00", "14:00") or is_forced_push):
+            if not active_targets and (slot_time in ("08:30", "14:00") or is_forced_push):
                 active_targets = [
-                    {"chat_id": 0, "title": "All Branches & Zones (Operational Push)", "hours": ["08:00", "14:00"], "reports": ["push"]}
+                    {"chat_id": 0, "title": "All Branches & Zones (Operational Push)", "hours": ["08:30", "14:00"], "reports": ["push"]}
                 ]
 
             if not active_targets:
@@ -1436,9 +1456,12 @@ async def run_pending_auto_scheduler(app: Application):
             try:
                 await asyncio.to_thread(downloader.download_detail, cfg["api"], src, force_refresh=True)
 
-                is_speed_slot = is_forced_speed
-                is_push_slot = (slot_time in ("08:00", "14:00")) or is_forced_push
-                needs_speed = is_forced_speed  # only run speed when manually forced, never in auto-schedule
+                is_speed_slot = (slot_time in ("11:00", "15:00")) or is_forced_speed
+                is_push_slot = (slot_time in ("08:30", "14:00")) or is_forced_push
+                needs_speed = any(
+                    "speed_all" in t.get("reports", []) or "speed" in t.get("reports", [])
+                    for t in active_targets
+                ) or is_speed_slot
 
                 needs_push = any(
                     "push" in t.get("reports", [])
@@ -2133,6 +2156,17 @@ async def run_daily_report_auto_scheduler(app: Application):
         await asyncio.sleep(20)
 
 
+_auto_scheduler_task = None
+
+def ensure_scheduler_running(app: Application):
+    """Ensure the background pending auto-scheduler task is actively running."""
+    global _auto_scheduler_task
+    if _auto_scheduler_task is None or _auto_scheduler_task.done():
+        log.info("▶ Spawning background auto-scheduler task (run_pending_auto_scheduler)...")
+        _auto_scheduler_task = asyncio.create_task(run_pending_auto_scheduler(app))
+    return _auto_scheduler_task
+
+
 async def on_post_init(app: Application):
     """Start background tasks on bot startup."""
     cfg = load_config()
@@ -2144,7 +2178,7 @@ async def on_post_init(app: Application):
     else:
         log.info("✅ Auto-Schedule is ACTIVE on startup.")
 
-    asyncio.create_task(run_pending_auto_scheduler(app))
+    ensure_scheduler_running(app)
     sched_cfg = cfg.get("daily_report_schedule") or cfg.get("telegram", {}).get("daily_report_schedule", {})
     if sched_cfg.get("enabled", False):
         asyncio.create_task(run_daily_report_auto_scheduler(app))
@@ -2170,20 +2204,24 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if sub in ("on", "enable", "resume", "start"):
         cfg["telegram"]["paused"] = False
         save_config(cfg)
+        ensure_scheduler_running(context.application)
         msg = (
-            "✅ *Auto-Schedule ENABLED (2 Slots / Day)*\n"
+            "✅ *Auto-Schedule ENABLED (6 Slots / Day)*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "• Morning:\n"
-            "  - 08:00: Operational Push + /total pending & /total mega\n"
+            "  - 08:00: /total pending & /total mega\n"
+            "  - 08:30: Operational Push (All Branches & Zones)\n"
+            "  - 11:00: /speed all (Delivery Speed SLA)\n"
             "• Afternoon:\n"
             "  - 14:00: Operational Push + /total pending & /total mega\n"
+            "  - 15:00 (3:00 PM): /speed all (Delivery Speed SLA)\n"
+            "  - 16:00: /total pending & /total mega\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "• Note: /speed all is manual only (not in auto-schedule)\n"
             "• Targets:\n"
             "  - 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
             "  - 🔴 QUALITY - METFONE EXPRESS (-5481716194)\n"
             "  - MEGA HUB (-1004493373354)\n"
-            "  - All Branch Groups & 5 Zone Groups (Operational Push)\n"
+            "  - All Branch Groups & 5 Zone Groups (Push & Speed SLA)\n"
             "• Status: Active in background"
         )
     elif sub in ("off", "pause", "stop", "disable"):
@@ -2197,6 +2235,7 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Use `/schedule on` or `/resume` to re-enable."
         )
     elif sub in ("run", "now", "force", "speed", "speedall", "speed_all", "push"):
+        ensure_scheduler_running(context.application)
         force_speed = sub in ("speed", "speedall", "speed_all") or any(a.lower() in ("speed", "speed_all", "speedall") for a in args[1:])
         force_push = sub == "push" or any(a.lower() == "push" for a in args[1:])
         # Reset state so scheduler triggers current slot immediately
@@ -2229,7 +2268,7 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if force_push:
             msg = "🚀 Triggering scheduled operational push (all branches & zones) now..."
         elif force_speed:
-            msg = "🚀 Triggering manual /speed all report now..."
+            msg = "🚀 Triggering scheduled /speed all report now..."
         else:
             msg = "🚀 Triggering scheduled reports (/total pending & /total mega) now..."
     else:
@@ -2239,22 +2278,25 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📅 *Auto-Schedule Status: {status_str}*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "• Morning:\n"
-            "  - 08:00: Operational Push + /total pending & /total mega\n"
+            "  - 08:00: /total pending & /total mega\n"
+            "  - 08:30: Operational Push (All Branches & Zones)\n"
+            "  - 11:00: /speed all (Delivery Speed SLA)\n"
             "• Afternoon:\n"
             "  - 14:00: Operational Push + /total pending & /total mega\n"
+            "  - 15:00 (3:00 PM): /speed all (Delivery Speed SLA)\n"
+            "  - 16:00: /total pending & /total mega\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
-            "• Note: /speed all is manual only (not in auto-schedule)\n"
             "• Targets:\n"
             "  - 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
             "  - 🔴 QUALITY - METFONE EXPRESS (-5481716194)\n"
             "  - MEGA HUB (-1004493373354)\n"
-            "  - All Branch Groups & 5 Zone Groups (Operational Push)\n\n"
+            "  - All Branch Groups & 5 Zone Groups (Push & Speed SLA)\n\n"
             "Commands:\n"
             "• `/schedule on` — Enable schedule mode\n"
             "• `/schedule off` — Pause schedule mode\n"
             "• `/schedule run` — Run scheduled pending/mega report now\n"
             "• `/schedule run push` — Run scheduled operational push now\n"
-            "• `/speed all` — Run manual speed report whenever needed"
+            "• `/schedule run speed` — Run scheduled /speed all now"
         )
 
     await private_or_current_reply(update, context, msg, parse_mode="Markdown")
@@ -2630,6 +2672,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔎 *Search & Explorer*\n"
         "`/app` — Open interactive Data Explorer app 📱\n"
         "`/find <phone/order>` — Search order tracking by phone number or ID\n"
+        "`/vip <phone/name> [date]` — Track VIP customer bills by date with live statuses 👑\n"
         "`/ask <order_id>` — Show status, next steps & responsible scanning office\n"
         "`/statues [code]` — Show status flow/app action details\n"
         "`/qr <order_id>` — Generate a scanable QR code image for direct scanning\n"
@@ -5389,6 +5432,201 @@ async def cmd_find(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await edit_or_send_requester_text(
             msg, update, context,
             f"❌ Search failed: {e}"
+        )
+
+
+@pm_required_handler
+async def cmd_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/vip <phone/name> [date] — track all bills for VIP customer with real-time status."""
+    await delete_group_command(update, context)
+    raw_args = [a.strip() for a in (context.args or []) if a.strip()]
+    if not raw_args:
+        await private_or_current_reply(
+            update,
+            context,
+            "👑 *VIP Customer Tracker*\n\n"
+            "Usage:\n"
+            "• `/vip <phone>` — Track recent bills (e.g. `/vip 06020333` or `/vip 060203333`)\n"
+            "• `/vip <phone> <DD/MM/YYYY>` — Track specific date (e.g. `/vip 06020333 08/10/2026`)\n"
+            "• `/vip <phone> all` — Track all historical dates in cache\n"
+            "• `/vip <name>` — Search by customer name (e.g. `/vip lengkimsan`)\n"
+            "• `/vip <phone> force` — Re-download fresh export data first\n\n"
+            "Example:\n"
+            "`/vip 06020333`",
+            parse_mode="Markdown",
+        )
+        return
+
+    force_refresh = any(a.lower() == "force" for a in raw_args)
+    clean_args = [a for a in raw_args if a.lower() != "force"]
+
+    if not clean_args:
+        await private_or_current_reply(
+            update, context, "Please specify a VIP phone number or name."
+        )
+        return
+
+    query = clean_args[0]
+    date_filter = clean_args[1] if len(clean_args) > 1 else None
+
+    # Status notification
+    msg = await send_requester_text(
+        update, context,
+        f"👑 Searching VIP orders for `{query}`...\nChecking live tracking statuses, please wait a moment."
+    )
+
+    try:
+        if force_refresh:
+            cfg = load_config()
+            tmpdir = _make_run_cache("vip_run")
+            stamp = datetime.now().strftime("%d.%m_%HH%M")
+            src = os.path.join(tmpdir, f"export_{stamp}.xlsx")
+            import downloader
+            downloader.download_detail(cfg["api"], src, force_refresh=True)
+
+        import vip_tracker
+        res = await asyncio.to_thread(
+            vip_tracker.track_vip_customer,
+            query=query,
+            date_filter=date_filter,
+            days_back=7
+        )
+
+        if not res.get("found"):
+            err_msg = res.get("error", f"No bills found for '{query}'.")
+            await edit_or_send_requester_text(
+                msg, update, context, f"❌ {err_msg}"
+            )
+            return
+
+        header_text = "⭐ *VIP CUSTOMER TRACKING*\n"
+        if res.get("customer_name"):
+            header_text += f"👤 *Customer:* `{res['customer_name']}`\n"
+        if res.get("customer_phone"):
+            header_text += f"📞 *Phone:* `{res['customer_phone']}`\n"
+        if res.get("customer_address"):
+            header_text += f"📍 *Location:* {res['customer_address']}\n"
+        header_text += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+        chunks = []
+        current_chunk = header_text
+
+        for dg in res["daily_groups"]:
+            dt = dg["date_str"]
+            c_cnt = dg["complete_count"]
+            r_cnt = dg["remain_count"]
+            rem_str = "1 Bill" if r_cnt == 1 else f"{r_cnt} Bills"
+
+            day_block = f"📅 *Bills on {dt}*\n"
+            for b in dg["bills"]:
+                oid = b["order_id"]
+                br = b["branch"]
+                st = b["status"]
+                br_str = f"`{br}` " if br else ""
+                day_block += f"`{oid}`  {br_str}{st}\n"
+            day_block += f"👉 *Complete {c_cnt}  Remain {rem_str}*\n\n"
+
+            if len(current_chunk) + len(day_block) > 3800:
+                chunks.append(current_chunk)
+                current_chunk = day_block
+            else:
+                current_chunk += day_block
+
+        total_summary = "━━━━━━━━━━━━━━━━━━━━━━\n"
+        total_summary += f"📊 *TOTAL:* `{res['total_bills']}` Bills | ✅ Complete: `{res['total_complete']}` | ⏳ Remain: `{res['total_remain']}`\n"
+
+        if len(current_chunk) + len(total_summary) > 3800:
+            chunks.append(current_chunk)
+            chunks.append(total_summary)
+        else:
+            current_chunk += total_summary
+            chunks.append(current_chunk)
+
+        # Send first chunk (editing the initial status message)
+        if chunks:
+            await edit_or_send_requester_text(
+                msg, update, context, chunks[0], parse_mode="Markdown"
+            )
+            # Send subsequent chunks
+            for ch in chunks[1:]:
+                await send_requester_text(update, context, ch, parse_mode="Markdown")
+
+        # Send Excel file if available
+        excel_path = res.get("excel_path")
+        if excel_path and os.path.exists(excel_path):
+            with open(excel_path, "rb") as f_excel:
+                cap = (
+                    f"📊 *VIP Shipment Report: {res.get('customer_name') or query}*\n"
+                    f"Total: {res['total_bills']} | Complete: {res['total_complete']} | Remain: {res['total_remain']}"
+                )
+                await send_requester_document(
+                    update,
+                    context,
+                    f_excel,
+                    filename=os.path.basename(excel_path),
+                    caption=cap
+                )
+
+        # Forward to registered VIP group (e.g. VIP_Lengkimsan: -5205920813)
+        target_group_id = res.get("group_id")
+        group_title = res.get("group_title", "")
+        if not target_group_id:
+            cfg = load_config()
+            vip_fwd_map = cfg.get("telegram", {}).get("vip_forward_mapping", {})
+            for k, gid in vip_fwd_map.items():
+                if k in query.lower() or query.lower() in k or k.endswith(query) or query.endswith(k):
+                    target_group_id = int(gid)
+                    break
+
+        # Fallback for 06020333 / Shop Leng Kim San
+        if not target_group_id and ("6020333" in query or "lengkimsan" in query.lower()):
+            target_group_id = -5205920813
+            group_title = "VIP_Lengkimsan"
+
+        curr_chat_id = update.effective_chat.id if update.effective_chat else None
+        no_fwd = any(a.lower() in ("nofwd", "no_fwd", "silent") for a in raw_args)
+
+        if target_group_id and not no_fwd and curr_chat_id != target_group_id:
+            sender_bot = get_group_sender_bot(context) or context.bot
+            try:
+                log.info("Forwarding VIP report to group %s (%s)...", target_group_id, group_title)
+                for ch in chunks:
+                    await safe_api_call(
+                        sender_bot.send_message,
+                        chat_id=target_group_id,
+                        text=ch,
+                        parse_mode="Markdown"
+                    )
+                    await asyncio.sleep(0.4)
+
+                if excel_path and os.path.exists(excel_path):
+                    with open(excel_path, "rb") as f_excel_fwd:
+                        cap = (
+                            f"📊 *VIP Shipment Report: {res.get('customer_name') or query}*\n"
+                            f"Total: {res['total_bills']} | Complete: {res['total_complete']} | Remain: {res['total_remain']}"
+                        )
+                        await safe_api_call(
+                            sender_bot.send_document,
+                            chat_id=target_group_id,
+                            document=f_excel_fwd,
+                            filename=os.path.basename(excel_path),
+                            caption=cap,
+                            parse_mode="Markdown"
+                        )
+
+                g_name = group_title or str(target_group_id)
+                await send_requester_text(
+                    update, context,
+                    f"✅ *Forwarded to VIP group:* `{g_name}` (`{target_group_id}`)",
+                    parse_mode="Markdown"
+                )
+            except Exception as e_fwd:
+                log.warning("Could not forward VIP report to group %s: %s", target_group_id, e_fwd)
+
+    except Exception as e:
+        log.exception("Error in /vip command: %s", e)
+        await edit_or_send_requester_text(
+            msg, update, context, f"❌ Error tracking VIP customer: {e}"
         )
 
 
@@ -9670,6 +9908,7 @@ def create_bot_app(token: str, proxy_url: str = None, is_primary: bool = True) -
     app.add_handler(CommandHandler("agents",       cmd_export_agent))
     app.add_handler(CommandHandler("exportagent",  cmd_export_agent))
     app.add_handler(CommandHandler("find",         cmd_find))
+    app.add_handler(CommandHandler("vip",          cmd_vip))
     app.add_handler(CommandHandler("assist",       cmd_assist))
     app.add_handler(CommandHandler("action",       cmd_assist))
     app.add_handler(CommandHandler("deliveryhelp", cmd_assist))
@@ -9705,6 +9944,11 @@ def create_bot_app(token: str, proxy_url: str = None, is_primary: bool = True) -
 async def _run_bot_coroutine(token: str, proxy_url: str = None, is_primary: bool = True):
     app = create_bot_app(token, proxy_url, is_primary=is_primary)
     await app.initialize()
+    if is_primary:
+        try:
+            await on_post_init(app)
+        except Exception as e_init:
+            log.exception("Error in on_post_init: %s", e_init)
     await app.start()
     await app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
     # Run indefinitely
