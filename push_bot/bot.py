@@ -1355,7 +1355,7 @@ async def run_pending_auto_scheduler(app: Application):
             "title": "VIP_Kang Rithy",
             "hours": ["09:00", "12:00", "15:00", "17:00"],
             "reports": ["vip"],
-            "query": "067620062",
+            "query": "0962752464",
         },
     ]
     state_file = os.path.join(HERE, "pending_schedule_state.json")
@@ -2325,12 +2325,12 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "  - 08:30: Operational Push (All Branches & Zones)\n"
             "  - 09:00: VIP Tracking (06020333 → VIP_Lengkimsan)\n"
             "  - 11:00: /speed all (Delivery Speed SLA)\n"
-            "  - 12:00: VIP Tracking (06020333 & 067620062)\n"
+            "  - 12:00: VIP Tracking (06020333 & 0962752464)\n"
             "• Afternoon:\n"
             "  - 14:00: Operational Push + /total pending & /total mega\n"
             "  - 15:00 (3:00 PM): /speed all + VIP Tracking\n"
             "  - 16:00: /total pending & /total mega\n"
-            "  - 17:00 (5:00 PM): VIP Tracking (06020333 & 067620062)\n"
+            "  - 17:00 (5:00 PM): VIP Tracking (06020333 & 0962752464)\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "• Targets:\n"
             "  - 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
@@ -2407,7 +2407,7 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "  - 14:00: Operational Push + /total pending & /total mega\n"
             "  - 15:00 (3:00 PM): /speed all + VIP Tracking\n"
             "  - 16:00: /total pending & /total mega\n"
-            "  - 17:00 (5:00 PM): VIP Tracking (06020333 & 067620062)\n"
+            "  - 17:00 (5:00 PM): VIP Tracking (06020333 & 0962752464)\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "• Targets:\n"
             "  - 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
@@ -5709,7 +5709,7 @@ async def cmd_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if "6020333" in query or "lengkimsan" in query.lower():
                 target_group_id = -5205920813
                 group_title = "VIP_Lengkimsan"
-            elif "67620062" in query or "kang rithy" in query.lower() or "kangrithy" in query.lower():
+            elif "962752464" in query or "67620062" in query or "kang rithy" in query.lower() or "kangrithy" in query.lower():
                 target_group_id = -5295202050
                 group_title = "VIP_Kang Rithy"
 
