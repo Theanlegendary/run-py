@@ -52,6 +52,10 @@ def verify_orders_in_transit_from_mega(order_ids, api_cfg=None):
             'User-Agent': 'Mozilla/5.0'
         }
         session = requests.Session()
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+        adapter = HTTPAdapter(pool_connections=35, pool_maxsize=35, max_retries=Retry(total=1, backoff_factor=0.1))
+        session.mount("https://", adapter)
         session.headers.update(headers)
         
         def check_one(oid):

@@ -243,6 +243,7 @@ logging.basicConfig(
 )
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 log = logging.getLogger("push_bot")
 
 
@@ -276,21 +277,18 @@ def track_report_dir(tmpdir: str):
 
 def _make_run_cache(name: str) -> str:
     """Return an isolated run-cache directory inside project cache/<name>/run_<ts>_<rand>.
-    Also cleans up older run directories inside cache/<name>/ that are older than 1 hour.
-    This prevents wiping directories that are actively being forwarded while avoiding
-    infinite disk accumulation.
+    USER LOGIC: Replaces previous run with the new run, keeping only the current run active
+    until the next run replaces it. This prevents disk space from accumulating duplicate 30MB+ runs.
     """
-    import shutil, uuid, time
+    import shutil, uuid
     base_dir = os.path.join(HERE, "cache", name)
     try:
         os.makedirs(base_dir, exist_ok=True)
-        # Clean up runs older than 14 hours (keeps entire working day)
-        cutoff = time.time() - 14 * 3600
+        # Immediately remove all previous runs for this report type
         for entry in os.scandir(base_dir):
             if entry.is_dir() and entry.name.startswith("run_"):
                 try:
-                    if entry.stat().st_mtime < cutoff:
-                        shutil.rmtree(entry.path, ignore_errors=True)
+                    shutil.rmtree(entry.path, ignore_errors=True)
                 except Exception:
                     pass
         run_id = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
@@ -1345,6 +1343,20 @@ async def run_pending_auto_scheduler(app: Application):
             "hours": ["08:30", "14:00"],
             "reports": ["push"],
         },
+        {
+            "chat_id": -5205920813,
+            "title": "VIP_Lengkimsan",
+            "hours": ["09:00", "12:00", "15:00", "17:00"],
+            "reports": ["vip"],
+            "query": "06020333",
+        },
+        {
+            "chat_id": -5295202050,
+            "title": "VIP_Kang Rithy",
+            "hours": ["09:00", "12:00", "15:00", "17:00"],
+            "reports": ["vip"],
+            "query": "067620062",
+        },
     ]
     state_file = os.path.join(HERE, "pending_schedule_state.json")
 
@@ -1375,7 +1387,7 @@ async def run_pending_auto_scheduler(app: Application):
                 continue
 
             SCHEDULED_TARGETS = cfg.get("scheduled_targets") or DEFAULT_SCHEDULED_TARGETS
-            ALL_SCHEDULED_HOURS = sorted(list(set(["08:00", "08:30", "11:00", "14:00", "15:00", "16:00"]).union(*(t.get("hours", []) for t in SCHEDULED_TARGETS))))
+            ALL_SCHEDULED_HOURS = sorted(list(set(["08:00", "08:30", "09:00", "11:00", "12:00", "14:00", "15:00", "16:00", "17:00"]).union(*(t.get("hours", []) for t in SCHEDULED_TARGETS))))
 
             now = datetime.now()
             date_str = now.strftime("%Y-%m-%d")
@@ -1383,6 +1395,7 @@ async def run_pending_auto_scheduler(app: Application):
             is_forced = bool(state.get("force_run", False))
             is_forced_speed = bool(state.get("force_speed", False))
             is_forced_push = bool(state.get("force_push", False))
+            is_forced_vip = bool(state.get("force_vip", False))
             completed_slots = set(state.get("completed_slots", []))
 
             # Determine all slots whose scheduled time has arrived today
@@ -1394,7 +1407,7 @@ async def run_pending_auto_scheduler(app: Application):
                     slot_key = f"{date_str}_{slot.replace(':', '')}"
                     # Auto-expire slots that passed more than 30 minutes ago (avoid late morning catch-up runs)
                     age_secs = (now - slot_time_today).total_seconds()
-                    if age_secs > 30 * 60 and not (is_forced or is_forced_speed or is_forced_push):
+                    if age_secs > 30 * 60 and not (is_forced or is_forced_speed or is_forced_push or is_forced_vip):
                         if slot_key not in completed_slots:
                             completed_slots.add(slot_key)
                             state.setdefault("completed_slots", []).append(slot_key)
@@ -1403,7 +1416,7 @@ async def run_pending_auto_scheduler(app: Application):
                     else:
                         past_slots.append(slot)
 
-            if not past_slots and not is_forced and not is_forced_speed and not is_forced_push:
+            if not past_slots and not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip:
                 # No scheduled slot reached yet today (e.g. before 08:00 or all past expired)
                 await asyncio.sleep(15)
                 continue
@@ -1414,7 +1427,7 @@ async def run_pending_auto_scheduler(app: Application):
                 if f"{date_str}_{s.replace(':', '')}" not in completed_slots
             ]
 
-            if not pending_past_slots and not is_forced and not is_forced_speed and not is_forced_push:
+            if not pending_past_slots and not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip:
                 # All past slots for today have already completed
                 await asyncio.sleep(15)
                 continue
@@ -1423,12 +1436,12 @@ async def run_pending_auto_scheduler(app: Application):
             slot_time = pending_past_slots[0] if pending_past_slots else (past_slots[-1] if past_slots else ALL_SCHEDULED_HOURS[0])
             current_slot = f"{date_str}_{slot_time.replace(':', '')}"
 
-            if not is_forced and not is_forced_speed and not is_forced_push and (state.get("last_run_slot") == current_slot or current_slot in completed_slots):
+            if not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip and (state.get("last_run_slot") == current_slot or current_slot in completed_slots):
                 await asyncio.sleep(15)
                 continue
 
             # Cooldown if this slot failed very recently (avoid tight error loop)
-            if not is_forced and not is_forced_speed and not is_forced_push and state.get("failed_slot") == current_slot:
+            if not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip and state.get("failed_slot") == current_slot:
                 last_fail = state.get("last_fail_ts", 0)
                 if (now.timestamp() - last_fail) < 120:
                     await asyncio.sleep(15)
@@ -1438,8 +1451,10 @@ async def run_pending_auto_scheduler(app: Application):
                 active_targets = [t for t in SCHEDULED_TARGETS if any("push" in r for r in t.get("reports", []))]
             elif is_forced_speed:
                 active_targets = [t for t in SCHEDULED_TARGETS if any("speed" in r for r in t.get("reports", []))]
+            elif is_forced_vip:
+                active_targets = [t for t in SCHEDULED_TARGETS if any("vip" in r for r in t.get("reports", []))]
             elif is_forced:
-                active_targets = [t for t in SCHEDULED_TARGETS if not any("speed" in r or "push" in r for r in t.get("reports", []))]
+                active_targets = [t for t in SCHEDULED_TARGETS if not any("speed" in r or "push" in r or "vip" in r for r in t.get("reports", []))]
             else:
                 active_targets = [t for t in SCHEDULED_TARGETS if slot_time in t.get("hours", [])]
 
@@ -1464,6 +1479,7 @@ async def run_pending_auto_scheduler(app: Application):
 
                 is_speed_slot = (slot_time in ("11:00", "15:00")) or is_forced_speed
                 is_push_slot = (slot_time in ("08:30", "14:00")) or is_forced_push
+                is_vip_slot = (slot_time in ("09:00", "12:00", "15:00", "17:00")) or is_forced_vip
                 needs_speed = any(
                     "speed_all" in t.get("reports", []) or "speed" in t.get("reports", [])
                     for t in active_targets
@@ -1473,6 +1489,11 @@ async def run_pending_auto_scheduler(app: Application):
                     "push" in t.get("reports", [])
                     for t in active_targets
                 ) or is_push_slot
+
+                needs_vip = any(
+                    "vip" in t.get("reports", [])
+                    for t in active_targets
+                ) or is_forced_vip
 
                 needs_total = not is_speed_slot and any(
                     "total" in t.get("reports", [])
@@ -1939,6 +1960,89 @@ async def run_pending_auto_scheduler(app: Application):
                             except Exception as e_sp_doc:
                                 log.warning("Could not send scheduled speed doc to %s (%s): %s", t_chat_id, safe_title, e_sp_doc)
 
+                    # Deliver /vip report
+                    if "vip" in t_reports:
+                        t_query = target.get("query", "06020333")
+                        try:
+                            import vip_tracker
+                            res_vip = await asyncio.to_thread(
+                                vip_tracker.track_vip_customer,
+                                query=t_query,
+                                days_back=7,
+                                export_file=src
+                            )
+                            if res_vip.get("found"):
+                                header_text = "⭐ *VIP CUSTOMER TRACKING*\n"
+                                if res_vip.get("customer_name"):
+                                    header_text += f"👤 *Customer:* `{res_vip['customer_name']}`\n"
+                                if res_vip.get("customer_phone"):
+                                    header_text += f"📞 *Phone:* `{res_vip['customer_phone']}`\n"
+                                if res_vip.get("customer_address"):
+                                    header_text += f"📍 *Location:* {res_vip['customer_address']}\n"
+                                header_text += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+                                v_chunks = []
+                                cur_ch = header_text
+                                for dg in res_vip.get("daily_groups", []):
+                                    dt = dg["date_str"]
+                                    c_cnt = dg["complete_count"]
+                                    r_cnt = dg["remain_count"]
+                                    rem_str = "1 Bill" if r_cnt == 1 else f"{r_cnt} Bills"
+                                    day_block = f"📅 *Bills on {dt}*\n"
+                                    for b in dg["bills"]:
+                                        oid = b["order_id"]
+                                        br = b["branch"]
+                                        st = b["status"]
+                                        br_str = f"`{br}` " if br else ""
+                                        day_block += f"`{oid}`  {br_str}{st}\n"
+                                    day_block += f"👉 *Complete {c_cnt}  Remain {rem_str}*\n\n"
+
+                                    if len(cur_ch) + len(day_block) > 3800:
+                                        v_chunks.append(cur_ch)
+                                        cur_ch = day_block
+                                    else:
+                                        cur_ch += day_block
+
+                                tot_summary = "━━━━━━━━━━━━━━━━━━━━━━\n"
+                                tot_summary += f"📊 *TOTAL:* `{res_vip['total_bills']}` Bills | ✅ Complete: `{res_vip['total_complete']}` | ⏳ Remain: `{res_vip['total_remain']}`\n"
+
+                                if len(cur_ch) + len(tot_summary) > 3800:
+                                    v_chunks.append(cur_ch)
+                                    v_chunks.append(tot_summary)
+                                else:
+                                    cur_ch += tot_summary
+                                    v_chunks.append(cur_ch)
+
+                                for ch in v_chunks:
+                                    await safe_api_call(
+                                        sender_bot.send_message,
+                                        chat_id=t_chat_id,
+                                        text=ch,
+                                        parse_mode="Markdown"
+                                    )
+                                    await asyncio.sleep(0.4)
+
+                                v_excel = res_vip.get("excel_path")
+                                if v_excel and os.path.exists(v_excel):
+                                    with open(v_excel, "rb") as f_vx:
+                                        cap = (
+                                            f"📊 *VIP Shipment Report: {res_vip.get('customer_name') or t_query}*\n"
+                                            f"Total: {res_vip['total_bills']} | Complete: {res_vip['total_complete']} | Remain: {res_vip['total_remain']}"
+                                        )
+                                        await safe_api_call(
+                                            sender_bot.send_document,
+                                            chat_id=t_chat_id,
+                                            document=f_vx,
+                                            filename=os.path.basename(v_excel),
+                                            caption=cap,
+                                            parse_mode="Markdown"
+                                        )
+                                log.info("Successfully delivered scheduled VIP report to %s (%s)", t_chat_id, safe_title)
+                            else:
+                                log.warning("VIP tracker found no bills for query %s for scheduled target %s", t_query, t_chat_id)
+                        except Exception as e_vip_sched:
+                            log.exception("Error sending scheduled VIP report to %s (%s): %s", t_chat_id, safe_title, e_vip_sched)
+
                 # ── 4. Forward scheduled /speed all to Zone Groups and Branch Groups ──
                 if needs_speed:
                     total_sent_zones = 0
@@ -2069,6 +2173,7 @@ async def run_pending_auto_scheduler(app: Application):
                 state.pop("force_run", None)
                 state.pop("force_speed", None)
                 state.pop("force_push", None)
+                state.pop("force_vip", None)
                 completed_slots.add(current_slot)
                 state["completed_slots"] = sorted(list(completed_slots))[-30:]
                 _save_state(state)
@@ -2080,6 +2185,7 @@ async def run_pending_auto_scheduler(app: Application):
                 state.pop("force_run", None)
                 state.pop("force_speed", None)
                 state.pop("force_push", None)
+                state.pop("force_vip", None)
                 _save_state(state)
 
         except Exception as e_loop:
@@ -2212,21 +2318,26 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_config(cfg)
         ensure_scheduler_running(context.application)
         msg = (
-            "✅ *Auto-Schedule ENABLED (6 Slots / Day)*\n"
+            "✅ *Auto-Schedule ENABLED*\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "• Morning:\n"
             "  - 08:00: /total pending & /total mega\n"
             "  - 08:30: Operational Push (All Branches & Zones)\n"
+            "  - 09:00: VIP Tracking (06020333 → VIP_Lengkimsan)\n"
             "  - 11:00: /speed all (Delivery Speed SLA)\n"
+            "  - 12:00: VIP Tracking (06020333 & 067620062)\n"
             "• Afternoon:\n"
             "  - 14:00: Operational Push + /total pending & /total mega\n"
-            "  - 15:00 (3:00 PM): /speed all (Delivery Speed SLA)\n"
+            "  - 15:00 (3:00 PM): /speed all + VIP Tracking\n"
             "  - 16:00: /total pending & /total mega\n"
+            "  - 17:00 (5:00 PM): VIP Tracking (06020333 & 067620062)\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "• Targets:\n"
             "  - 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
             "  - 🔴 QUALITY - METFONE EXPRESS (-5481716194)\n"
             "  - MEGA HUB (-1004493373354)\n"
+            "  - VIP_Lengkimsan (-5205920813)\n"
+            "  - VIP_Kang Rithy (-5295202050)\n"
             "  - All Branch Groups & 5 Zone Groups (Push & Speed SLA)\n"
             "• Status: Active in background"
         )
@@ -2240,10 +2351,11 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• Status: Paused\n\n"
             "Use `/schedule on` or `/resume` to re-enable."
         )
-    elif sub in ("run", "now", "force", "speed", "speedall", "speed_all", "push"):
+    elif sub in ("run", "now", "force", "speed", "speedall", "speed_all", "push", "vip"):
         ensure_scheduler_running(context.application)
         force_speed = sub in ("speed", "speedall", "speed_all") or any(a.lower() in ("speed", "speed_all", "speedall") for a in args[1:])
         force_push = sub == "push" or any(a.lower() == "push" for a in args[1:])
+        force_vip = sub == "vip" or any(a.lower() == "vip" for a in args[1:])
         # Reset state so scheduler triggers current slot immediately
         state_file = os.path.join(HERE, "pending_schedule_state.json")
         try:
@@ -2255,18 +2367,18 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             st.pop("last_run_slot", None)
             st.pop("completed_slots", None)
             st.pop("failed_slot", None)
+            st.pop("force_run", None)
+            st.pop("force_push", None)
+            st.pop("force_speed", None)
+            st.pop("force_vip", None)
             if force_push:
                 st["force_push"] = True
-                st.pop("force_speed", None)
-                st.pop("force_run", None)
             elif force_speed:
                 st["force_speed"] = True
-                st.pop("force_push", None)
-                st.pop("force_run", None)
+            elif force_vip:
+                st["force_vip"] = True
             else:
                 st["force_run"] = True
-                st.pop("force_push", None)
-                st.pop("force_speed", None)
             with open(state_file, "w", encoding="utf-8") as f:
                 json.dump(st, f, indent=2)
         except Exception:
@@ -2275,6 +2387,8 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = "🚀 Triggering scheduled operational push (all branches & zones) now..."
         elif force_speed:
             msg = "🚀 Triggering scheduled /speed all report now..."
+        elif force_vip:
+            msg = "🚀 Triggering scheduled VIP customer report (/vip 06020333) now..."
         else:
             msg = "🚀 Triggering scheduled reports (/total pending & /total mega) now..."
     else:
@@ -2286,23 +2400,29 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• Morning:\n"
             "  - 08:00: /total pending & /total mega\n"
             "  - 08:30: Operational Push (All Branches & Zones)\n"
+            "  - 09:00: VIP Tracking (06020333 → VIP_Lengkimsan)\n"
             "  - 11:00: /speed all (Delivery Speed SLA)\n"
+            "  - 12:00: VIP Tracking (06020333 → VIP_Lengkimsan)\n"
             "• Afternoon:\n"
             "  - 14:00: Operational Push + /total pending & /total mega\n"
-            "  - 15:00 (3:00 PM): /speed all (Delivery Speed SLA)\n"
+            "  - 15:00 (3:00 PM): /speed all + VIP Tracking\n"
             "  - 16:00: /total pending & /total mega\n"
+            "  - 17:00 (5:00 PM): VIP Tracking (06020333 & 067620062)\n"
             "━━━━━━━━━━━━━━━━━━━━━━\n"
             "• Targets:\n"
             "  - 🔴 GẤP- ĐIỀU HÀNH TỒN PHÁT (-1003964504795)\n"
             "  - 🔴 QUALITY - METFONE EXPRESS (-5481716194)\n"
             "  - MEGA HUB (-1004493373354)\n"
+            "  - VIP_Lengkimsan (-5205920813)\n"
+            "  - VIP_Kang Rithy (-5295202050)\n"
             "  - All Branch Groups & 5 Zone Groups (Push & Speed SLA)\n\n"
             "Commands:\n"
             "• `/schedule on` — Enable schedule mode\n"
             "• `/schedule off` — Pause schedule mode\n"
             "• `/schedule run` — Run scheduled pending/mega report now\n"
             "• `/schedule run push` — Run scheduled operational push now\n"
-            "• `/schedule run speed` — Run scheduled /speed all now"
+            "• `/schedule run speed` — Run scheduled /speed all now\n"
+            "• `/schedule run vip` — Run scheduled VIP report now"
         )
 
     await private_or_current_reply(update, context, msg, parse_mode="Markdown")
@@ -5584,10 +5704,14 @@ async def cmd_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     target_group_id = int(gid)
                     break
 
-        # Fallback for 06020333 / Shop Leng Kim San
-        if not target_group_id and ("6020333" in query or "lengkimsan" in query.lower()):
-            target_group_id = -5205920813
-            group_title = "VIP_Lengkimsan"
+        # Fallback for VIP groups
+        if not target_group_id:
+            if "6020333" in query or "lengkimsan" in query.lower():
+                target_group_id = -5205920813
+                group_title = "VIP_Lengkimsan"
+            elif "67620062" in query or "kang rithy" in query.lower() or "kangrithy" in query.lower():
+                target_group_id = -5295202050
+                group_title = "VIP_Kang Rithy"
 
         curr_chat_id = update.effective_chat.id if update.effective_chat else None
         no_fwd = any(a.lower() in ("nofwd", "no_fwd", "silent") for a in raw_args)
@@ -5729,9 +5853,17 @@ def _generate_branch_assist_excel(target_branch: str, out_dir: str):
         }
         api_search_url = 'https://gw-express.metfone.com.kh/tms-receiving/api/v1/orders/search'
 
+        max_w = min(len(unique_oids), 25) or 1
+        addr_session = requests.Session()
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+        addr_adapter = HTTPAdapter(pool_connections=max_w + 5, pool_maxsize=max_w + 5, max_retries=Retry(total=1, backoff_factor=0.1))
+        addr_session.mount("https://", addr_adapter)
+        addr_session.headers.update(api_hdrs)
+
         def _fetch_one_addr(o_code):
             try:
-                r = requests.get(api_search_url, headers=api_hdrs, params={'order_code': o_code}, timeout=5)
+                r = addr_session.get(api_search_url, params={'order_code': o_code}, timeout=5)
                 if r.status_code == 200:
                     sd = r.json()
                     ca = sd.get('consignee', {}).get('address', {})
@@ -5742,11 +5874,16 @@ def _generate_branch_assist_excel(target_branch: str, out_dir: str):
                 pass
             return o_code, ''
 
-        max_w = min(len(unique_oids), 25) or 1
-        with ThreadPoolExecutor(max_workers=max_w) as pool:
-            for o_code, f_addr in pool.map(_fetch_one_addr, unique_oids):
-                if f_addr:
-                    addr_map[o_code] = f_addr
+        try:
+            with ThreadPoolExecutor(max_workers=max_w) as pool:
+                for o_code, f_addr in pool.map(_fetch_one_addr, unique_oids):
+                    if f_addr:
+                        addr_map[o_code] = f_addr
+        finally:
+            try:
+                addr_session.close()
+            except Exception:
+                pass
     except Exception as e_addr:
         log.warning(f"Failed to fetch real addresses from API: {e_addr}")
 
@@ -9957,9 +10094,25 @@ async def _run_bot_coroutine(token: str, proxy_url: str = None, is_primary: bool
             log.exception("Error in on_post_init: %s", e_init)
     await app.start()
     await app.updater.start_polling(allowed_updates=Update.ALL_TYPES)
-    # Run indefinitely
-    while True:
-        await asyncio.sleep(3600)
+    try:
+        while app.updater and app.updater.running:
+            await asyncio.sleep(2)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        try:
+            if app.updater and app.updater.running:
+                await app.updater.stop()
+        except Exception:
+            pass
+        try:
+            await app.stop()
+        except Exception:
+            pass
+        try:
+            await app.shutdown()
+        except Exception:
+            pass
 
 
 def run_bot_in_thread(token: str, proxy_url: str = None, is_primary: bool = True):
