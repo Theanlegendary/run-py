@@ -1357,6 +1357,13 @@ async def run_pending_auto_scheduler(app: Application):
             "reports": ["vip"],
             "query": "0962752464",
         },
+        {
+            "chat_id": -5233726066,
+            "title": "MEGA - VEHICLE DATA",
+            "hours": ["09:00"],
+            "reports": ["total_dvc"],
+            "team_filter": "DVCMEGA",
+        },
     ]
     state_file = os.path.join(HERE, "pending_schedule_state.json")
 
@@ -1396,6 +1403,7 @@ async def run_pending_auto_scheduler(app: Application):
             is_forced_speed = bool(state.get("force_speed", False))
             is_forced_push = bool(state.get("force_push", False))
             is_forced_vip = bool(state.get("force_vip", False))
+            is_forced_dvc = bool(state.get("force_dvc", False))
             completed_slots = set(state.get("completed_slots", []))
 
             # Determine all slots whose scheduled time has arrived today
@@ -1407,7 +1415,7 @@ async def run_pending_auto_scheduler(app: Application):
                     slot_key = f"{date_str}_{slot.replace(':', '')}"
                     # Auto-expire slots that passed more than 30 minutes ago (avoid late morning catch-up runs)
                     age_secs = (now - slot_time_today).total_seconds()
-                    if age_secs > 30 * 60 and not (is_forced or is_forced_speed or is_forced_push or is_forced_vip):
+                    if age_secs > 30 * 60 and not (is_forced or is_forced_speed or is_forced_push or is_forced_vip or is_forced_dvc):
                         if slot_key not in completed_slots:
                             completed_slots.add(slot_key)
                             state.setdefault("completed_slots", []).append(slot_key)
@@ -1416,7 +1424,7 @@ async def run_pending_auto_scheduler(app: Application):
                     else:
                         past_slots.append(slot)
 
-            if not past_slots and not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip:
+            if not past_slots and not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip and not is_forced_dvc:
                 # No scheduled slot reached yet today (e.g. before 08:00 or all past expired)
                 await asyncio.sleep(15)
                 continue
@@ -1427,7 +1435,7 @@ async def run_pending_auto_scheduler(app: Application):
                 if f"{date_str}_{s.replace(':', '')}" not in completed_slots
             ]
 
-            if not pending_past_slots and not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip:
+            if not pending_past_slots and not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip and not is_forced_dvc:
                 # All past slots for today have already completed
                 await asyncio.sleep(15)
                 continue
@@ -1436,12 +1444,12 @@ async def run_pending_auto_scheduler(app: Application):
             slot_time = pending_past_slots[0] if pending_past_slots else (past_slots[-1] if past_slots else ALL_SCHEDULED_HOURS[0])
             current_slot = f"{date_str}_{slot_time.replace(':', '')}"
 
-            if not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip and (state.get("last_run_slot") == current_slot or current_slot in completed_slots):
+            if not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip and not is_forced_dvc and (state.get("last_run_slot") == current_slot or current_slot in completed_slots):
                 await asyncio.sleep(15)
                 continue
 
             # Cooldown if this slot failed very recently (avoid tight error loop)
-            if not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip and state.get("failed_slot") == current_slot:
+            if not is_forced and not is_forced_speed and not is_forced_push and not is_forced_vip and not is_forced_dvc and state.get("failed_slot") == current_slot:
                 last_fail = state.get("last_fail_ts", 0)
                 if (now.timestamp() - last_fail) < 120:
                     await asyncio.sleep(15)
@@ -1453,8 +1461,10 @@ async def run_pending_auto_scheduler(app: Application):
                 active_targets = [t for t in SCHEDULED_TARGETS if any("speed" in r for r in t.get("reports", []))]
             elif is_forced_vip:
                 active_targets = [t for t in SCHEDULED_TARGETS if any("vip" in r for r in t.get("reports", []))]
+            elif is_forced_dvc:
+                active_targets = [t for t in SCHEDULED_TARGETS if any("dvc" in r or "total_dvc" in r for r in t.get("reports", []))]
             elif is_forced:
-                active_targets = [t for t in SCHEDULED_TARGETS if not any("speed" in r or "push" in r or "vip" in r for r in t.get("reports", []))]
+                active_targets = [t for t in SCHEDULED_TARGETS if not any("speed" in r or "push" in r or "vip" in r or "dvc" in r or "total_dvc" in r for r in t.get("reports", []))]
             else:
                 active_targets = [t for t in SCHEDULED_TARGETS if slot_time in t.get("hours", [])]
 
@@ -1507,10 +1517,10 @@ async def run_pending_auto_scheduler(app: Application):
                     "total_mega" in t.get("reports", [])
                     for t in active_targets
                 )
-                needs_dvc = not is_speed_slot and any(
+                needs_dvc = (not is_speed_slot and any(
                     "total_dvc" in t.get("reports", []) or "dvc" in t.get("reports", [])
                     for t in active_targets
-                )
+                )) or is_forced_dvc
 
                 # Initialize outputs
                 summary_df, grand_total, df_detail, out_xlsx, text_caption, img_buf = None, {}, None, None, None, None
@@ -1724,15 +1734,31 @@ async def run_pending_auto_scheduler(app: Application):
                 if needs_dvc:
                     import truck_kpi_report, importlib
                     importlib.reload(truck_kpi_report)
-                    src_bc = truck_kpi_report.find_latest_bctyle_file([HERE, os.getcwd()])
+                    t_team_filter = None
+                    for t in active_targets:
+                        if "total_dvc" in t.get("reports", []) or "dvc" in t.get("reports", []):
+                            if t.get("team_filter"):
+                                t_team_filter = t.get("team_filter")
+                                break
+                            elif "MEGA" in str(t.get("title", "")).upper() or str(t.get("chat_id")) == "-5233726066":
+                                t_team_filter = "DVCMEGA"
+                                break
+
+                    exclude_dvc_gen = cfg.get("exclude_dvc_generated", True)
+                    # Day N-1 (yesterday)
+                    yest = (now - timedelta(days=1)).strftime("%d%m%Y")
+                    src_bc = truck_kpi_report.find_latest_bctyle_file([HERE, os.getcwd()], target_date_str=yest)
+                    if not src_bc:
+                        src_bc = truck_kpi_report.find_latest_bctyle_file([HERE, os.getcwd()])
                     if src_bc:
                         try:
                             dvc_xlsx, dvc_img_buf, dvc_caption, dvc_stats = await asyncio.to_thread(
-                                truck_kpi_report.generate_truck_kpi_report, src_bc, tmpdir
+                                truck_kpi_report.generate_truck_kpi_report, src_bc, tmpdir, exclude_dvc_gen, t_team_filter
                             )
                             date_tag = dvc_stats.get('date_str', 'report').replace('/', '.')
+                            tf_tag = f"_{t_team_filter}" if t_team_filter else ""
                             if dvc_img_buf:
-                                dvc_img_buf.name = f"DVC_Truck_KPI_{date_tag}.png"
+                                dvc_img_buf.name = f"DVC_Truck_KPI{tf_tag}_{date_tag}.png"
                         except Exception as e_dvc_gen:
                             log.warning("Failed generating scheduled truck/dvc report from %s: %s", src_bc, e_dvc_gen)
                     else:
@@ -2171,6 +2197,7 @@ async def run_pending_auto_scheduler(app: Application):
                 state.pop("force_speed", None)
                 state.pop("force_push", None)
                 state.pop("force_vip", None)
+                state.pop("force_dvc", None)
                 completed_slots.add(current_slot)
                 state["completed_slots"] = sorted(list(completed_slots))[-30:]
                 _save_state(state)
@@ -2183,6 +2210,7 @@ async def run_pending_auto_scheduler(app: Application):
                 state.pop("force_speed", None)
                 state.pop("force_push", None)
                 state.pop("force_vip", None)
+                state.pop("force_dvc", None)
                 _save_state(state)
 
         except Exception as e_loop:
@@ -2321,6 +2349,7 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "  - 08:00: /total pending & /total mega\n"
             "  - 08:30: Operational Push (All Branches & Zones)\n"
             "  - 09:00: VIP Tracking (06020333 → VIP_Lengkimsan)\n"
+            "  - 09:00: /total dvc (DVCMEGA → MEGA - VEHICLE DATA)\n"
             "  - 11:00: /speed all (Delivery Speed SLA)\n"
             "  - 12:00: VIP Tracking (06020333 & 0962752464)\n"
             "• Afternoon:\n"
@@ -2335,6 +2364,7 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "  - MEGA HUB (-1004493373354)\n"
             "  - VIP_Lengkimsan (-5205920813)\n"
             "  - VIP_Kang Rithy (-5295202050)\n"
+            "  - 🚛 MEGA - VEHICLE DATA (-5233726066)\n"
             "  - All Branch Groups & 5 Zone Groups (Push & Speed SLA)\n"
             "• Status: Active in background"
         )
@@ -2348,11 +2378,12 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• Status: Paused\n\n"
             "Use `/schedule on` or `/resume` to re-enable."
         )
-    elif sub in ("run", "now", "force", "speed", "speedall", "speed_all", "push", "vip"):
+    elif sub in ("run", "now", "force", "speed", "speedall", "speed_all", "push", "vip", "dvc", "truck"):
         ensure_scheduler_running(context.application)
         force_speed = sub in ("speed", "speedall", "speed_all") or any(a.lower() in ("speed", "speed_all", "speedall") for a in args[1:])
         force_push = sub == "push" or any(a.lower() == "push" for a in args[1:])
         force_vip = sub == "vip" or any(a.lower() == "vip" for a in args[1:])
+        force_dvc = sub in ("dvc", "truck") or any(a.lower() in ("dvc", "truck", "total_dvc") for a in args[1:])
         # Reset state so scheduler triggers current slot immediately
         state_file = os.path.join(HERE, "pending_schedule_state.json")
         try:
@@ -2368,12 +2399,15 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             st.pop("force_push", None)
             st.pop("force_speed", None)
             st.pop("force_vip", None)
+            st.pop("force_dvc", None)
             if force_push:
                 st["force_push"] = True
             elif force_speed:
                 st["force_speed"] = True
             elif force_vip:
                 st["force_vip"] = True
+            elif force_dvc:
+                st["force_dvc"] = True
             else:
                 st["force_run"] = True
             with open(state_file, "w", encoding="utf-8") as f:
@@ -2386,6 +2420,8 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg = "🚀 Triggering scheduled /speed all report now..."
         elif force_vip:
             msg = "🚀 Triggering scheduled VIP customer report (/vip 06020333) now..."
+        elif force_dvc:
+            msg = "🚀 Triggering scheduled DVC Truck KPI report (/total dvc) now..."
         else:
             msg = "🚀 Triggering scheduled reports (/total pending & /total mega) now..."
     else:
@@ -2398,6 +2434,7 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "  - 08:00: /total pending & /total mega\n"
             "  - 08:30: Operational Push (All Branches & Zones)\n"
             "  - 09:00: VIP Tracking (06020333 → VIP_Lengkimsan)\n"
+            "  - 09:00: /total dvc (DVCMEGA → MEGA - VEHICLE DATA)\n"
             "  - 11:00: /speed all (Delivery Speed SLA)\n"
             "  - 12:00: VIP Tracking (06020333 → VIP_Lengkimsan)\n"
             "• Afternoon:\n"
@@ -2412,6 +2449,7 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "  - MEGA HUB (-1004493373354)\n"
             "  - VIP_Lengkimsan (-5205920813)\n"
             "  - VIP_Kang Rithy (-5295202050)\n"
+            "  - 🚛 MEGA - VEHICLE DATA (-5233726066)\n"
             "  - All Branch Groups & 5 Zone Groups (Push & Speed SLA)\n\n"
             "Commands:\n"
             "• `/schedule on` — Enable schedule mode\n"
@@ -2419,7 +2457,8 @@ async def cmd_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• `/schedule run` — Run scheduled pending/mega report now\n"
             "• `/schedule run push` — Run scheduled operational push now\n"
             "• `/schedule run speed` — Run scheduled /speed all now\n"
-            "• `/schedule run vip` — Run scheduled VIP report now"
+            "• `/schedule run vip` — Run scheduled VIP report now\n"
+            "• `/schedule run dvc` — Run scheduled /total dvc report now"
         )
 
     await private_or_current_reply(update, context, msg, parse_mode="Markdown")
@@ -9819,12 +9858,29 @@ async def cmd_truck_kpi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif any(a in ("exclude", "clean", "no_gen") for a in args):
             exclude_gen = True
 
+        chat = update.effective_chat
+        is_mega_group = bool(chat and (chat.id == -5233726066 or (chat.title and "MEGA" in chat.title.upper())))
+        team_filter = None
+        if is_mega_group or any(a in ("mega", "dvcmega", "dvcmega1") for a in args):
+            team_filter = "DVCMEGA"
+        if any(a in ("all", "raw", "full", "include_all", "no_filter") for a in args):
+            team_filter = None
+
+        for a in args:
+            if a.startswith("team="):
+                team_filter = a.split("=", 1)[1].upper()
+            elif a.startswith("doi="):
+                team_filter = a.split("=", 1)[1].upper()
+            elif a.startswith("zone="):
+                team_filter = a.split("=", 1)[1].upper()
+
         out_xlsx, img_buf, caption, stats = await asyncio.to_thread(
-            truck_kpi_report.generate_truck_kpi_report, src_file, tmpdir, exclude_gen
+            truck_kpi_report.generate_truck_kpi_report, src_file, tmpdir, exclude_gen, team_filter
         )
 
         date_tag = stats.get('date_str', 'report').replace('/', '.')
-        img_buf.name = f"DVC_Truck_KPI_{date_tag}.png"
+        tf_name = f"_{team_filter}" if team_filter else ""
+        img_buf.name = f"DVC_Truck_KPI{tf_name}_{date_tag}.png"
         try:
             await send_requester_photo(update, context, img_buf, caption=caption, parse_mode="Markdown")
         except Exception as e_ph:

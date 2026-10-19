@@ -865,6 +865,17 @@
         "vip"
       ],
       "query": "0962752464"
+    },
+    {
+      "chat_id": -5233726066,
+      "title": "MEGA - VEHICLE DATA",
+      "hours": [
+        "09:00"
+      ],
+      "reports": [
+        "total_dvc"
+      ],
+      "team_filter": "DVCMEGA"
     }
   ]
 }

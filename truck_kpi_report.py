@@ -53,11 +53,12 @@ def classify_trip_type(row) -> str:
     return 'Nội tỉnh' if not raw_ht or raw_ht.lower() == 'nan' else raw_ht
 
 
-def parse_truck_kpi(source_path: str, exclude_generated: bool = True) -> dict:
+def parse_truck_kpi(source_path: str, exclude_generated: bool = True, team_filter: str = None) -> dict:
     """
     Parse BCtyleketnoidungdugio Excel or CSV file.
     Returns structured stats dict grouped by Hành trình, Tên tuyến, Biển số xe, Chiều.
     If exclude_generated is True, excludes 'Chuyến phát sinh' (Generated route) from Column G.
+    If team_filter is specified (e.g. 'DVCMEGA'), filters by Column D (Mã đội vận chuyển).
     """
     if str(source_path).lower().endswith(".csv"):
         df = pd.read_csv(source_path)
@@ -100,6 +101,23 @@ def parse_truck_kpi(source_path: str, exclude_generated: bool = True) -> dict:
         is_gen = df[gen_col].astype(str).str.strip().str.lower().isin(['có', 'co', 'yes', 'true', '1'])
         excluded_gen_count = int(is_gen.sum())
         df = df[~is_gen].copy()
+
+    # ── Filter by transportation team (Mã đội vận chuyển) if requested ──
+    filtered_team_count = 0
+    if team_filter:
+        team_col = None
+        for col in df.columns:
+            c_clean = str(col).strip().lower()
+            if "đội vận chuyển" in c_clean or "doi van chuyen" in c_clean or "mã đội" in c_clean or "ma doi" in c_clean:
+                team_col = col
+                break
+        if team_col is None and len(df.columns) > 3:
+            team_col = df.columns[3]
+        if team_col and team_col in df.columns:
+            tf = str(team_filter).upper().strip()
+            is_team = df[team_col].astype(str).str.upper().str.contains(tf, na=False)
+            filtered_team_count = int(is_team.sum())
+            df = df[is_team].copy()
 
     # Assign trip type (Hành trình)
     df['Hành trình'] = df.apply(classify_trip_type, axis=1)
@@ -193,6 +211,8 @@ def parse_truck_kpi(source_path: str, exclude_generated: bool = True) -> dict:
         "trucks": dict(trucks),
         "routes": dict(routes),
         "excluded_gen_count": excluded_gen_count,
+        "team_filter": team_filter,
+        "filtered_team_count": filtered_team_count,
         "df_clean": df,
     }
 
@@ -238,7 +258,8 @@ def export_truck_kpi_workbook(stats: dict, out_xlsx: str, source_path: str = Non
     # Row 1: Title Banner with Current Date & Time Remark
     date_str = stats.get("date_str") or datetime.now().strftime("%d/%m/%Y")
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
-    title_text = f"🚚 BÁO CÁO TỶ LỆ KẾT NỐI XE TẢI (DVC & TRUCK KPI) — NGÀY: {date_str} (Cập nhật: {now_str})"
+    tf_tag = f" ({stats['team_filter']})" if stats.get("team_filter") else " (DVC & TRUCK KPI)"
+    title_text = f"📊 BÁO CÁO TỶ LỆ KẾT NỐI XE TẢI{tf_tag} - NGÀY: {date_str} (Cập nhật: {now_str})"
 
     ws.merge_cells("A1:I1")
     t_cell = ws.cell(1, 1, title_text)
@@ -405,12 +426,17 @@ def build_telegram_caption(stats: dict) -> str:
     tot_le30 = stats["total_le30"]
     tot_gt30 = stats["total_gt30"]
     ex_gen = stats.get("excluded_gen_count", 0)
+    tf = stats.get("team_filter")
 
+    tf_title = f" ({tf})" if tf else " (DVC & TRUCK KPI)"
     lines = [
-        f"🚚 *BÁO CÁO TỶ LỆ KẾT NỐI XE TẢI (DVC & TRUCK KPI)*",
+        f"🚚 *BÁO CÁO TỶ LỆ KẾT NỐI XE TẢI{tf_title}*",
         f"📅 *Ngày*: `{date_str}` | ⏰ *Cập nhật*: `{now_str}`",
-        f"📊 *Chỉ số Đúng/Sai Giờ theo Tuyến & Loại Hành Trình*",
     ]
+    if tf:
+        lines.append(f"🎯 *Đội xe*: `{tf}` (Đã lọc chỉ lấy đội này)")
+    lines.append(f"📊 *Chỉ số Đúng/Sai Giờ theo Tuyến & Loại Hành Trình*")
+
     if ex_gen > 0:
         lines.append(f"ℹ️ _(Đã loại trừ `{ex_gen}` chuyến phát sinh / generated route từ Cột G)_\n")
     else:
@@ -460,10 +486,11 @@ def build_telegram_caption(stats: dict) -> str:
     return res
 
 
-def find_latest_bctyle_file(extra_dirs=None) -> str:
+def find_latest_bctyle_file(extra_dirs=None, target_date_str: str = None) -> str:
     """
     Find the most recently modified BCtyleketnoidungdugio file across all common locations:
     project root, Downloads/Telegram Desktop, Downloads, Desktop, cache, etc.
+    If target_date_str is given (e.g. '18102026' or '18.10'), prioritizes matching file.
     Runs instantaneously by checking specific directories.
     """
     import glob
@@ -494,25 +521,35 @@ def find_latest_bctyle_file(extra_dirs=None) -> str:
 
     if not found:
         return None
+
+    # If target_date_str is provided, look for exact date match first
+    if target_date_str:
+        clean_target = target_date_str.replace("/", "").replace("-", "").replace(".", "")
+        date_matches = [f for f in found if clean_target in os.path.basename(f)]
+        if date_matches:
+            return sorted(date_matches, key=os.path.getmtime, reverse=True)[0]
+
     return sorted(found, key=os.path.getmtime, reverse=True)[0]
 
 
-def generate_truck_kpi_report(source_path: str = None, out_dir: str = None, exclude_generated: bool = True):
+def generate_truck_kpi_report(source_path: str = None, out_dir: str = None, exclude_generated: bool = True, team_filter: str = None, target_date_str: str = None):
     """
     Main entry point: parses Excel, generates dashboard workbook,
     renders image, and returns paths and Telegram caption.
     If exclude_generated is True, excludes 'Chuyến phát sinh' (Column G = Có).
+    If team_filter is specified (e.g. 'DVCMEGA'), includes only that team.
     """
     if not source_path:
-        source_path = find_latest_bctyle_file()
+        source_path = find_latest_bctyle_file(target_date_str=target_date_str)
     if not source_path or not os.path.exists(source_path):
         raise FileNotFoundError(f"BCtyle source file not found: {source_path}")
 
     if not out_dir:
         out_dir = "."
-    stats = parse_truck_kpi(source_path, exclude_generated=exclude_generated)
+    stats = parse_truck_kpi(source_path, exclude_generated=exclude_generated, team_filter=team_filter)
     stamp = datetime.now().strftime("%d.%m_%HH%M")
-    out_xlsx = os.path.join(out_dir, f"Truck_KPI_Report_{stamp}.xlsx")
+    tf_tag = f"_{team_filter}" if team_filter else ""
+    out_xlsx = os.path.join(out_dir, f"Truck_KPI_Report{tf_tag}_{stamp}.xlsx")
     export_truck_kpi_workbook(stats, out_xlsx, source_path=source_path)
 
     img_buf = excel_to_image.excel_to_image(out_xlsx)
