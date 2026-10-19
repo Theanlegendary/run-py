@@ -1724,17 +1724,8 @@ async def run_pending_auto_scheduler(app: Application):
                 if needs_dvc:
                     import truck_kpi_report, importlib
                     importlib.reload(truck_kpi_report)
-                    import glob
-
-                    user_dl = os.path.expanduser("~/Downloads/BCtyle*.xlsx")
-                    user_dt = os.path.expanduser("~/Desktop/BCtyle*.xlsx")
-                    candidates = sorted(
-                        glob.glob(user_dl) + glob.glob(user_dt) + glob.glob("BCtyle*.xlsx") + glob.glob("cache/**/BCtyle*.xlsx", recursive=True),
-                        key=os.path.getmtime,
-                        reverse=True
-                    )
-                    if candidates:
-                        src_bc = candidates[0]
+                    src_bc = truck_kpi_report.find_latest_bctyle_file([HERE, os.getcwd()])
+                    if src_bc:
                         try:
                             dvc_xlsx, dvc_img_buf, dvc_caption, dvc_stats = await asyncio.to_thread(
                                 truck_kpi_report.generate_truck_kpi_report, src_bc, tmpdir
@@ -1802,6 +1793,93 @@ async def run_pending_auto_scheduler(app: Application):
                     t_title = target.get("title", "")
                     safe_title = str(t_title).encode('ascii', 'replace').decode('ascii')
                     t_reports = target.get("reports", ["total", "total_pending"])
+
+                    # Deliver VIP customer tracking reports (VIP groups ONLY receive their customer orders!)
+                    is_vip_target = "vip" in t_reports or str(t_title).upper().startswith("VIP")
+                    if is_vip_target:
+                        if "vip" in t_reports:
+                            t_query = target.get("query", "06020333")
+                            try:
+                                import vip_tracker
+                                res_vip = await asyncio.to_thread(
+                                    vip_tracker.track_vip_customer,
+                                    query=t_query,
+                                    days_back=7,
+                                    export_file=src
+                                )
+                                if res_vip.get("found"):
+                                    header_text = "⭐ *VIP CUSTOMER TRACKING*\n"
+                                    if res_vip.get("customer_name"):
+                                        header_text += f"👤 *Customer:* `{res_vip['customer_name']}`\n"
+                                    if res_vip.get("customer_phone"):
+                                        header_text += f"📞 *Phone:* `{res_vip['customer_phone']}`\n"
+                                    if res_vip.get("customer_address"):
+                                        header_text += f"📍 *Location:* {res_vip['customer_address']}\n"
+                                    header_text += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+                                    v_chunks = []
+                                    cur_ch = header_text
+                                    for dg in res_vip.get("daily_groups", []):
+                                        dt = dg["date_str"]
+                                        c_cnt = dg["complete_count"]
+                                        r_cnt = dg["remain_count"]
+                                        rem_str = "1 Bill" if r_cnt == 1 else f"{r_cnt} Bills"
+                                        day_block = f"📅 *Bills on {dt}*\n"
+                                        for b in dg["bills"]:
+                                            oid = b["order_id"]
+                                            br = b["branch"]
+                                            st = b["status"]
+                                            br_str = f"`{br}` " if br else ""
+                                            day_block += f"`{oid}`  {br_str}{st}\n"
+                                        day_block += f"👉 *Complete {c_cnt}  Remain {rem_str}*\n\n"
+
+                                        if len(cur_ch) + len(day_block) > 3800:
+                                            v_chunks.append(cur_ch)
+                                            cur_ch = day_block
+                                        else:
+                                            cur_ch += day_block
+
+                                    tot_summary = "━━━━━━━━━━━━━━━━━━━━━━\n"
+                                    tot_summary += f"📊 *TOTAL:* `{res_vip['total_bills']}` Bills | ✅ Complete: `{res_vip['total_complete']}` | ⏳ Remain: `{res_vip['total_remain']}`\n"
+
+                                    if len(cur_ch) + len(tot_summary) > 3800:
+                                        v_chunks.append(cur_ch)
+                                        v_chunks.append(tot_summary)
+                                    else:
+                                        cur_ch += tot_summary
+                                        v_chunks.append(cur_ch)
+
+                                    for ch in v_chunks:
+                                        await safe_api_call(
+                                            sender_bot.send_message,
+                                            chat_id=t_chat_id,
+                                            text=ch,
+                                            parse_mode="Markdown"
+                                        )
+                                        await asyncio.sleep(0.4)
+
+                                    v_excel = res_vip.get("excel_path")
+                                    if v_excel and os.path.exists(v_excel):
+                                        with open(v_excel, "rb") as f_vx:
+                                            cap = (
+                                                f"📊 *VIP Shipment Report: {res_vip.get('customer_name') or t_query}*\n"
+                                                f"Total: {res_vip['total_bills']} | Complete: {res_vip['total_complete']} | Remain: {res_vip['total_remain']}"
+                                            )
+                                            await safe_api_call(
+                                                sender_bot.send_document,
+                                                chat_id=t_chat_id,
+                                                document=f_vx,
+                                                filename=os.path.basename(v_excel),
+                                                caption=cap,
+                                                parse_mode="Markdown"
+                                            )
+                                    log.info("Successfully delivered scheduled VIP report to %s (%s)", t_chat_id, safe_title)
+                                else:
+                                    log.warning("VIP tracker found no bills for query %s for scheduled target %s", t_query, t_chat_id)
+                            except Exception as e_vip_sched:
+                                log.exception("Error sending scheduled VIP report to %s (%s): %s", t_chat_id, safe_title, e_vip_sched)
+                        # VIP target finished: strictly skip all company reports
+                        continue
 
                     # Deliver /total mega
                     if "total_mega" in t_reports:
@@ -1930,8 +2008,8 @@ async def run_pending_auto_scheduler(app: Application):
                             except Exception as e_dvc_doc:
                                 log.warning("Could not send scheduled dvc excel to %s (%s): %s", t_chat_id, safe_title, e_dvc_doc)
 
-                    # Deliver /speed all to target groups
-                    if "speed_all" in t_reports or "speed" in t_reports or (needs_speed and is_speed_slot):
+                    # Deliver /speed all to target groups (strictly excluding VIP customer targets)
+                    if not is_vip_target and ("speed_all" in t_reports or "speed" in t_reports or (needs_speed and is_speed_slot)):
                         if img_speed_buf is not None:
                             try:
                                 if hasattr(img_speed_buf, "seek"):
@@ -1960,88 +2038,7 @@ async def run_pending_auto_scheduler(app: Application):
                             except Exception as e_sp_doc:
                                 log.warning("Could not send scheduled speed doc to %s (%s): %s", t_chat_id, safe_title, e_sp_doc)
 
-                    # Deliver /vip report
-                    if "vip" in t_reports:
-                        t_query = target.get("query", "06020333")
-                        try:
-                            import vip_tracker
-                            res_vip = await asyncio.to_thread(
-                                vip_tracker.track_vip_customer,
-                                query=t_query,
-                                days_back=7,
-                                export_file=src
-                            )
-                            if res_vip.get("found"):
-                                header_text = "⭐ *VIP CUSTOMER TRACKING*\n"
-                                if res_vip.get("customer_name"):
-                                    header_text += f"👤 *Customer:* `{res_vip['customer_name']}`\n"
-                                if res_vip.get("customer_phone"):
-                                    header_text += f"📞 *Phone:* `{res_vip['customer_phone']}`\n"
-                                if res_vip.get("customer_address"):
-                                    header_text += f"📍 *Location:* {res_vip['customer_address']}\n"
-                                header_text += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
-                                v_chunks = []
-                                cur_ch = header_text
-                                for dg in res_vip.get("daily_groups", []):
-                                    dt = dg["date_str"]
-                                    c_cnt = dg["complete_count"]
-                                    r_cnt = dg["remain_count"]
-                                    rem_str = "1 Bill" if r_cnt == 1 else f"{r_cnt} Bills"
-                                    day_block = f"📅 *Bills on {dt}*\n"
-                                    for b in dg["bills"]:
-                                        oid = b["order_id"]
-                                        br = b["branch"]
-                                        st = b["status"]
-                                        br_str = f"`{br}` " if br else ""
-                                        day_block += f"`{oid}`  {br_str}{st}\n"
-                                    day_block += f"👉 *Complete {c_cnt}  Remain {rem_str}*\n\n"
-
-                                    if len(cur_ch) + len(day_block) > 3800:
-                                        v_chunks.append(cur_ch)
-                                        cur_ch = day_block
-                                    else:
-                                        cur_ch += day_block
-
-                                tot_summary = "━━━━━━━━━━━━━━━━━━━━━━\n"
-                                tot_summary += f"📊 *TOTAL:* `{res_vip['total_bills']}` Bills | ✅ Complete: `{res_vip['total_complete']}` | ⏳ Remain: `{res_vip['total_remain']}`\n"
-
-                                if len(cur_ch) + len(tot_summary) > 3800:
-                                    v_chunks.append(cur_ch)
-                                    v_chunks.append(tot_summary)
-                                else:
-                                    cur_ch += tot_summary
-                                    v_chunks.append(cur_ch)
-
-                                for ch in v_chunks:
-                                    await safe_api_call(
-                                        sender_bot.send_message,
-                                        chat_id=t_chat_id,
-                                        text=ch,
-                                        parse_mode="Markdown"
-                                    )
-                                    await asyncio.sleep(0.4)
-
-                                v_excel = res_vip.get("excel_path")
-                                if v_excel and os.path.exists(v_excel):
-                                    with open(v_excel, "rb") as f_vx:
-                                        cap = (
-                                            f"📊 *VIP Shipment Report: {res_vip.get('customer_name') or t_query}*\n"
-                                            f"Total: {res_vip['total_bills']} | Complete: {res_vip['total_complete']} | Remain: {res_vip['total_remain']}"
-                                        )
-                                        await safe_api_call(
-                                            sender_bot.send_document,
-                                            chat_id=t_chat_id,
-                                            document=f_vx,
-                                            filename=os.path.basename(v_excel),
-                                            caption=cap,
-                                            parse_mode="Markdown"
-                                        )
-                                log.info("Successfully delivered scheduled VIP report to %s (%s)", t_chat_id, safe_title)
-                            else:
-                                log.warning("VIP tracker found no bills for query %s for scheduled target %s", t_query, t_chat_id)
-                        except Exception as e_vip_sched:
-                            log.exception("Error sending scheduled VIP report to %s (%s): %s", t_chat_id, safe_title, e_vip_sched)
 
                 # ── 4. Forward scheduled /speed all to Zone Groups and Branch Groups ──
                 if needs_speed:
@@ -9790,17 +9787,8 @@ async def cmd_truck_kpi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         import truck_kpi_report, importlib
         importlib.reload(truck_kpi_report)
-        import glob
-
-        # Look for BCtyle file in Downloads, Desktop, workspace or cache
-        user_dl = os.path.expanduser("~/Downloads/BCtyle*.xlsx")
-        user_dt = os.path.expanduser("~/Desktop/BCtyle*.xlsx")
-        candidates = sorted(
-            glob.glob(user_dl) + glob.glob(user_dt) + glob.glob("BCtyle*.xlsx") + glob.glob("cache/**/BCtyle*.xlsx", recursive=True),
-            key=os.path.getmtime,
-            reverse=True
-        )
-        if not candidates:
+        src_file = truck_kpi_report.find_latest_bctyle_file([HERE, os.getcwd()])
+        if not src_file:
             await edit_or_send_requester_text(
                 msg, update, context,
                 "⚠️ Không tìm thấy file `BCtyleketnoidungdugio_*.xlsx`.\n"
@@ -9808,8 +9796,6 @@ async def cmd_truck_kpi(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "chọn đủ 3 loại (*Intra province, Inter region, Intra region*) và gửi file Excel vào chat để Bot tạo báo cáo!"
             )
             return
-
-        src_file = candidates[0]
         tmpdir = tempfile.mkdtemp(prefix="truck_kpi_")
         track_report_dir(tmpdir)
 

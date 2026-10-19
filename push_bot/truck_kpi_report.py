@@ -460,11 +460,55 @@ def build_telegram_caption(stats: dict) -> str:
     return res
 
 
-def generate_truck_kpi_report(source_path: str, out_dir: str):
+def find_latest_bctyle_file(extra_dirs=None) -> str:
+    """
+    Find the most recently modified BCtyleketnoidungdugio file across all common locations:
+    project root, cache, Downloads/Telegram Desktop, Downloads, Desktop, etc.
+    """
+    import glob
+    home = os.path.expanduser("~")
+    here = os.path.dirname(os.path.abspath(__file__))
+    search_patterns = [
+        os.path.join(here, "BCtyle*.*"),
+        os.path.join(here, "cache", "**", "BCtyle*.*"),
+        os.path.join(home, "Downloads", "Telegram Desktop", "BCtyle*.*"),
+        os.path.join(home, "Downloads", "BCtyle*.*"),
+        os.path.join(home, "Downloads", "**", "BCtyle*.*"),
+        os.path.join(home, "Desktop", "BCtyle*.*"),
+        os.path.join(home, "Desktop", "daily_push", "BCtyle*.*"),
+    ]
+    if extra_dirs:
+        for ed in extra_dirs:
+            if ed and os.path.isdir(ed):
+                search_patterns.append(os.path.join(ed, "BCtyle*.*"))
+                search_patterns.append(os.path.join(ed, "**", "BCtyle*.*"))
+
+    found = []
+    for pat in search_patterns:
+        try:
+            for f in glob.glob(pat, recursive=True):
+                if os.path.isfile(f) and f not in found and not os.path.basename(f).startswith("~$"):
+                    found.append(f)
+        except Exception:
+            pass
+
+    if not found:
+        return None
+    return sorted(found, key=os.path.getmtime, reverse=True)[0]
+
+
+def generate_truck_kpi_report(source_path: str = None, out_dir: str = None):
     """
     Main entry point: parses Excel, generates dashboard workbook,
     renders image, and returns paths and Telegram caption.
     """
+    if not source_path:
+        source_path = find_latest_bctyle_file()
+    if not source_path or not os.path.exists(source_path):
+        raise FileNotFoundError(f"BCtyle source file not found: {source_path}")
+
+    if not out_dir:
+        out_dir = "."
     stats = parse_truck_kpi(source_path)
     stamp = datetime.now().strftime("%d.%m_%HH%M")
     out_xlsx = os.path.join(out_dir, f"Truck_KPI_Report_{stamp}.xlsx")
