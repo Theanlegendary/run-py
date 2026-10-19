@@ -47,6 +47,13 @@ KNOWN_VIP_PROFILES = {
         "address": "SPEP001 (SPE)",
         "group_id": -5295202050,
         "group_title": "VIP_Kang Rithy"
+    },
+    "0883160732": {
+        "name": "Dun Srey Mom",
+        "phone": "+855883160732",
+        "address": "KAMP001 (KAM)",
+        "group_id": None,
+        "group_title": "VIP_Dun Srey Mom"
     }
 }
 
@@ -62,26 +69,92 @@ def _clean_phone(phone_str: str) -> str:
 
 
 def get_latest_export_file() -> str:
-    """Locate the most recently modified export_*.xlsx or latest_detail.xlsx."""
+    """Locate the most recently modified export_*.xlsx or latest_detail.xlsx across cache directories."""
     candidates = []
-    # 1. Project cache directory
-    cache_dir = os.path.join(HERE, "cache")
-    if os.path.exists(cache_dir):
-        for root, _, files in os.walk(cache_dir):
+    parent = os.path.dirname(HERE)
+    search_dirs = [
+        os.path.join(HERE, "cache"),
+        HERE,
+        os.path.join(parent, "cache") if parent else None,
+        parent if parent else None,
+        os.path.join(os.getcwd(), "cache"),
+        os.getcwd(),
+    ]
+    seen = set()
+    for s_dir in search_dirs:
+        if not s_dir:
+            continue
+        s_dir = os.path.abspath(s_dir)
+        if s_dir in seen or not os.path.exists(s_dir):
+            continue
+        seen.add(s_dir)
+        for root, _, files in os.walk(s_dir):
             for f in files:
                 if f.endswith(".xlsx") and ("export_" in f or f == "latest_detail.xlsx"):
-                    candidates.append(os.path.join(root, f))
-    
-    # 2. Root directory fallbacks
-    for f in glob.glob(os.path.join(HERE, "export_*.xlsx")):
-        candidates.append(f)
-    
+                    p = os.path.join(root, f)
+                    try:
+                        if os.path.getsize(p) > 1000:
+                            candidates.append(p)
+                    except Exception:
+                        pass
+
     if not candidates:
         return ""
-    
+
     # Sort by modification time descending
     candidates.sort(key=os.path.getmtime, reverse=True)
     return candidates[0]
+
+
+def ensure_export_file(force_refresh: bool = False, max_age_hours: float = 6.0) -> str:
+    """Ensure an export data file exists. If missing or older than max_age_hours, download via Metfone API."""
+    import time
+    if not force_refresh:
+        latest = get_latest_export_file()
+        if latest and os.path.exists(latest):
+            try:
+                age_hours = (time.time() - os.path.getmtime(latest)) / 3600.0
+                if age_hours < max_age_hours:
+                    return latest
+            except Exception:
+                pass
+
+    log.info("Downloading fresh export data for VIP tracker...")
+    cfg_path = os.path.join(HERE, "config.json")
+    if not os.path.exists(cfg_path):
+        cfg_path = os.path.join(os.path.dirname(HERE), "config.json")
+
+    api_cfg = {}
+    if os.path.exists(cfg_path):
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                api_cfg = json.load(f).get("api", {})
+        except Exception as e:
+            log.warning("Could not load config.json: %s", e)
+
+    if not api_cfg or not api_cfg.get("bearer_token"):
+        latest = get_latest_export_file()
+        if latest:
+            return latest
+        return ""
+
+    cache_dir = os.path.join(HERE, "cache", "vip_run")
+    os.makedirs(cache_dir, exist_ok=True)
+    stamp = datetime.now().strftime("%d.%m_%HH%M")
+    out_path = os.path.join(cache_dir, f"export_{stamp}.xlsx")
+
+    try:
+        import downloader
+        downloaded = downloader.download_detail(api_cfg, out_path, force_refresh=True)
+        if downloaded and os.path.exists(downloaded):
+            return downloaded
+    except Exception as e:
+        log.error("Failed auto-downloading export file for VIP: %s", e)
+        latest = get_latest_export_file()
+        if latest:
+            return latest
+
+    return out_path if os.path.exists(out_path) else ""
 
 
 def _check_bill_tracking(order_id: str, bearer_token: str, default_branch: str = "", timeout: int = 4, session: requests.Session = None) -> tuple:
@@ -174,15 +247,17 @@ def track_vip_customer(query: str, date_filter: str = None, days_back: int = 14,
         dict with customer info, daily breakdown, message_text, excel_path
     """
     if not export_file or not os.path.exists(export_file):
-        export_file = get_latest_export_file()
+        export_file = ensure_export_file()
     if not export_file or not os.path.exists(export_file):
         return {
             "found": False,
-            "error": "No export data file found in cache. Please run /push or /schedule run first to download data."
+            "error": "Không tìm thấy dữ liệu và không thể tải từ Metfone API. Vui lòng kiểm tra kết nối mạng hoặc cập nhật /settoken."
         }
 
     # Load configuration for API bearer token
     cfg_path = os.path.join(HERE, "config.json")
+    if not os.path.exists(cfg_path):
+        cfg_path = os.path.join(os.path.dirname(HERE), "config.json")
     bearer_token = ""
     try:
         with open(cfg_path, "r", encoding="utf-8") as f:
@@ -194,9 +269,12 @@ def track_vip_customer(query: str, date_filter: str = None, days_back: int = 14,
     clean_digits = _clean_phone(query)
     is_phone_query = clean_digits.isdigit() and len(clean_digits) >= 6
 
-    # Load DataFrame
+    # Load DataFrame (use fast calamine engine if available)
     try:
-        df = pd.read_excel(export_file, dtype=str).fillna("")
+        try:
+            df = pd.read_excel(export_file, engine="calamine", dtype=str).fillna("")
+        except Exception:
+            df = pd.read_excel(export_file, dtype=str).fillna("")
     except Exception as e:
         return {"found": False, "error": f"Failed reading export file: {e}"}
 

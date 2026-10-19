@@ -5599,20 +5599,32 @@ async def cmd_vip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        if force_refresh:
+        import vip_tracker
+        export_file = vip_tracker.get_latest_export_file()
+        if force_refresh or not export_file or not os.path.exists(export_file):
+            await edit_or_send_requester_text(
+                msg, update, context,
+                f"👑 Đang tải dữ liệu đơn hàng mới từ Metfone API để tra cứu VIP `{query}`...\nVui lòng đợi giây lát."
+            )
             cfg = load_config()
             tmpdir = _make_run_cache("vip_run")
             stamp = datetime.now().strftime("%d.%m_%HH%M")
             src = os.path.join(tmpdir, f"export_{stamp}.xlsx")
             import downloader
-            downloader.download_detail(cfg["api"], src, force_refresh=True)
+            export_file = await asyncio.to_thread(
+                downloader.download_detail, cfg["api"], src, force_refresh=True
+            )
+            await edit_or_send_requester_text(
+                msg, update, context,
+                f"👑 Đang kiểm tra trạng thái live tracking các đơn của `{query}`..."
+            )
 
-        import vip_tracker
         res = await asyncio.to_thread(
             vip_tracker.track_vip_customer,
             query=query,
             date_filter=date_filter,
-            days_back=7
+            days_back=7,
+            export_file=export_file
         )
 
         if not res.get("found"):
