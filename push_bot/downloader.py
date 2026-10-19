@@ -199,9 +199,8 @@ def download_detail(api_cfg, out_path, from_date=None, to_date=None, branch_code
                        "Chrome/148.0.0.0 Safari/537.36"),
     }
     
-    # If caching is active, we always download the full branch list to ensure the cached
-    # file contains all data and can satisfy future partial or full requests.
-    api_branch_code = api_cfg.get("branch_code", "PRE,PNP,SVA,KAN")
+    ALL_DEFAULT_BRANCHES = "MEGA,MEGA1,DVCMEGA1,PRE,PNP,SVA,KAN,KAM,KOH,SIH,SPE,TAK,BAN,BAT,CHH,PUR,SIE,PRH,ODD,THO,CHA,KRA,TBK,ROT,MON,STU"
+    api_branch_code = api_cfg.get("branch_code") or ALL_DEFAULT_BRANCHES
     fetch_branch_code = api_branch_code if (is_default_range and cache_minutes > 0) else (branch_code or api_branch_code)
 
     payload = {

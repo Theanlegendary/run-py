@@ -145,7 +145,10 @@ def ensure_export_file(force_refresh: bool = False, max_age_hours: float = 6.0) 
 
     try:
         import downloader
-        downloaded = downloader.download_detail(api_cfg, out_path, force_refresh=True)
+        api_cfg_all = dict(api_cfg)
+        all_branches = "MEGA,MEGA1,DVCMEGA1,PRE,PNP,SVA,KAN,KAM,KOH,SIH,SPE,TAK,BAN,BAT,CHH,PUR,SIE,PRH,ODD,THO,CHA,KRA,TBK,ROT,MON,STU"
+        api_cfg_all["branch_code"] = all_branches
+        downloaded = downloader.download_detail(api_cfg_all, out_path, branch_code=all_branches, force_refresh=True)
         if downloaded and os.path.exists(downloaded):
             return downloaded
     except Exception as e:
@@ -232,7 +235,7 @@ def _check_bill_tracking(order_id: str, bearer_token: str, default_branch: str =
     return order_id, default_branch, "Pending", False
 
 
-def track_vip_customer(query: str, date_filter: str = None, days_back: int = 14, max_workers: int = 15, export_file: str = None) -> dict:
+def track_vip_customer(query: str, date_filter: str = None, days_back: int = 14, max_workers: int = 15, export_file: str = None, _retried_with_fresh: bool = False) -> dict:
     """
     Search and track all orders for a VIP customer by phone or name.
     
@@ -285,17 +288,56 @@ def track_vip_customer(query: str, date_filter: str = None, days_back: int = 14,
     sender_col = df["SENDER"].astype(str) if "SENDER" in df.columns else pd.Series("", index=df.index)
     receiver_col = df["RECEIVER"].astype(str) if "RECEIVER" in df.columns else pd.Series("", index=df.index)
 
+    # Check known VIP directory first to broaden matching terms
+    matched_profile = None
+    for k_phone, prof in KNOWN_VIP_PROFILES.items():
+        k_clean = re.sub(r"\D", "", str(k_phone))
+        c_clean = clean_digits
+        is_phone_match = bool(c_clean and (c_clean in k_clean or k_clean in c_clean or c_clean.lstrip("0") in k_clean or k_clean.lstrip("0") in c_clean))
+        is_name_match = bool(query.strip() and (query.lower() in prof["name"].lower() or prof["name"].lower() in query.lower()))
+        if is_phone_match or is_name_match:
+            matched_profile = prof
+            break
+
+    search_patterns = []
     if is_phone_query:
-        # Match by last 8 digits to handle prefix differences seamlessly (06020333 vs 060203333)
-        pattern = clean_digits[-8:] if len(clean_digits) >= 8 else clean_digits
-        mask = sender_col.str.contains(pattern, na=False) | receiver_col.str.contains(pattern, na=False)
-    else:
-        # Match by name (case-insensitive)
-        clean_q = query.strip()
-        mask = sender_col.str.contains(clean_q, case=False, na=False) | receiver_col.str.contains(clean_q, case=False, na=False)
+        if len(clean_digits) >= 8:
+            search_patterns.append(clean_digits[-8:])
+        search_patterns.append(clean_digits)
+        search_patterns.append(clean_digits.lstrip("0"))
+    if matched_profile:
+        p_clean = re.sub(r"\D", "", str(matched_profile.get("phone", "")))
+        if p_clean and len(p_clean) >= 8:
+            search_patterns.append(p_clean[-8:])
+            search_patterns.append(p_clean)
+        if matched_profile.get("name"):
+            search_patterns.append(matched_profile["name"])
+
+    if not search_patterns:
+        search_patterns.append(query.strip())
+
+    mask = pd.Series(False, index=df.index)
+    for pat in search_patterns:
+        if pat:
+            mask |= sender_col.str.contains(pat, case=False, regex=False, na=False)
+            mask |= receiver_col.str.contains(pat, case=False, regex=False, na=False)
 
     matched_df = df[mask].copy()
     if matched_df.empty:
+        # If not found in the current export file (which might have been filtered or partial), auto-download all branches and retry once
+        if not _retried_with_fresh:
+            log.info("No bills found in local file '%s' for '%s'. Downloading fresh full export from Metfone API...", export_file, query)
+            fresh_file = ensure_export_file(force_refresh=True)
+            if fresh_file and os.path.exists(fresh_file) and fresh_file != export_file:
+                return track_vip_customer(
+                    query=query,
+                    date_filter=date_filter,
+                    days_back=days_back,
+                    max_workers=max_workers,
+                    export_file=fresh_file,
+                    _retried_with_fresh=True
+                )
+
         return {
             "found": False,
             "error": f"No bills found matching '{query}'. Verify phone number or customer name."
@@ -305,22 +347,15 @@ def track_vip_customer(query: str, date_filter: str = None, days_back: int = 14,
     customer_phone = clean_digits if is_phone_query else ""
     customer_name = ""
     customer_address = ""
-
-    # Check known VIP directory first
     vip_group_id = None
     vip_group_title = ""
-    for k_phone, prof in KNOWN_VIP_PROFILES.items():
-        k_clean = re.sub(r"\D", "", str(k_phone))
-        c_clean = clean_digits
-        is_phone_match = bool(c_clean and (c_clean in k_clean or k_clean in c_clean or c_clean.lstrip("0") in k_clean or k_clean.lstrip("0") in c_clean))
-        is_name_match = bool(query.strip() and (query.lower() in prof["name"].lower() or prof["name"].lower() in query.lower()))
-        if is_phone_match or is_name_match:
-            customer_name = prof["name"]
-            customer_phone = prof["phone"]
-            customer_address = prof["address"]
-            vip_group_id = prof.get("group_id")
-            vip_group_title = prof.get("group_title", "")
-            break
+
+    if matched_profile:
+        customer_name = matched_profile["name"]
+        customer_phone = matched_profile["phone"]
+        customer_address = matched_profile["address"]
+        vip_group_id = matched_profile.get("group_id")
+        vip_group_title = matched_profile.get("group_title", "")
 
     first_row = matched_df.iloc[0]
     if not customer_name:
