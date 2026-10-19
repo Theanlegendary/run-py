@@ -53,11 +53,11 @@ def classify_trip_type(row) -> str:
     return 'Nội tỉnh' if not raw_ht or raw_ht.lower() == 'nan' else raw_ht
 
 
-def parse_truck_kpi(source_path: str) -> dict:
+def parse_truck_kpi(source_path: str, exclude_generated: bool = True) -> dict:
     """
     Parse BCtyleketnoidungdugio Excel or CSV file.
     Returns structured stats dict grouped by Hành trình, Tên tuyến, Biển số xe, Chiều.
-    Excludes 'Chuyến phát sinh' (Generated route) from Column G per management instruction.
+    If exclude_generated is True, excludes 'Chuyến phát sinh' (Generated route) from Column G.
     """
     if str(source_path).lower().endswith(".csv"):
         df = pd.read_csv(source_path)
@@ -80,7 +80,7 @@ def parse_truck_kpi(source_path: str) -> dict:
                     date_str = val_str.split(" ")[0]
                 break
 
-    # ── Exclude "generated route" (Chuyến phát sinh) per management instruction ──
+    # ── Exclude "generated route" (Chuyến phát sinh) if requested ──
     # Column G: 'Chuyến phát sinh' -> Exclude any row where it is 'Có' / 'yes' / 'true'
     gen_col = None
     for col in df.columns:
@@ -96,7 +96,7 @@ def parse_truck_kpi(source_path: str) -> dict:
             gen_col = col_g
 
     excluded_gen_count = 0
-    if gen_col and gen_col in df.columns:
+    if exclude_generated and gen_col and gen_col in df.columns:
         is_gen = df[gen_col].astype(str).str.strip().str.lower().isin(['có', 'co', 'yes', 'true', '1'])
         excluded_gen_count = int(is_gen.sum())
         df = df[~is_gen].copy()
@@ -463,44 +463,45 @@ def build_telegram_caption(stats: dict) -> str:
 def find_latest_bctyle_file(extra_dirs=None) -> str:
     """
     Find the most recently modified BCtyleketnoidungdugio file across all common locations:
-    project root, cache, Downloads/Telegram Desktop, Downloads, Desktop, etc.
+    project root, Downloads/Telegram Desktop, Downloads, Desktop, cache, etc.
+    Runs instantaneously by checking specific directories.
     """
     import glob
     home = os.path.expanduser("~")
     here = os.path.dirname(os.path.abspath(__file__))
-    search_patterns = [
-        os.path.join(here, "BCtyle*.*"),
-        os.path.join(here, "cache", "**", "BCtyle*.*"),
-        os.path.join(home, "Downloads", "Telegram Desktop", "BCtyle*.*"),
-        os.path.join(home, "Downloads", "BCtyle*.*"),
-        os.path.join(home, "Downloads", "**", "BCtyle*.*"),
-        os.path.join(home, "Desktop", "BCtyle*.*"),
-        os.path.join(home, "Desktop", "daily_push", "BCtyle*.*"),
+    search_dirs = [
+        here,
+        os.path.join(home, "Downloads", "Telegram Desktop"),
+        os.path.join(home, "Downloads"),
+        os.path.join(home, "Desktop"),
+        os.path.join(home, "Desktop", "daily_push"),
+        os.path.join(here, "cache"),
     ]
     if extra_dirs:
         for ed in extra_dirs:
-            if ed and os.path.isdir(ed):
-                search_patterns.append(os.path.join(ed, "BCtyle*.*"))
-                search_patterns.append(os.path.join(ed, "**", "BCtyle*.*"))
+            if ed and os.path.isdir(ed) and ed not in search_dirs:
+                search_dirs.append(ed)
 
     found = []
-    for pat in search_patterns:
-        try:
-            for f in glob.glob(pat, recursive=True):
-                if os.path.isfile(f) and f not in found and not os.path.basename(f).startswith("~$"):
-                    found.append(f)
-        except Exception:
-            pass
+    for d in search_dirs:
+        if os.path.isdir(d):
+            try:
+                for f in glob.glob(os.path.join(d, "BCtyle*.*")):
+                    if os.path.isfile(f) and f not in found and not os.path.basename(f).startswith("~$"):
+                        found.append(f)
+            except Exception:
+                pass
 
     if not found:
         return None
     return sorted(found, key=os.path.getmtime, reverse=True)[0]
 
 
-def generate_truck_kpi_report(source_path: str = None, out_dir: str = None):
+def generate_truck_kpi_report(source_path: str = None, out_dir: str = None, exclude_generated: bool = True):
     """
     Main entry point: parses Excel, generates dashboard workbook,
     renders image, and returns paths and Telegram caption.
+    If exclude_generated is True, excludes 'Chuyến phát sinh' (Column G = Có).
     """
     if not source_path:
         source_path = find_latest_bctyle_file()
@@ -509,7 +510,7 @@ def generate_truck_kpi_report(source_path: str = None, out_dir: str = None):
 
     if not out_dir:
         out_dir = "."
-    stats = parse_truck_kpi(source_path)
+    stats = parse_truck_kpi(source_path, exclude_generated=exclude_generated)
     stamp = datetime.now().strftime("%d.%m_%HH%M")
     out_xlsx = os.path.join(out_dir, f"Truck_KPI_Report_{stamp}.xlsx")
     export_truck_kpi_workbook(stats, out_xlsx, source_path=source_path)

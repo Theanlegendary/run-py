@@ -9799,8 +9799,16 @@ async def cmd_truck_kpi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tmpdir = tempfile.mkdtemp(prefix="truck_kpi_")
         track_report_dir(tmpdir)
 
+        args = [str(a).lower() for a in (context.args or [])]
+        cfg = load_config()
+        exclude_gen = cfg.get("exclude_dvc_generated", True)
+        if any(a in ("all", "raw", "full", "include_all", "no_exclude") for a in args):
+            exclude_gen = False
+        elif any(a in ("exclude", "clean", "no_gen") for a in args):
+            exclude_gen = True
+
         out_xlsx, img_buf, caption, stats = await asyncio.to_thread(
-            truck_kpi_report.generate_truck_kpi_report, src_file, tmpdir
+            truck_kpi_report.generate_truck_kpi_report, src_file, tmpdir, exclude_gen
         )
 
         date_tag = stats.get('date_str', 'report').replace('/', '.')
@@ -9826,6 +9834,206 @@ async def cmd_truck_kpi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.exception("Error in cmd_truck_kpi: %s", e)
         await edit_or_send_requester_text(msg, update, context, f"❌ Lỗi xử lý báo cáo xe tải: {e}")
+
+
+@user_guard
+async def cmd_exclude(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Manage excluded bills and report exclusion settings.
+    Usage:
+      /exclude <bill_id> [id2 ...]        - Add bill(s) to permanent exclusion list (test_bills.txt)
+      /exclude add <bill_id> [id2 ...]    - Add bill(s) to exclusion list
+      /exclude remove <bill_id> [id2 ...] - Remove bill(s) from exclusion list
+      /exclude check <bill_id>            - Check if a bill is currently excluded
+      /exclude list                       - Show total excluded count and recent bills
+      /exclude dvc [on|off]               - Toggle / check excluding generated routes in /total dvc
+    """
+    await delete_group_command(update, context)
+    args = list(context.args or [])
+    txt_path = os.path.join(HERE, "test_bills.txt")
+    delay_path = os.path.join(HERE, "delayed_bills.json")
+
+    if not args:
+        total_test = 0
+        if os.path.exists(txt_path):
+            try:
+                with open(txt_path, "r", encoding="utf-8") as f:
+                    total_test = sum(1 for line in f if line.strip() and not line.strip().startswith("#"))
+            except Exception:
+                pass
+
+        total_delay = 0
+        if os.path.exists(delay_path):
+            try:
+                with open(delay_path, "r", encoding="utf-8") as f:
+                    total_delay = len(json.load(f))
+            except Exception:
+                pass
+
+        cfg = load_config()
+        dvc_ex_status = "BẬT (Tự động loại trừ Cột G Có)" if cfg.get("exclude_dvc_generated", True) else "TẮT (Lấy đủ toàn bộ chuyến)"
+
+        msg = (
+            "🛡️ *HƯỚNG DẪN LỆNH /exclude (QUẢN LÝ LOẠI TRỪ)*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "• *Loại trừ đơn hàng (Test / Fake Bills)*:\n"
+            "  - `/exclude <bill_id>` — Thêm đơn vào danh sách loại trừ\n"
+            "  - `/exclude add <id1> <id2>` — Thêm nhiều đơn cùng lúc\n"
+            "  - `/exclude remove <id>` — Gỡ bỏ loại trừ đơn hàng\n"
+            "  - `/exclude check <id>` — Kiểm tra trạng thái đơn hàng\n"
+            "  - `/exclude list` — Xem tổng số đơn đang bị loại trừ\n\n"
+            "• *Loại trừ chuyến phát sinh xe tải (Truck KPI / DVC)*:\n"
+            "  - `/exclude dvc on` — Bật loại trừ chuyến phát sinh (Cột G = Có)\n"
+            "  - `/exclude dvc off` — Tắt loại trừ (lấy toàn bộ chuyến)\n"
+            "  - `/total dvc exclude` — Chạy báo cáo loại trừ chuyến phát sinh\n"
+            "  - `/total dvc all` — Chạy báo cáo lấy đủ toàn bộ chuyến xe\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 *Hiện tại*: `{total_test:,}` đơn test bị loại trừ | `{total_delay:,}` đơn hoãn\n"
+            f"🚚 *DVC Generated Routes*: `{dvc_ex_status}`"
+        )
+        await private_or_current_reply(update, context, msg, parse_mode="Markdown")
+        return
+
+    sub = args[0].strip().lower()
+
+    # 1. DVC toggle
+    if sub == "dvc":
+        cfg = load_config()
+        if len(args) > 1:
+            val = args[1].strip().lower()
+            if val in ("on", "true", "1", "enable", "yes"):
+                cfg["exclude_dvc_generated"] = True
+                save_config(cfg)
+                await private_or_current_reply(
+                    update, context,
+                    "✅ *Truck KPI (/total dvc)*: Đã **BẬT** loại trừ chuyến phát sinh (Cột G = Có).\n"
+                    "Báo cáo xe tải sẽ tự động loại trừ các chuyến phát sinh.",
+                    parse_mode="Markdown"
+                )
+                return
+            elif val in ("off", "false", "0", "disable", "no", "all"):
+                cfg["exclude_dvc_generated"] = False
+                save_config(cfg)
+                await private_or_current_reply(
+                    update, context,
+                    "✅ *Truck KPI (/total dvc)*: Đã **TẮT** loại trừ.\n"
+                    "Báo cáo xe tải sẽ lấy đầy đủ toàn bộ các chuyến xe (không loại trừ chuyến nào).",
+                    parse_mode="Markdown"
+                )
+                return
+        cur_status = "BẬT (Loại trừ Cột G = Có)" if cfg.get("exclude_dvc_generated", True) else "TẮT (Lấy toàn bộ)"
+        await private_or_current_reply(
+            update, context,
+            f"🚚 Trạng thái Truck KPI hiện tại: *{cur_status}*\n"
+            "• Dùng `/exclude dvc on` để bật loại trừ.\n"
+            "• Dùng `/exclude dvc off` để tắt loại trừ.",
+            parse_mode="Markdown"
+        )
+        return
+
+    # 2. Check
+    if sub == "check":
+        if len(args) < 2:
+            await private_or_current_reply(update, context, "Usage: `/exclude check <bill_id>`", parse_mode="Markdown")
+            return
+        bid = args[1].strip()
+        in_test = False
+        if os.path.exists(txt_path):
+            with open(txt_path, "r", encoding="utf-8") as f:
+                in_test = any(line.strip() == bid for line in f)
+        in_delay = False
+        exp = ""
+        if os.path.exists(delay_path):
+            with open(delay_path, "r", encoding="utf-8") as f:
+                dmap = json.load(f)
+                if bid in dmap:
+                    in_delay = True
+                    exp = dmap[bid]
+        if in_test:
+            res = f"🚫 Đơn `{bid}`: **ĐANG BỊ LOẠI TRỪ VĨNH VIỄN** (trong `test_bills.txt`).\nKhông tính vào push, /total pending, /speed."
+        elif in_delay:
+            res = f"⏳ Đơn `{bid}`: **ĐANG BỊ HOÃN (TẠM THỜI)** đến ngày `{exp}`.\nKhông tính vào báo cáo cho đến khi hết hạn."
+        else:
+            res = f"🟢 Đơn `{bid}`: **HOẠT ĐỘNG BÌNH THƯỜNG** (Không bị loại trừ)."
+        await private_or_current_reply(update, context, res, parse_mode="Markdown")
+        return
+
+    # 3. List
+    if sub == "list":
+        test_ids = []
+        if os.path.exists(txt_path):
+            with open(txt_path, "r", encoding="utf-8") as f:
+                test_ids = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
+        recent = test_ids[-10:] if len(test_ids) > 10 else test_ids
+        recent_str = ", ".join(f"`{x}`" for x in reversed(recent)) if recent else "Không có"
+        res = (
+            f"📋 *DANH SÁCH ĐƠN BỊ LOẠI TRỪ (EXCLUDED)*\n"
+            f"• Tổng số đơn test bị loại trừ: `{len(test_ids):,}` đơn\n"
+            f"• 10 đơn thêm gần nhất: {recent_str}\n\n"
+            "Dùng `/exclude remove <bill_id>` để gỡ bỏ loại trừ một đơn."
+        )
+        await private_or_current_reply(update, context, res, parse_mode="Markdown")
+        return
+
+    # 4. Remove / Unexclude
+    if sub in ("remove", "delete", "rm", "unexclude"):
+        targets = args[1:]
+        if not targets:
+            await private_or_current_reply(update, context, "Usage: `/exclude remove <bill_id> [id2 ...]`", parse_mode="Markdown")
+            return
+        to_remove = set(t.strip() for t in targets if t.strip())
+        new_lines = []
+        removed = 0
+        if os.path.exists(txt_path):
+            with open(txt_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    val = line.strip()
+                    if val in to_remove:
+                        removed += 1
+                    else:
+                        new_lines.append(line)
+            with open(txt_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+        await private_or_current_reply(
+            update, context,
+            f"✅ Đã gỡ bỏ loại trừ `{removed}` đơn hàng. Các đơn này sẽ được tính lại vào báo cáo.",
+            parse_mode="Markdown"
+        )
+        return
+
+    # 5. Add / Exclude bills
+    targets = args[1:] if sub == "add" else args
+    raw_ids = [t.strip() for t in targets if t.strip() and re.match(r"^\d+$", t.strip())]
+    if not raw_ids:
+        await private_or_current_reply(
+            update, context,
+            "⚠️ Mã đơn không hợp lệ. Vui lòng nhập số mã đơn.\nVí dụ: `/exclude 3405788190`",
+            parse_mode="Markdown"
+        )
+        return
+
+    existing = set()
+    if os.path.exists(txt_path):
+        with open(txt_path, "r", encoding="utf-8") as f:
+            for line in f:
+                v = line.strip()
+                if v and not v.startswith("#"):
+                    existing.add(v)
+
+    added = []
+    with open(txt_path, "a", encoding="utf-8") as f:
+        for bid in raw_ids:
+            if bid not in existing:
+                f.write(f"\n{bid}")
+                existing.add(bid)
+                added.append(bid)
+
+    added_str = ", ".join(f"`{x}`" for x in added) if added else "Đơn đã nằm trong danh sách trước đó"
+    await private_or_current_reply(
+        update, context,
+        f"🛡️ *Đã loại trừ thành công*:\n{added_str}\n\n"
+        f"👉 Các đơn này sẽ bị **bỏ qua hoàn toàn** trong tất cả báo cáo `push`, `/total pending`, `/speed`, `/tomorrow`.",
+        parse_mode="Markdown"
+    )
 
 
 async def on_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -10065,6 +10273,8 @@ def create_bot_app(token: str, proxy_url: str = None, is_primary: bool = True) -
     app.add_handler(CommandHandler("truckkpi",     cmd_truck_kpi))
     app.add_handler(CommandHandler("truck_kpi",    cmd_truck_kpi))
     app.add_handler(CommandHandler("chuyenxe",     cmd_truck_kpi))
+    app.add_handler(CommandHandler("exclude",      cmd_exclude))
+    app.add_handler(CommandHandler("unexclude",    cmd_exclude))
     app.add_handler(MessageHandler(filters.Document.ALL, on_document))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     return app
